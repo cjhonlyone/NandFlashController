@@ -1,3 +1,4 @@
 ##ignore this file##
 *.gtkw
 *.vcd
+/firmware/hex/

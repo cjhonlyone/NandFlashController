@@ -1,4 +1,102 @@
 `timescale 1ns / 1ps
 
-module NandFlashController_Top.v
+module NandFlashController_Top;
+
+
+      NFC_Atom_Command_Generator_Top #(
+                  .NumberOfWays(NumberOfWays)
+            ) inst_NFC_Atom_Command_Generator_Top (
+                  .iSystemClock                (iSystemClock),
+                  .iReset                      (iReset),
+                  .iCI_ACG_Command             (iCI_ACG_Command),
+                  .iCI_ACG_CommandOption       (iCI_ACG_CommandOption),
+                  .oACG_CI_Ready               (oACG_CI_Ready),
+                  .oACG_CI_LastStep            (oACG_CI_LastStep),
+                  .iCI_ACG_TargetWay           (iCI_ACG_TargetWay),
+                  .iCI_ACG_NumOfData           (iCI_ACG_NumOfData),
+                  .iCI_ACG_CASelect            (iCI_ACG_CASelect),
+                  .iCI_ACG_CAData              (iCI_ACG_CAData),
+                  .iCI_ACG_WriteData           (iCI_ACG_WriteData),
+                  .iCI_ACG_WriteLast           (iCI_ACG_WriteLast),
+                  .iCI_ACG_WriteValid          (iCI_ACG_WriteValid),
+                  .oACG_CI_WriteReady          (oACG_CI_WriteReady),
+                  .oACG_CI_ReadData            (oACG_CI_ReadData),
+                  .oACG_CI_ReadLast            (oACG_CI_ReadLast),
+                  .oACG_CI_ReadValid           (oACG_CI_ReadValid),
+                  .iCI_ACG_ReadReady           (iCI_ACG_ReadReady),
+                  .oACG_CI_ReadyBusy           (oACG_CI_ReadyBusy),
+                  .iACG_PHY_PinIn_Reset        (iACG_PHY_PinIn_Reset),
+                  .iACG_PHY_PinIn_BUFF_Reset   (iACG_PHY_PinIn_BUFF_Reset),
+                  .iACG_PHY_PinOut_Reset       (iACG_PHY_PinOut_Reset),
+                  .iPI_BUFF_RE                 (iPI_BUFF_RE),
+                  .iPI_BUFF_OutSel             (iPI_BUFF_OutSel),
+                  .oPI_DQ                      (oPI_DQ),
+                  .oPI_ValidFlag               (oPI_ValidFlag),
+                  .oACG_PHY_DelayTapLoad       (oACG_PHY_DelayTapLoad),
+                  .oACG_PHY_DelayTap           (oACG_PHY_DelayTap),
+                  .iPHY_ACG_DelayReady         (iPHY_ACG_DelayReady),
+                  .oACG_PHY_DQSOutEnable       (oACG_PHY_DQSOutEnable),
+                  .oACG_PHY_DQOutEnable        (oACG_PHY_DQOutEnable),
+                  .oACG_PHY_DQStrobe           (oACG_PHY_DQStrobe),
+                  .oACG_PHY_DQ                 (oACG_PHY_DQ),
+                  .oACG_PHY_ChipEnable         (oACG_PHY_ChipEnable),
+                  .oACG_PHY_ReadEnable         (oACG_PHY_ReadEnable),
+                  .oACG_PHY_WriteEnable        (oACG_PHY_WriteEnable),
+                  .oACG_PHY_AddressLatchEnable (oACG_PHY_AddressLatchEnable),
+                  .oACG_PHY_CommandLatchEnable (oACG_PHY_CommandLatchEnable),
+                  .iPHY_ACG_ReadyBusy          (iPHY_ACG_ReadyBusy),
+                  .oACG_PHY_WriteProtect       (oACG_PHY_WriteProtect),
+                  .oACG_PHY_BUFF_WE            (oACG_PHY_BUFF_WE),
+                  .iPHY_ACG_BUFF_Empty         (iPHY_ACG_BUFF_Empty),
+                  .oACG_PHY_Buff_Ready         (oACG_PHY_Buff_Ready),
+                  .iPHY_ACG_Buff_Valid         (iPHY_ACG_Buff_Valid),
+                  .iPHY_ACG_Buff_Data          (iPHY_ACG_Buff_Data),
+                  .iPHY_ACG_Buff_Keep          (iPHY_ACG_Buff_Keep),
+                  .iPHY_ACG_Buff_Last          (iPHY_ACG_Buff_Last)
+            );
+
+
+    NFC_Physical_Top #(
+            .IDelayValue(IDelayValue),
+            .InputClockBufferType(InputClockBufferType),
+            .NumberOfWays(NumberOfWays)
+        ) inst_NFC_Physical_Top (
+            .iSystemClock                (iSystemClock),
+            .iDelayRefClock              (iDelayRefClock),
+            .iOutputDrivingClock         (iOutputDrivingClock),
+            .iACG_PHY_PinIn_Reset        (iACG_PHY_PinIn_Reset),
+            .iACG_PHY_PinIn_BUFF_Reset   (iACG_PHY_PinIn_BUFF_Reset),
+            .iACG_PHY_PinOut_Reset       (iACG_PHY_PinOut_Reset),
+            .iACG_PHY_DelayTapLoad       (iACG_PHY_DelayTapLoad),
+            .iACG_PHY_DelayTap           (iACG_PHY_DelayTap),
+            .oPHY_ACG_DelayReady         (oPHY_ACG_DelayReady),
+            .iACG_PHY_DQSOutEnable       (iACG_PHY_DQSOutEnable),
+            .iACG_PHY_DQOutEnable        (iACG_PHY_DQOutEnable),
+            .iACG_PHY_DQStrobe           (iACG_PHY_DQStrobe),
+            .iACG_PHY_DQ                 (iACG_PHY_DQ),
+            .iACG_PHY_ChipEnable         (iACG_PHY_ChipEnable),
+            .iACG_PHY_ReadEnable         (iACG_PHY_ReadEnable),
+            .iACG_PHY_WriteEnable        (iACG_PHY_WriteEnable),
+            .iACG_PHY_AddressLatchEnable (iACG_PHY_AddressLatchEnable),
+            .iACG_PHY_CommandLatchEnable (iACG_PHY_CommandLatchEnable),
+            .oPHY_ACG_ReadyBusy          (oPHY_ACG_ReadyBusy),
+            .iACG_PHY_WriteProtect       (iACG_PHY_WriteProtect),
+            .iACG_PHY_BUFF_WE            (iACG_PHY_BUFF_WE),
+            .oPHY_ACG_BUFF_Empty         (oPHY_ACG_BUFF_Empty),
+            .iACG_PHY_Buff_Ready         (iACG_PHY_Buff_Ready),
+            .oPHY_ACG_Buff_Valid         (oPHY_ACG_Buff_Valid),
+            .oPHY_ACG_Buff_Data          (oPHY_ACG_Buff_Data),
+            .oPHY_ACG_Buff_Keep          (oPHY_ACG_Buff_Keep),
+            .oPHY_ACG_Buff_Last          (oPHY_ACG_Buff_Last),
+            .IO_NAND_DQS                 (IO_NAND_DQS),
+            .IO_NAND_DQ                  (IO_NAND_DQ),
+            .O_NAND_CE                   (O_NAND_CE),
+            .O_NAND_WE                   (O_NAND_WE),
+            .O_NAND_RE                   (O_NAND_RE),
+            .O_NAND_ALE                  (O_NAND_ALE),
+            .O_NAND_CLE                  (O_NAND_CLE),
+            .I_NAND_RB                   (I_NAND_RB),
+            .O_NAND_WP                   (O_NAND_WP)
+        );
+
 endmodule
