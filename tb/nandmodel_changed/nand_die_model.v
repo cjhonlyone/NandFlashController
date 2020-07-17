@@ -1,5 +1,7 @@
 /* ---------------------------------------------------------------------------
 *
+* Confidential:  This file and all files delivered herewith are Micron Confidential Information.
+*
 *    File Name:  nand_die_model.V
 *        Model:  BUS Functional
 * Dependencies:  nand_parameters.vh
@@ -22,7 +24,7 @@
 *                IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
 *                A PARTICULAR PURPOSE, OR AGAINST INFRINGEMENT.
 *
-*                Copyright Â© 2006-2008 Micron Semiconductor Products, Inc.
+*                Copyright © 2006-2012 Micron Semiconductor Products, Inc.
 *                All rights reserved
 *
 * Rev  Author          Date        Changes
@@ -174,12 +176,45 @@
                                     - Fix: Model will correctly release DQ bus (after tCHZ) when host disables CE at same time that Model drives data on DQ
 * 7.26 ew          	 8/2/10     - Fix: Single Plane Read Page Cache Random 00h-31h can cross plane boundary
                                     - Fix: Read Page Cache Last 3Fh no longer initiates a new read operation to the array (no longer schedules array_load_done)
+* 7.26_rel ew          11/17/10     - Fix: Pgm Clear now clears only the selected plane of the selected die
+                                    - Fix: Pgm Clear incorrectly cleared the cache reg in middle of multiplane pgm commands
+                                    - Fix: Pgm Clear incorrectly cleared the cache reg after receiving 85h-5addr change row address
+                                    - Fix: If host interrupted a program cmd's data input with a read command, the 85h cmd did not resume the data input
+                                    - Fix: updated tRR check to take into account die_select
+                                    - Fix: tm_cle_clk and tm_ale_clk was incorrectly updated even though the chip was disabled, causing invalid tCCS violations
+                                    - nand_model.v: exclude reset operations from the "70h prohibited during Multi-LUN ops" check
+                                    - Added JEDEC RdID, Rd Parameter Page, Multiplane Pgm for applicable parts
+                                    - Fix: Issuing reset during OTP mode will now exit the chip back into normal operation mode
+* 7.27 ew, rv            2/7/11     - Fix: Giving Reset during Erase operation did not disable scheduled event where RB# returns ready after tBERS time
+                                    - Changed erase operation to use go_busy task instead of scheduled events 
+* 7.28 ew               9/19/11     - Added tWB and tWRCK check; fixed sync interface tRHW check
+                                    - Fix: 05h read during Small Data Move now works
+                                    - tb.v: Updated tasks to wait for tWB in all modes and to wait tRHW in sync mode
+                                    - Fix: Copyaback Program 85h-5addr will now clear previously queued planes
+                                    - Fix: Multidie Status Read 78h following Reset LUN FAh will not exectute another reset lun operation
+                                    - Fix: Data was not outputted following interleaved read and erase operation
+                                    - Fix: Interleaved commands on die0 would not de-select die0 during the interleaved die1 cmd (b/c go_busy task)
+                                    - tCCS check following 85h change row/column address now works
+* 7.29 ew               6/30/12     - Fix: Reading multiple status bytes in edo mode yielded xx after first byte
+				    - Testbench: switching async timing mode will correctly update tb clock period
+                                    - Fix: Pre-load or pre-read data calls to LUN1 mem_array selected the wrong block locations
+                                    - Fix: Set feature bits for input/output warmup cycles were switched
+                                    - Fix: Issuing die1 78h-00h, die0 78h-31h did not auto-increment row addr on die0
+                                    - Fix: Data following multiplane copyback read will follow CMD_MP_OUTPUT option
+                                    - Fix: There were false tCCS errors during 78h multi-lun status read issued to a different lun
+                                    - Fix: Reset during program cache froze model by executing next program cache after reset had finished
+                                    - Added new simple checker for new command received during LUN busy
+                                    - Fix: Get feature following read unique ID actually returned unique ID data
+* 7.30 ew                8/7/12     - Added previous owner's (jjc) sv updates for dynamic memory solution
+
+
 
 --------------------------------------------------------------------------- */
 `timescale 1ns / 1ps
 
-module nand_die_model (Io, Cle, Ale, Ce_n_i, Clk_We_n, Wr_Re_n, Wp_n, Rb_n, Pre, Lock, Dqs, ML_rdy, Rb_lun_n, PID);
+module nand_die_model (Io, Cle, Ale, Ce_n_i, Clk_We_n, Wr_Re_n, Wp_n, Rb_n, Pre, Lock, Dqs, ML_rdy, Rb_lun_n, PID, ENi, ENo, Dqs_c, Re_c);
 
+`include "nand_defines.vh"
 `include "nand_parameters.vh"
 
 //-----------------------------------------------------------------
@@ -190,7 +225,8 @@ module nand_die_model (Io, Cle, Ale, Ce_n_i, Clk_We_n, Wr_Re_n, Wp_n, Rb_n, Pre,
 // DEBUG[2] = data debug
 // DEBUG[3] = command debug
 // DEBUG[4] = queued planes debug
-parameter DEBUG = 5'b00000;
+//parameter DEBUG = 5'b00000;
+parameter DEBUG = 5'b11110;
 
 // set this parameter to match the inverse of the timescale "a / b" ratio
 // This parameter is used to make small adjustments to timing checks that
@@ -231,6 +267,9 @@ parameter CMD_ECC       =   4'h0;
 parameter CMD_RESETLUN  =   4'h1;
 parameter CMD_MP_OUTPUT =   4'h2; // if FEATURE_SET2[CMD_MP_OUTPUT] is 0, then plane0 data is output first; 1 means we output data from the plane associated with the ending 00h-5addr-30h sequence
 parameter CMD_PGM_CLR	=   4'h3;
+parameter CMD_JEDEC	=   4'h4;
+parameter CMD_ONFI3	=   4'h5;
+parameter CMD_DUMMY	=   4'h6;
 //----------------------------------
 parameter mds = 3'b000;
 
@@ -243,20 +282,27 @@ input                   Ale;
 input                   Ce_n_i;
 input                   Clk_We_n;  // Clk active high, We_n active low.
 input                   Wr_Re_n;   // Wr_n active low, Re_n active low.  
+input                   Re_c;      // Complementary of Wr_Re_n.  
 input                   Wp_n;
 output                  Rb_n;
 input                   Pre;
 input                   Lock;
 inout 				    Dqs;
+inout 				    Dqs_c;
 output                  ML_rdy;  // multi-LUN checks 
 output                  Rb_lun_n;  // multi-LUN checks 
 input [ 2 : 0]          PID;
+input                   ENi;
+output                  ENo;
+
+reg ENo;
 
 //Since this model supports both async and sync parts, we'll re-assign the sync input pins
 // to make the coding of the model consistent for both
 
     wire bypass_cache =1'b0;
     reg  sync_mode;
+    reg  sync_enh_mode;
 
     wire    Clk         = Clk_We_n;
     wire    Wr_n        = Wr_Re_n ;
@@ -291,10 +337,17 @@ reg [PAGE_SIZE - 1 : 0]         data_reg[0:NUM_PLANES -1]; //data register for e
 reg [PAGE_SIZE - 1 : 0]         cache_reg[0:NUM_PLANES -1]; //cache register for each plane
 reg [PAGE_SIZE - 1 : 0]         bit_mask; //cache register for each plane
 reg [(BPC_MAX*DQ_BITS) - 1 : 0] data_out_reg; //data register for each plane
+`ifdef MODEL_SV
+typedef reg [0 : PAGE_BITS - 1] PackedOTPArrayType;
+reg [PAGE_SIZE - 1 : 0]         OTP_array [PackedOTPArrayType];
+typedef reg [0 : ROW_BITS-LUN_BITS - 1] PackedAssociativeArrayType;
+reg [PAGE_SIZE - 1 : 0]         mem_array [PackedAssociativeArrayType]; //Main flash memory array
+`else
 reg [PAGE_SIZE - 1 : 0]         OTP_array [0 : OTP_ADDR_MAX - 1];
-reg [DQ_BITS - 1 : 0]           rd_uid_id2_array [0 : MAX_COL]; //Special array for Read_ID_2 and Read_Unique
 reg [PAGE_SIZE - 1 : 0]         mem_array [0 : NUM_ROW - 1]; //Main flash memory array
 reg [ROW_BITS -1 :0]            memory_addr [0 : NUM_ROW - 1];
+`endif
+reg [DQ_BITS - 1 : 0]           rd_uid_id2_array [0 : MAX_COL]; //Special array for Read_ID_2 and Read_Unique
 integer                         memory_index; // page based
 integer                         memory_used;
 reg [DQ_BITS - 1 : 0]           datain_reg[0:NUM_PLANES -1][7:0]; //data register for each plane
@@ -302,6 +355,12 @@ reg [2 : 0]                     datain_index;
 reg [DQ_BITS - 1 : 0]           data;
 reg [DQ_BITS - 1 : 0]           status_register; //nand device status
 reg [DQ_BITS - 1 : 0]           status_register1;
+`ifdef JEDEC_ARRAY_DEFINED
+`else
+				// dummy reg for backwards compatibility (older models will not have this reg declared in their nand_parameters.vh)
+				// if it is already declared in nand_parameters.vh, then JEDEC_ARRAY_DEFINED should be `defined in that file
+reg				jedec_params_array_unpacked; 
+`endif
 reg                             abort_en     = 1'b0;
 reg [1:0]                       clr_fail_bit = 0; 
 reg [1:0]                       fail_bit     = 0; 
@@ -319,22 +378,28 @@ reg [ROW_BITS -1 : 0]           otp_prog_addr;
 reg                             array_prog_2plane;
 reg [7:0]                       id_reg_addr;
 reg [ROW_BITS -1 : 0]           cmnd_35h_row_addr;
+`ifdef MODEL_SV
+reg [3 : 0]                     pp_counter [PackedAssociativeArrayType]; //support for # of partial page programming checks
+typedef reg [0 : BLCK_BITS]     PackedSeqPageArrayType;
+reg [PAGE_BITS-1 : 0]           seq_page [PackedSeqPageArrayType]; //allows checks for prohibited random page programming
+`else
 reg [3 : 0]                     pp_counter [0 : NUM_ROW -1]; //support for # of partial page programming checks
 reg [ROW_BITS -1 : 0]           pp_addr [0 : NUM_ROW -1];
 reg [ROW_BITS -1 : 0]           pp_index;
 reg [ROW_BITS -1 : 0]           pp_used;
+reg [PAGE_BITS-1 : 0]           seq_page [0 : MAX_BLOCKS]; //allows checks for prohibited random page programming
+`endif
 reg [3 : 0]                     otp_counter [0 : OTP_ADDR_MAX-1]; //support for # of OTP partial page programming checks
 reg                             OTP_page_locked [ 0 : OTP_ADDR_MAX]; // supports the OTP page by lock feature (not supported in all OTP devices)
-reg [PAGE_BITS-1 : 0]           seq_page [0 : MAX_BLOCKS]; //allows checks for prohibited random page programming
 reg [ROW_BITS -1 : 0]           UnlockAddrLower;
 reg [ROW_BITS -1 : 0]           UnlockAddrUpper;
 reg [3:0]                       BootBlockLocked; //some devices have blocks 0,1,2,3 as lockable 'boot' blocks
 reg IoX;
-reg IoX_enable;
+reg IoX_enable; // only used during async data output
 
 reg dqs_en = 0;                 //used in sync mode for devices that support it
-reg drive_dqs = 0;              //indicate when model needs to start driving DQS
-reg release_dqs = 0;            //indicate when model should release DQS
+reg drive_dqs = 0;              //indicate when model needs to start driving DQS; only used in sync conventional
+reg release_dqs = 0;            //indicate when model should release DQS; only used in sync conventional
 reg first_dqs = 0;              //used in HS timing checks
 reg first_clk = 1;              //used in HS timing checks
 reg new_clk   = 1;              //used in HS timing checks
@@ -343,13 +408,14 @@ wire [BLCK_BITS -1 : 0]		block_addr   = new_addr[(BLCK_BITS-1+PAGE_BITS):PAGE_BI
 reg  [1:0]			LA;
 reg				id_cmd_lun; // selects LUN to return target data on id commands, related to LUNs per target 
 reg addr_cnt_en = 1;		// do we increment address counter (usually enabled, it is disabled for special cases)
+reg [2:0]			temp_mem_exist;
 
 reg   load_cache_en;
 reg   load_cache_en_r;
 reg   ld_reg_en;
-reg   ld_page_addr_good;
+//reg   ld_page_addr_good; // replaced by temp_mem_exist
 integer ldthisPlane;
-integer ld_mem_mp_index; //local multi-plane memory index
+//integer ld_mem_mp_index; //local multi-plane memory index, replaced by directly using memory_index
 reg [ROW_BITS -1 : 0] ld_load_row_addr; //multi-plane plane decoded row address
 reg   corrupt_reg;	// Corrupt the data/cache register if we are doing a read operation illegally
 
@@ -392,6 +458,7 @@ reg             OTP_write;
 reg             OTP_read;
 reg             OTP_locked;
 reg             ONFI_read_param;
+reg             JEDEC_read_param; // we are reading JEDEC param if both ONFI_read_param and JEDEC_read_param are high
 reg             disable_md_stat;
 reg             ALLOWLOCKCOMMAND;
 reg             LOCKTIGHT;
@@ -403,8 +470,8 @@ reg [2:0]       thisDieNumber;
 reg             PowerUp_Complete;
 reg             InitReset_Complete;
 reg             ResetComplete;
-reg             Rb_flush_n;
-reg             Rb_abort_n;
+reg             Rb_flush_n; // only used in BA
+reg             Rb_abort_n; // only used in BA
 reg             die_select;
 reg [7:0]       lastCmd;
 reg [NUM_PLANES >> 2:0] active_plane;
@@ -444,6 +511,8 @@ wire            datain_sync;
 wire            datain_async;
 wire            data_out_enable_async;
 wire            dqs_out_enable;
+reg		datain_sync_enh;
+reg		data_out_enable_sync_enh;
 reg             col_addr_dis;
 reg             MLC_SLC;
 reg             reset_cmd;
@@ -451,12 +520,14 @@ reg             disable_ready_n;  // sequential cache read will continue busy ev
 reg             poss_rd_mode_err;
 reg             force_sts_fail; // force pgm/ers operation to fail, thereby returning E1h status
 reg             LUN_pgm_clear;
+reg             saw_cmnd_81h_jedec; // only used in error messages
 
 reg timezero;
 reg clr_que_en_rd;
 reg clr_que_en_wr;
 reg ml_prohibit_cmd;
 reg ml_rdy;
+reg tWB_check_en;
 
 reg   [0:0]                nand_mode  = 0;
 reg             boot_block_lock_mode =1'b0;
@@ -519,6 +590,7 @@ realtime    tm_wr_start =   0;       //HS only : first clock during data input
 realtime    tm_wr_end	=   0;       //HS only : last clock edge during a write
 realtime    tm_cle_clk  =   0;       //HS only : last command clock
 realtime    tm_ale_clk  =   0;       //HS only : last address clock
+realtime    tm_wr_n_clk =   0;       //HS only : last wr_n clock
 realtime    tm_dq	=   0;       //HS only : dq transition time
 real	    tCK_sync	=   0;       //HS only : calculate clock period
 
@@ -597,10 +669,14 @@ initial begin
     `else
     sync_mode           =   1'b0;
     `endif             
+    sync_enh_mode       =   1'b0;
+    datain_sync_enh	=   1'b0;
+    data_out_enable_sync_enh = 1'b0;
     clr_que_en_rd       =   1'b0;
     clr_que_en_wr       =   1'b0;
     ml_prohibit_cmd     =   1'b0;
     ml_rdy              =   1'b1;
+    tWB_check_en        =   1'b0;
     array_load_done     =   1'b0;
     array_prog_done     =   1'b0;
     active_plane        =      0;
@@ -650,7 +726,8 @@ initial begin
     OTP_locked          =   1'b0;
     OTP_write           =   1'b0;
     OTP_read            =   1'b0;
-    ONFI_read_param           =   1'b0;
+    ONFI_read_param     =   1'b0;
+    JEDEC_read_param    =   1'b0;
     rd_out              =   1'b0;
     pl_cnt              =      0;
     check_idle          =      0;
@@ -658,6 +735,7 @@ initial begin
     UnlockAddrUpper     = {ROW_BITS{1'b1}};
     BootBlockLocked     =   4'h0;
     Io_buf             <= {DQ_BITS{1'bz}};
+    Dqs_buf             =   1'bz;
     IoX_enable          =   1'b0;
     IoX                 =   1'b0;
     corrupt_reg 	=   1'b0;
@@ -678,6 +756,11 @@ initial begin
     force_sts_fail	=   1'b0;
     erase_data		=   {DQ_BITS{1'b1}};
     LUN_pgm_clear	=   1'b0;
+    saw_cmnd_81h_jedec	=   1'b0;
+`ifdef JEDEC_ARRAY_DEFINED
+`else
+    jedec_params_array_unpacked = 0;
+`endif
 
     //Time output format
     $timeformat (-9, 3, " ns", 1);
@@ -685,7 +768,8 @@ initial begin
     INFO(msg);
               
     if((NUM_DIE/NUM_CE) == 2) begin
-        if((mds ==3'h0) | (mds ==3'h2) | (mds ==3'h4) | (mds ==3'h6)) id_cmd_lun = 1'b1;  // each target has 2 LUNs, and one LUN returns id data (avoids collisions)
+      //  if((mds ==3'h0) | (mds ==3'h2) | (mds ==3'h4) | (mds ==3'h6)) id_cmd_lun = 1'b1;  // each target has 2 LUNs, and one LUN returns id data (avoids collisions)
+        id_cmd_lun = 1'b1;
     end else 
         id_cmd_lun = 1'b1;  // each target has 1 LUN, the LUN returns target data
 
@@ -700,23 +784,26 @@ initial begin
 
     // Initialize memory array to erased data
     // also initialize partial page counters to all 00s
+`ifdef MODEL_SV
+`else
     `ifdef FullMem
-        for (j = 0; j <= NUM_ROW - 1; j = j + 1) begin
-            pp_counter[j] = {4{1'b0}};
-            mem_array [j] = {PAGE_SIZE{erase_data[0]}};
-            end
-    `endif
-    for (j=0; j< OTP_ADDR_MAX; j=j+1) begin
-        otp_counter[j] = 3'b000;
+    for (j = 0; j <= NUM_ROW - 1; j = j + 1) begin
+	pp_counter[j] = {4{1'b0}};
+	mem_array [j] = {PAGE_SIZE{erase_data[0]}};
     end
+    `endif
     for (j=0; j<= MAX_BLOCKS ; j=j+1) begin
         seq_page[j] = {PAGE_BITS{1'b0}};
     end
     `ifdef FullMem
     `else
-        memory_used = 0;
-        pp_used = 0;
+    memory_used = 0;
+    pp_used = 0;
     `endif
+`endif
+    for (j=0; j< OTP_ADDR_MAX; j=j+1) begin
+        otp_counter[j] = 3'b000;
+    end
 
     // initialize the OTP page locking tracker (for devices that support OTP lock by page)
     for (j=0;j < OTP_ADDR_MAX; j=j+1) begin
@@ -730,14 +817,14 @@ initial begin
     if(mds%2==0) die_select = 1'b1;
     `ifdef INIT_MEM
     /*
-    `ifdef x8
-       $readmemh ("data.8.init", mem_array);
-       $readmemh ("read_unq.8.init", rd_uid_id2_array);
-       $readmemh ("otp.8.init", OTP_array);
-    `else
+    `ifdef x16
        $readmemh ("data.16.init", mem_array);
        $readmemh ("read_unq.16.init", rd_uid_id2_array);
        $readmemh ("otp.16.init", OTP_array);
+    `else
+       $readmemh ("data.8.init", mem_array);
+       $readmemh ("read_unq.8.init", rd_uid_id2_array);
+       $readmemh ("otp.8.init", OTP_array);
     `endif
     `ifdef FullMem
     `else
@@ -749,9 +836,12 @@ initial begin
     `endif
     */
     `else
+`ifdef MODEL_SV
+`else
         for (j=0; j < OTP_ADDR_MAX; j=j+1) begin
             OTP_array [j] = {PAGE_SIZE{erase_data[0]}};
         end
+`endif
         //Set manufacturer's ID to 128'h05060708_090A0B0C_0D0E0F10_11121314 until defined
 `ifdef x16
        for (k =0; k < 256 ; k=k+16) begin
@@ -801,15 +891,13 @@ initial begin
             INFO(msg);
             Rb_n_int <= 0;
             status_register [6:5] = 2'b00;
-                `ifdef FullMem
-                    cache_reg[active_plane] = mem_array [{ROW_BITS{1'b0}}];
-                `else
-                    if (memory_addr_exists({ROW_BITS{1'b0}})) begin
-                        cache_reg[active_plane] = mem_array[memory_index];
-                    end else begin
-                        cache_reg[active_plane] = {PAGE_SIZE{erase_data[0]}};
-                    end
-                `endif
+            temp_mem_exist = memory_addr_exists({ROW_BITS{1'b0}});
+            if(temp_mem_exist =5 | temp_mem_exist =3)
+                cache_reg[active_plane] = mem_array[0];
+            else if (temp_mem_exist=4 | temp_mem_exist=0)
+                cache_reg[active_plane] = {PAGE_SIZE{erase_data[0]}};
+            else if (temp_mem_exist =1)
+                cache_reg[active_plane] = mem_array[memory_index];
             go_busy(tRPRE_max-1);
             status_register [6:5] = 2'b11;
             $sformat(msg,"PO_read complete");
@@ -886,9 +974,11 @@ begin
         if ((EXP_ERR[errcode] === 1) && ((errcount[errcode] <= ERR_MAX_INT) || (ERR_MAX_INT < 0))) begin
             $display("Caught expected violation at time %t: %0s", $time, msg);        
         end else begin
-	    `ifdef MDL_NO_TIME_ERRMSG
-	    if (errcode !== ERR_TIM)
-	    `endif
+            `ifdef MDL_NO_TIME_ERRMSG
+	    if (errcode !== ERR_TIM) // do not print timing errors
+            `elsif MDL_START_TIME_ERRMSG
+	    if (errcode !== ERR_TIM || $time > `MDL_START_TIME_ERRMSG) // do print timing errors during specified time at beginning of simulation
+            `endif
             $display("%m at time %t: %0s", $realtime, msg);
         end
     if (errcount[errcode] == ERR_MAX_REPORTED) begin
@@ -940,11 +1030,14 @@ endtask
         reg    [PAGE_SIZE-1:0] ld_mask;
         begin
             // chop off the lowest address bits
-            addr = {block, page, col};
-            page_addr = {block, page};
+            addr = {block, page, col}; // incorrect, but won't fix b/c no more FullMem
+            page_addr = {thisDieNumber[0], block, page}; // lun1 addr must include lun bit for mem_array[memory_index] access
             ld_mask = ({DQ_BITS{1'b1}} << (col * BPC_MAX * DQ_BITS)); // shifting left zero-fills
             case (memory_select)
                 0:  begin
+`ifdef MODEL_SV
+                    mem_array[addr]       = (mem_array[addr] & ~ld_mask) | (data<<(col  * BPC_MAX* DQ_BITS));
+`else
                 `ifdef FullMem
                     mem_array[addr]       = (mem_array[addr] & ~ld_mask) | (data<<(col  * BPC_MAX* DQ_BITS));
                 `else
@@ -962,8 +1055,9 @@ endtask
                         memory_index = memory_index + 1'b1;
                     end
                 `endif
+`endif
                 end
-                1:    OTP_array[page]       = (OTP_array[page] & ~ld_mask) | (data<<(col * BPC_MAX * DQ_BITS));
+                1:    OTP_array[page]       = (get_OTP_array(page) & ~ld_mask) | (data<<(col * BPC_MAX * DQ_BITS));
                 2:    rd_uid_id2_array[col]    = data;
             endcase
         end
@@ -980,16 +1074,16 @@ endtask
         output [DQ_BITS-1:0]    data;
         reg    [ROW_BITS-1:0]   page_addr;
         begin
-            page_addr = {block, page};
-`ifdef FullMem
-            data = mem_array[page_addr] >> (col * BPC_MAX * DQ_BITS);
-`else
-            if (memory_addr_exists(page_addr)) begin
-                data = mem_array[memory_index] >> (col * BPC_MAX * DQ_BITS);
-            end else begin
+            page_addr = {thisDieNumber[0], block, page}; // lun1 addr must include lun bit for mem_array[memory_index] access
+            temp_mem_exist = memory_addr_exists(page_addr);
+            if (temp_mem_exist == 5 | temp_mem_exist == 3) 
+                data = mem_array[page_addr] >> (col * BPC_MAX * DQ_BITS);
+            else if (temp_mem_exist == 4)
                 data = {DQ_BITS{1'b1}};
-            end
-`endif
+            else if (temp_mem_exist == 1)
+                data = mem_array[memory_index] >> (col * BPC_MAX * DQ_BITS);
+            else if (temp_mem_exist == 0 | temp_mem_exist ==2)
+                data = {DQ_BITS{1'b1}};
 //            $display("Memory index %0d memory address (%0h) data=%0h", memory_index,  memory_addr[memory_index], data);
         end
     endtask
@@ -1004,16 +1098,20 @@ task corrupt_page;
     integer i;
 begin
     if (DEBUG[0]) begin $sformat(msg, "Corrupting addr=%0h due to reset", tsk_row_addr); INFO(msg); end
+`ifdef MODEL_SV
+	mem_array [tsk_row_addr] = {PAGE_SIZE{1'bx}};
+`else
     `ifdef FullMem
-            mem_array [tsk_row_addr] = {PAGE_SIZE{1'bx}};
+	mem_array [tsk_row_addr] = {PAGE_SIZE{1'bx}};
     `else
-        //if used memory address in associative array has same row addr as corrupt task, corrupt with x's
-        for (i=0; i< memory_used; i=i+1) begin
-            if (memory_addr[i] === tsk_row_addr) begin
+	//if used memory address in associative array has same row addr as corrupt task, corrupt with x's
+	for (i=0; i< memory_used; i=i+1) begin
+	    if (memory_addr[i] === tsk_row_addr) begin
                     mem_array[i] =  {PAGE_SIZE{1'bx}};
             end
         end
     `endif
+`endif
 end
 endtask
 
@@ -1025,10 +1123,17 @@ endtask
 task corrupt_block;
     input [BLCK_BITS -1: 0] tsk_block_addr;
     reg [COL_BITS -1 : 0] col;
-    reg [COL_BITS -1 : 0] page;
+    reg [PAGE_BITS -1 : 0] page;
     integer i;
 begin
     if (DEBUG[0]) begin $sformat(msg, "Corrupting block addr=%0h due to reset", tsk_block_addr); INFO(msg); end
+`ifdef MODEL_SV   
+        page = 0;
+        repeat (NUM_PAGE) begin
+            mem_array [{tsk_block_addr, page}] = {PAGE_SIZE{1'bx}};
+            page = page +1;
+        end
+`else
     `ifdef FullMem
         page = 0;
         repeat (NUM_PAGE) begin
@@ -1039,11 +1144,12 @@ begin
         //if used memory address in associative array has same block addr as corrupt task, corrupt with x's
         for (i=0; i< memory_used; i=i+1) begin
             //check to see if existing used address location matches block being corrupted
-            if (memory_addr[i][(ROW_BITS) -1 : (PAGE_BITS)] === tsk_block_addr) begin
+            if (memory_addr[i][(ROW_BITS-LUN_BITS) -1 : (PAGE_BITS)] === tsk_block_addr) begin
                     mem_array[i] = {PAGE_SIZE{1'bx}};
             end
         end
     `endif
+`endif
 end
 endtask
 
@@ -1053,7 +1159,7 @@ endtask
 // Called during reset of an OTP program operation.
 //-----------------------------------------------------------------
 task corrupt_otp_page;
-    input [ROW_BITS -1: 0] tsk_row_addr;
+    input [PAGE_BITS -1: 0] tsk_row_addr;
 begin
     if (DEBUG[0]) begin $sformat(msg, "Corrupting OTP addr=%0h due to reset", tsk_row_addr); INFO(msg); end
     OTP_array [tsk_row_addr] = {PAGE_SIZE{1'bx}};
@@ -1083,19 +1189,18 @@ end
 endtask
 
 //-----------------------------------------------------------------
-// TASK : clear_all_register
+// TASK : clear_plane_register
 // Completely clears cache or data register for all planes to all FF's.
 // Used during 80h command to clear all registers
 //-----------------------------------------------------------------
-task clear_all_register;
+task clear_plane_register;
+    input [1:0] plane;
 begin
-    for (pl_cnt=0;pl_cnt<NUM_PLANES;pl_cnt=pl_cnt+1) begin
-	if (bypass_cache)
-	    clear_data_register(pl_cnt);
-	else
-	    clear_cache_register(pl_cnt);
-	clear_queued_planes;
-    end
+    if (bypass_cache)
+	clear_data_register(plane);
+    else
+	clear_cache_register(plane);
+    clear_queued_planes;
 end
 endtask
 
@@ -1153,6 +1258,7 @@ task load_reg_cache_mode;
 begin
 //    #tWB_delay;
     temp_delay = tWB_delay;
+    tWB_check_en = 1'b1;
     Rb_n_int <= #temp_delay 1'b0;
     disable_ready_n <= #temp_delay 1'b0;
     status_register [6:5] <= #temp_delay 2'b00;
@@ -1213,14 +1319,13 @@ task load_cache_register;
     input cache_mode;
     integer thisPlane;
     reg [ROW_BITS -1 : 0] load_row_addr; //multi-plane plane decoded row address
-    reg page_addr_good;
-    integer mem_mp_index; //local multi-plane memory index
+    //reg page_addr_good; // replaced by temp_mem_exist
+    //integer mem_mp_index; //local multi-plane memory index, replaced by directly using memory_index
     integer delay;
     integer temp_delay;
 
 begin
     // Delay For RB# (tWB)
-    page_addr_good = 0;
     temp_delay = 0;
 
     //for cache reads, first transfer data_reg->cache_reg    
@@ -1233,6 +1338,7 @@ begin
     end else begin
 //        #tWB_delay
         temp_delay = tWB_delay;
+	tWB_check_en = 1'b1;
         Rb_n_int <= #temp_delay 1'b0;
         status_register[6:5] <= #temp_delay 2'b00;
     	array_load_done <= #temp_delay 1'b0;
@@ -1253,13 +1359,13 @@ begin
 
     for (thisPlane =0; thisPlane < NUM_PLANES; thisPlane=thisPlane+1) begin : plane_loop
         if (OTP_read && (thisPlane == 0)) begin : otp_read
-            cache_reg[active_plane] <= #temp_delay OTP_array[row_addr[active_plane]];
+            cache_reg[active_plane] <= #temp_delay get_OTP_array(row_addr[active_plane][PAGE_BITS-1:0]);
 	    
             if (row_addr[active_plane] >= OTP_ADDR_MAX) begin
                 $sformat(msg, "Error: OTP Read Address overflow.  Block must be 0 and page < OTP_ADDR_MAX.  Block=%0h Page=%0h  OTP_ADDR_MAX=%0h", row_addr[active_plane][ROW_BITS-1:PAGE_BITS], row_addr[active_plane][PAGE_BITS-1:0], OTP_ADDR_MAX); ERROR(ERR_OTP, msg); 
             end 
         end else if (ONFI_read_param && (thisPlane == 0)) begin : onfi_read_param
-            if(~nand_mode[0])   cache_reg[active_plane] <= #temp_delay onfi_params_array_unpacked;
+            if(~nand_mode[0])   cache_reg[0] <= #temp_delay (JEDEC_read_param ? jedec_params_array_unpacked : onfi_params_array_unpacked);
         end else begin //regular_read
             // cant do any loading if already in special read_id_2 or read_unique states
             // only way out is reset or power down/up
@@ -1275,36 +1381,28 @@ begin
                                row_addr[active_plane][PAGE_BITS-1:0]};  //page address bits defined by last address plane
                 end
                 //now check to see if the address already exists
-                page_addr_good = 0;
-                `ifdef FullMem
-                `else
-                if (memory_addr_exists(load_row_addr)) begin
-                    page_addr_good = 1;
-                    mem_mp_index = memory_index;  // memory addr exists returns the index assoc. with load row addr
-                end
-                `endif
+                temp_mem_exist = memory_addr_exists(load_row_addr);
                 if (cache_mode) begin
-                    `ifdef FullMem
+                    if (temp_mem_exist ==5 | temp_mem_exist ==3) begin
                         data_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[load_row_addr]);
-                    `else
-                        if (page_addr_good) begin
-                            data_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[mem_mp_index]);
-                            if (DEBUG[2]) begin $sformat(msg, "Transferring Read data from array block=%0h, page=%0h to data_reg=%d)", memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0], thisPlane); INFO(msg); end
-                        end else begin
+                    end else if (temp_mem_exist ==1) begin 
+                            data_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[memory_index]);
+                    end else if (temp_mem_exist ==4 | temp_mem_exist ==0) begin
                             data_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : {PAGE_SIZE{erase_data[0]}});
                         end
-                    `endif
 			active_plane <= #temp_delay cache_rd_active_plane; // when RB# returns ready during cache mode, set active_plane to the plane that should output data. In MP case, this assign will be overwritten later during 31h/3Fh cmd detection
                 end else begin
-                    `ifdef FullMem
+                    if (temp_mem_exist ==5 | temp_mem_exist ==3) begin
                         cache_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[load_row_addr]);
-                    `else
-                        if (page_addr_good) begin
-                            cache_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[mem_mp_index]);
-                        end else begin
+                    end else if (temp_mem_exist ==1) begin
+                            cache_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[memory_index]);
+                    end else if (temp_mem_exist ==4 | temp_mem_exist ==0) begin
                             cache_reg[thisPlane] <= #temp_delay (corrupt_reg ? {PAGE_SIZE{1'bx}} : {PAGE_SIZE{erase_data[0]}});
-                        end
-                        if (DEBUG[2]) begin $sformat(msg, "Read %0h data from memory block=%0h, page=%0h)", cache_reg[thisPlane],  memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0]); INFO(msg); end
+                    end
+                    `ifdef MODEL_SV
+                    `elsif FullMem
+                    `else
+                    if (DEBUG[2]) begin $sformat(msg, "Read %0h data from memory block=%0h, page=%0h)", cache_reg[thisPlane],  memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0]); INFO(msg); end
                     `endif
                 end
 		corrupt_reg = 0; // reset for next plane loop
@@ -1339,19 +1437,17 @@ endtask
 // replaces load_cache_register
 always @(*)
 begin
+    // tWB_check_en enabled inside 30h cmd blk
     ld_reg_en <= #tWB_delay ((load_cache_en & ~load_cache_en_r) | (~load_cache_en & load_cache_en_r));
     load_cache_en_r <= #1 load_cache_en;
 end 
 
 always @(posedge ld_reg_en)
 begin
-    if(cache_op) begin
-    ld_page_addr_good = 0;
-    end else begin
+    if(~cache_op) begin
         Rb_n_int <= 1'b0;
         status_register[6:5] = 2'b00;
         array_load_done = 1'b0;
-        ld_page_addr_good = 0;
         
         if (multiplane_op_rd) begin
         end else begin
@@ -1368,12 +1464,12 @@ begin
 
         for (ldthisPlane =0; ldthisPlane < NUM_PLANES; ldthisPlane=ldthisPlane+1) begin : plane_loop
             if (OTP_read && (ldthisPlane == 0)) begin : otp_read
-                cache_reg[active_plane] = OTP_array[row_addr[active_plane]];
+                cache_reg[active_plane] = get_OTP_array(row_addr[active_plane][PAGE_BITS-1:0]);
                 if (row_addr[active_plane] >= OTP_ADDR_MAX) begin
                     $sformat(msg, "Error: OTP Read Address overflow.  Block must be 0 and page < OTP_ADDR_MAX.  Block=%0h Page=%0h  OTP_ADDR_MAX=%0h", row_addr[active_plane][ROW_BITS-1:PAGE_BITS], row_addr[active_plane][PAGE_BITS-1:0], OTP_ADDR_MAX); ERROR(ERR_OTP, msg); 
                 end 
             end else if (ONFI_read_param && (ldthisPlane == 0)) begin : onfi_read_param
-                if(~nand_mode[0])   cache_reg[active_plane] = onfi_params_array_unpacked;
+                if(~nand_mode[0])   cache_reg[0] = (JEDEC_read_param ? jedec_params_array_unpacked : onfi_params_array_unpacked);
             end else begin //regular_read
                 // cant do any loading if already in special read_id_2 or read_unique states
                 // only way out is reset or power down/up
@@ -1391,35 +1487,34 @@ begin
                                row_addr[active_plane][PAGE_BITS-1:0]};  //page address bits defined by last address plane
                 end
                     //now check to see if the address already exists
-                    ld_page_addr_good = 0;
-                    `ifdef FullMem
-                    `else
-                    if (memory_addr_exists(ld_load_row_addr)) begin
-                        ld_page_addr_good = 1;
-                        ld_mem_mp_index = memory_index;  // memory addr exists returns the index assoc. with load row addr
-                    end
-                    `endif
+                   temp_mem_exist = memory_addr_exists(ld_load_row_addr);
                     if (cache_op) begin
-                        `ifdef FullMem
-                            data_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array [ld_load_row_addr]);
-                        `else
-                            if (ld_page_addr_good) begin
-                                data_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[ld_mem_mp_index]);
-                                if (DEBUG[2]) begin $sformat(msg, "Transferring Read data from array block=%0h, page=%0h to data_reg=%d)", memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0], ldthisPlane); INFO(msg); end
-                            end else begin
+                        if (temp_mem_exist == 5 | temp_mem_exist == 3) begin
+                            data_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[ld_load_row_addr]);
+                        end else if (temp_mem_exist == 1) begin 
+                            data_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[memory_index]);
+                        end else if (temp_mem_exist == 4 | temp_mem_exist == 0) begin
                                 data_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : {PAGE_SIZE{erase_data[0]}});
-                            end
+                        end 
+                        `ifdef MODEL_SV
+                        `elsif MemFull
+                        `else
+                        if (DEBUG[2]) begin $sformat(msg, "Transferring Read data from array block=%0h, page=%0h to data_reg=%d)", memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0], ldthisPlane); INFO(msg); end
                         `endif
                     end else begin
-                        `ifdef FullMem
+                        if (temp_mem_exist == 5) begin
+                            cache_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[ld_load_row_addr]);
+                        end else if (temp_mem_exist == 3) begin
                             cache_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array [ld_load_row_addr]);
-                        `else
-                            if (ld_page_addr_good) begin
-                                cache_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[ld_mem_mp_index]);
-                            end else begin
+                        end else if (temp_mem_exist == 1) begin 
+                            cache_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : mem_array[memory_index]);
+                        end else if (temp_mem_exist == 4 | temp_mem_exist == 0) begin
                                 cache_reg[ldthisPlane] = (corrupt_reg ? {PAGE_SIZE{1'bx}} : {PAGE_SIZE{erase_data[0]}});
-                            end
-                            if (DEBUG[2]) begin $sformat(msg, "Read %0h data from memory block=%0h, page=%0h)", cache_reg[ldthisPlane],  memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0]); INFO(msg); end
+                        end
+                        `ifdef MODEL_SV
+                        `elsif MemFull
+                        `else
+                        if (DEBUG[2]) begin $sformat(msg, "Read %0h data from memory block=%0h, page=%0h)", cache_reg[ldthisPlane],  memory_addr[memory_index][(ROW_BITS -1) : (PAGE_BITS)], memory_addr[memory_index][(PAGE_BITS -1) : 0]); INFO(msg); end
                         `endif
                     end
 		    corrupt_reg = 0; // reset for next plane loop
@@ -1472,7 +1567,7 @@ end
 task sync_output_data;
     input [DQ_BITS -1 : 0] dataOut;
 begin
-    if (Clk || (~Clk && saw_posedge_dqs)) begin
+    if (sync_mode && (Clk || (~Clk && saw_posedge_dqs))) begin
         `ifdef mtdef
         //data becomes valid
         rd_out <= #(tACmaxDQSQmaxsync) 1'b1;
@@ -1493,7 +1588,7 @@ begin
         Io_buf <= #(tACmaxDQSQmaxDVWminsync) {DQ_BITS{1'bx}};
         rd_out <= #(tACmaxDQSQmaxDVWminsync) 1'b0;
         t_readtox = ($realtime + tACmaxQHminsync);
-        IoX_enable <= #(t_readtox) 1'b1;
+        // IoX_enable <= #(t_readtox) 1'b1; // only used during async data output
         `endif         
     end
 end
@@ -1505,7 +1600,7 @@ endtask
 //-----------------------------------------------------------------
 task output_status;
 begin
-    if (sync_mode && ~Wr_n && ~Ce_n && die_select && status_cmnd) begin
+    if (((sync_mode && ~Wr_n) || sync_enh_mode) && ~Ce_n && die_select && status_cmnd) begin
         if (cmnd_78h && disable_md_stat) begin
             $sformat(msg, "MULTI-DIE STATUS READ (78h) IS PROHIBITED DURING AND AFTER POWER-UP RESET, OTP OPERATIONS, READ PARAMETERS, READ ID, READ UNIQUE ID, and GET/SET FEATURES.");
             INFO(msg);
@@ -1517,7 +1612,7 @@ begin
         end        
     end else
     //cmd 70h only works on the last selected die
-    if (~sync_mode && ~Re_n && ~Ce_n && We_n && die_select && status_cmnd) begin
+    if (~sync_mode && ~sync_enh_mode && ~Re_n && ~Ce_n && We_n && die_select && status_cmnd) begin
         if (cmnd_78h && disable_md_stat) begin
             $sformat(msg, "MULTI-DIE STATUS READ (78h) IS PROHIBITED DURING AND AFTER POWER-UP RESET, OTP OPERATIONS, READ PARAMETERS, READ ID, READ UNIQUE ID, and GET/SET FEATURES.");
             INFO(msg);
@@ -1536,14 +1631,14 @@ endtask
 
 // when we see this trigger go high, it's time to output status
 always @(posedge queue_status_output) begin
-    //cancel the output if we've already gone inactive and tRHOH is met (Io is being driven X's)
-    if (~(Re_n && IoX_enable)) begin
+    //cancel the output if we've already gone inactive and tRHOH is met (Io is being driven X's). Nvm, we must consider edo mode
+    //if (~(Re_n && IoX_enable)) begin
         if(nand_mode[0])
             Io_buf <= status_register1;
         else
             Io_buf <= status_register;
         rd_out <= 1'b1;
-    end
+    //end
     queue_status_output <= #1 0;
 end
 
@@ -1551,19 +1646,16 @@ end
 // only need this update in async mode b/c in sync mode, we are constantly updating IO output at every clk edge
 always @(status_register) begin
     #1; // wait for 1 time unit b/c Rb_reset_n is assigned non-blocking (<=), but status_register is assigned blocking (=)
-    // chip has mistakenly set status back to ready while reset operation is still happening (this mistake happens b/c we schedule chip to go back to ready at the end of tBERS (status_register [6 : 5] <= #(tBERS_min) 2'b11)
-    if (~Rb_reset_n) begin
-    	status_register [6 : 5] = 2'b00;
-    end else if (~sync_mode && ~Re_n && ~Ce_n && We_n && die_select && status_cmnd) begin
+    if (~sync_mode && ~sync_enh_mode && ~Re_n && ~Ce_n && We_n && die_select && status_cmnd) begin
     	Io_buf <= status_register;
     end
-end	
+end
 
 // ----------------------------------------------------------
 // Multi-LUN Ready logic.
 // Reset, ID, and Config commands prohibit Multi-LUN operations while Array is busy.  
 // ----------------------------------------------------------
-always @(*) begin
+always @(Clk_We_n) begin
     if(Clk_We_n & command_enable) begin 
         case (Io[7:0])
         8'h90, 8'hEC, 8'hED, 8'hEE, 8'hEF, 8'hFA, 8'hFC, 8'hFF:
@@ -1586,6 +1678,7 @@ assign ML_rdy = ml_rdy;
 //-----------------------------------------------------------------
 always @(*)
 begin
+    // tWB_check_en enabled inside D0h cmd blk
     erase_blk_pls <= #tWB_delay ((erase_blk_en & ~erase_blk_en_r) | (~erase_blk_en & erase_blk_en_r));
     erase_blk_en_r <= #1 erase_blk_en;
 end 
@@ -1632,14 +1725,26 @@ begin
                 erase_block_addr = row_addr[eb_thisPlane][BLCK_BITS+PAGE_BITS-1:PAGE_BITS];
                 if (1) begin $sformat(msg, "ERASE: interleave/plane=%h, Block=%h", eb_thisPlane, erase_block_addr); INFO(msg);  end
                 //Main reset implementation block
-            `ifdef FullMem
+            `ifdef MODEL_SV
                 repeat (NUM_PAGE) begin : page_loop
-                    mem_array [{erase_block_addr,eb_page}] = {PAGE_SIZE{erase_data[0]}};
-                    pp_counter[{erase_block_addr,eb_page}] = {4{1'b0}}; //reset partial page counter
-                    eb_page = eb_page + 1'b1;
+                    temp_mem_exist = memory_addr_exists({erase_block_addr,eb_page});
+				    if(temp_mem_exist ==5) begin 
+    				    //if (mem_array.exists ( {erase_block_addr,eb_page}) ) mem_array.delete ({erase_block_addr,eb_page});
+                        //if (pp_counter.exists( {erase_block_addr,eb_page}) ) pp_counter.delete({erase_block_addr,eb_page});
+				        erase_exec({erase_block_addr,eb_page});
+                    end
+                    eb_page = (eb_page + 1'b1)%NUM_PAGE; // reset to 0 after last page for next plane
                 end // page_loop
-                seq_page[erase_block_addr] = {PAGE_BITS{1'b0}}; //reset sequential page counter for this block
+                //if (seq_page.exists( erase_block_addr) ) seq_page.delete(erase_block_addr); 
+                seq_page_erase(erase_block_addr);
             `else
+              `ifdef FullMem
+                  repeat (NUM_PAGE) begin : page_loop
+			          erase_exec({erase_block_addr,eb_page});
+                      eb_page = (eb_page + 1'b1)%NUM_PAGE; // reset to 0 after last page for next plane
+                  end // page_loop
+                  seq_page[erase_block_addr] = {PAGE_BITS{1'b0}}; //reset sequential page counter for this block
+              `else
                 //use associative array erase block here
                 for (e=0; e<memory_used; e=e+1) begin : mem_loop
                     //check to see if existing used address location matches block being erased
@@ -1649,21 +1754,23 @@ begin
                         seq_page[erase_block_addr] = {PAGE_BITS{1'b0}};
                     end
                 end // mem_loop
+              `endif
             `endif
             end //if (queued_plane)
         end // plane_loop
         
         // Delay for RB# (tBERS)
-        Rb_n_int <= #(tBERS_min) 1'b1;   // not busy anymore
-        status_register [6 : 5] <= #(tBERS_min) 2'b11;
-        erase_done <= #(tBERS_min) 1'b1;
-	if (force_sts_fail) status_register[0] <= #(tBERS_min) 1'b1;
+	go_busy(tBERS_min);
+        Rb_n_int <= 1'b1;   // not busy anymore
+        status_register [6 : 5] <= 2'b11;
+        erase_done <= 1'b1;
+	if (force_sts_fail) status_register[0] <= 1'b1;
 //        output_status;
         // from d0h cmd begin
-        multiplane_op_erase <= #tBERS_min 1'b0;
-        multiplane_op_rd    <= #tBERS_min 1'b0;
-        multiplane_op_wr    <= #tBERS_min 1'b0;
-        cache_op            <= #tBERS_min 1'b0;
+        multiplane_op_erase <= 1'b0;
+        multiplane_op_rd    <= 1'b0;
+        multiplane_op_wr    <= 1'b0;
+        cache_op            <= 1'b0;
         // from d0h cmd end
     end else begin //eb_unlocked_erase
         // else block was locked and cannot be erased
@@ -1722,15 +1829,19 @@ task inc_pp;
     input [ROW_BITS -1: 0] row_addr_tsk; //row address to check in partial page counter
     reg [ROW_BITS -1: 0] index;
 begin
-`ifdef FullMem
+`ifdef MODEL_SV
     index = row_addr_tsk;
 `else
+  `ifdef FullMem
+    index = row_addr_tsk;
+  `else
     if (!pp_addr_exists(row_addr_tsk)) begin
            pp_used = pp_used + 1;
     end
     pp_addr[pp_index] = row_addr_tsk;
     index = pp_index;
-`endif            
+  `endif            
+`endif
     if (DEBUG[2]) begin $sformat(msg, "Partial page counter:  Block=%0h, Page=%0h  Count=%d  Limit=%1d", row_addr_tsk[ROW_BITS-1:PAGE_BITS], row_addr_tsk[PAGE_BITS-1:0], pp_counter[index] +1, NPP); INFO(msg); end
     if (pp_counter[index] < NPP) begin
         pp_counter[index] = pp_counter[index] + 1;
@@ -1752,14 +1863,14 @@ task check_block;
 begin
     blck_addr_tsk = row_addr_tsk[ROW_BITS -1 : PAGE_BITS];
     page_tsk = row_addr_tsk[PAGE_BITS -1 : 0];
-    if (page_tsk == seq_page[blck_addr_tsk]) begin 
+    if (page_tsk == get_seq_page(blck_addr_tsk)) begin 
         // don't need to do anything here, programming to same page already in seq_page block checker
-    end    else if (page_tsk == (seq_page[blck_addr_tsk] +1)) begin
+    end    else if (page_tsk == (get_seq_page(blck_addr_tsk) +1)) begin
            // increment page in sequential page checker for this block
-        seq_page[blck_addr_tsk] = seq_page[blck_addr_tsk] +1;
+        seq_page[blck_addr_tsk] = get_seq_page(blck_addr_tsk) +1;
         if (DEBUG[2]) begin $sformat (msg, "Programming to  Block=%0h  Page=%0h", blck_addr_tsk, page_tsk); INFO(msg); end
     end else begin
-        $sformat(msg, "Random page programming within a block is prohibited! Block=%0h, Page=%0h, last page=%0h", blck_addr_tsk, page_tsk, seq_page[blck_addr_tsk]);
+        $sformat(msg, "Random page programming within a block is prohibited! Block=%0h, Page=%0h, last page=%0h", blck_addr_tsk, page_tsk, get_seq_page(blck_addr_tsk));
         ERROR(ERR_ADDR, msg);
     end
 end
@@ -1779,6 +1890,7 @@ task program_page;
 begin
     if (DEBUG[0]) begin $sformat(msg, "START CACHE ARRAY PROGRAMMING, multiplane=%d, prog_cache_op=%d", multiplane, prog_cache_op); INFO(msg); end
     // Delay For RB# (tWB)
+    tWB_check_en = 1'b1;
     go_busy(tWB_delay);
     Rb_n_int <= 1'b0;
     status_register [6 : 5] = 2'b00;
@@ -1799,7 +1911,7 @@ begin
     wait(array_prog_done);
     queued_copyback2 <= 0;
     
-    if (prog_cache_op === 1) begin
+    if (prog_cache_op === 1 && lastCmd != 8'hFF && lastCmd != 8'hFA && lastCmd != 8'hFC) begin
         // this is for cache mode program ops
         // now wait for delay to transfer cache_reg -> data_reg
         go_busy(tCBSY_min);    
@@ -1813,7 +1925,7 @@ begin
     end
     //if this is  a copyback op, no program executes here.
     // If this is the last program page in a copyback cache operation, we'll
-    if (~copyback2) begin
+    if (~copyback2 && lastCmd != 8'hFF && lastCmd != 8'hFA && lastCmd != 8'hFC) begin
         program_page_from_datareg(multiplane); 
     end
     
@@ -1833,7 +1945,7 @@ task program_page_from_datareg;
     reg [ROW_BITS -1 : 0] lock_addr;
     reg otp_prog_fail;
     integer page_count, otp_count;
-    reg page_addr_good;
+    //reg page_addr_good; // replaced by temp_mem_exist
     reg unlocked_write;
     integer mem_mp_index;  //local 2plane memory index for associative addressing
     integer delay;
@@ -1903,6 +2015,7 @@ begin
                 if (OTP_locked || OTP_page_locked[otp_prog_addr]) begin : OTP_locked_block
                     $sformat(msg, "OTP Program FAILED - OTP Protected!  Aborting program operation ...");
                     ERROR(ERR_OTP, msg);
+                    status_register [7 : 5] = 3'b011;
                     otp_prog_fail = 1;
                     
     // ----------------------------------------------------------------------------------------------------
@@ -1975,9 +2088,9 @@ begin
                 end else begin
                     if(OTP_NPP == 1) begin
                         // only program if OTP data is still FF's
-                        if (&OTP_array[otp_prog_addr]) begin
+                        if (&get_OTP_array(otp_prog_addr[PAGE_BITS-1:0])) begin
                             otp_prog_done = 1'b0;
-                            OTP_array [otp_prog_addr] = data_reg[active_plane];
+                            OTP_array [otp_prog_addr[PAGE_BITS-1:0]] = data_reg[active_plane];
                             if (otp_count == 0) inc_otpc(otp_prog_addr);
                             otp_count = 1'b1;
                             if (DEBUG[2]) begin $sformat(msg, "OTP Program from Data Register = %0h", data_reg[active_plane]); INFO(msg); end
@@ -1990,7 +2103,7 @@ begin
                         end
                     end else begin
                         otp_prog_done = 1'b0;
-                        OTP_array [otp_prog_addr] = data_reg[active_plane] & OTP_array [otp_prog_addr];
+                        OTP_array [otp_prog_addr[PAGE_BITS-1:0]] = data_reg[active_plane] & get_OTP_array (otp_prog_addr[PAGE_BITS-1:0]);
                         if (otp_count == 0) inc_otpc(otp_prog_addr);
                         otp_count = 1'b1;
                         if (DEBUG[2]) begin $sformat(msg, "OTP Program from Data Register = %0h", data_reg[active_plane]); INFO(msg); end
@@ -2031,13 +2144,24 @@ begin
                         end
                     end
 
-                    page_addr_good = 0;
-                    `ifdef FullMem
-                    `else
-                    if (memory_addr_exists(array_prog_addr)) begin
-                        page_addr_good = 1;
+                    temp_mem_exist = memory_addr_exists(array_prog_addr);
+                    if (temp_mem_exist == 5)
+                        mem_mp_index = array_prog_addr;
+                    else if (temp_mem_exist == 4) begin
+                        pp_counter[array_prog_addr]  = {4{1'b0}}; //initialize partial page counter
+                        mem_array [array_prog_addr]  = {PAGE_SIZE{erase_data[0]}}; // initialize array row data
+                        `ifdef PACK
+                        for (i = 0; i <= NUM_COL - 1; i = i + 1) begin
+                            mem_array_packed [array_prog_addr][i]  = {(DQ_BITS*BPC_MAX){erase_data[0]}}; // initialize array row data
+                        end 
+                        `endif 
+                        mem_mp_index = array_prog_addr;
+                    end else if (temp_mem_exist == 1)
                         mem_mp_index = memory_index;
-                    end else begin
+                    else if(temp_mem_exist ==0) begin
+                        `ifdef MODEL_SV
+                        `elsif FullMem
+                        `else
                         pp_counter[memory_index]  = {4{1'b0}}; //initialize partial page counter
                         memory_addr[memory_index] = array_prog_addr;
                         mem_array [memory_index]  = {PAGE_SIZE{erase_data[0]}}; // initialize array row data
@@ -2049,11 +2173,24 @@ begin
                         memory_used  = memory_used + 1'b1;
                         mem_mp_index = memory_index;
                         memory_index = memory_index + 1'b1;
+                        `endif
                     end
-                    `endif
-                    
+
                         if (DEBUG[2]) begin $sformat(msg, "Programmed %0h to memory location (%0h, %0h)", data_reg[active_plane],  array_prog_addr[(ROW_BITS -1) : (PAGE_BITS)], array_prog_addr[(PAGE_BITS -1) : 0]); INFO(msg); end
                         //program the array
+                    `ifdef MODEL_SV
+                        mem_array[array_prog_addr] =  data_reg[thisPlane] & mem_array [array_prog_addr];
+                        `ifdef PACK
+                        for (i = 0; i <= NUM_COL - 1; i = i + 1) begin
+                            case (thisPlane)
+                            0 : mem_array_packed[mem_mp_index][i] = data_reg_packed0[i] & mem_array_packed [mem_mp_index][i];
+                            1 : mem_array_packed[mem_mp_index][i] = data_reg_packed1[i] & mem_array_packed [mem_mp_index][i];
+                            2 : mem_array_packed[mem_mp_index][i] = data_reg_packed2[i] & mem_array_packed [mem_mp_index][i];
+                            3 : mem_array_packed[mem_mp_index][i] = data_reg_packed3[i] & mem_array_packed [mem_mp_index][i];
+                            endcase
+                        end
+                        `endif 
+                    `else
                         `ifdef FullMem
                         mem_array [array_prog_addr] = data_reg[thisPlane] & mem_array [array_prog_addr];
                         `else
@@ -2074,6 +2211,7 @@ begin
                             `endif 
                         end
                         `endif
+                    `endif
                     inc_pp(array_prog_addr);
                     check_block(array_prog_addr);
                 end // queued_plane_section
@@ -2102,11 +2240,13 @@ begin
 
     end else begin
         // else if block is locked
+	// need active_plane ? 1 : 0 format instead of doing row_addr[active_plane] b/c doing the latter gave us plane1 data when active_plane was 0, race condtion?
         if (BootBlockLocked[row_addr[active_plane][PAGE_BITS+1:PAGE_BITS]]) begin
-	    // need active_plane ? 1 : 0 format instead of doing row_addr[active_plane] b/c doing the latter gave us plane1 data when active_plane was 0, race condtion?
-            $sformat(msg, "LOCKED: Not Programing Block 0x%0h.  Boot Block has been locked.", active_plane ? row_addr[1][BLCK_BITS-1:PAGE_BITS] : row_addr[0][BLCK_BITS-1:PAGE_BITS]);
+            $sformat(msg, "LOCKED: Not Programing Block 0x%0h.  Boot Block has been locked.", active_plane ? row_addr[1][BLCK_BITS+PAGE_BITS-1:PAGE_BITS] : row_addr[0][BLCK_BITS+PAGE_BITS-1:PAGE_BITS]);
         end else begin
-            $sformat(msg, "LOCKED: Not Programing Block 0x%0h, page 0x%0h, UnlockAddrLowr=%0h UnlockAddrUpr=%0h, invert=%0d", row_addr[active_plane][BLCK_BITS-1:PAGE_BITS], row_addr[active_plane][PAGE_BITS-1:0], UnlockAddrLower, UnlockAddrUpper, LockInvert);
+            $sformat(msg, "LOCKED: Not Programing Block 0x%0h, page 0x%0h, UnlockAddrLowr=%0h UnlockAddrUpr=%0h, invert=%0d", 
+	    	active_plane ? row_addr[1][BLCK_BITS+PAGE_BITS-1:PAGE_BITS] : row_addr[0][BLCK_BITS+PAGE_BITS-1:PAGE_BITS],
+		active_plane ? row_addr[1][PAGE_BITS-1:0] : row_addr[0][PAGE_BITS-1:0]  , UnlockAddrLower, UnlockAddrUpper, LockInvert);
         end
         WARN(msg);
         status_register [7] = 1'b0;
@@ -2238,7 +2378,10 @@ begin
                 addr_start = COL_BYTES +1;
                 addr_stop  =  ADDR_BYTES;
                 row_valid = 1'b0;
-            end else if ((Io [7 : 0] === 8'hFF) | ((Io [7 : 0] === 8'hFC) & sync_mode)) begin
+		if (lastCmd == 8'hFA && FEATURE_SET2[CMD_RESETLUN]) begin
+		    lastCmd = 8'hAA; // set to illegal value to stop chip from executing another reset LUN during 78h cmd
+		end
+            end else if ((Io [7 : 0] === 8'hFF) | ((Io [7 : 0] === 8'hFC) & (sync_mode || sync_enh_mode))) begin
                 $sformat(msg, "RESET WHILE BUSY - ABORT");
                 INFO(msg);
                 lastCmd = (Io [7 : 0]);
@@ -2252,6 +2395,24 @@ begin
                 addr_start = COL_BYTES +1;
                 addr_stop = ADDR_BYTES;
                 disable delay_loop; //exit out of this loop
+            end else begin // UNSUPPORTED COMMAND (DURING BUSY)
+		// else this is a non-status command during busy.
+		// since this could be an interleaved die operation, tell this device
+		//  to look at the upcoming address cycles to de-select the die if needed
+                if (die_select) begin
+		    if (Io[7:0] == 8'h30 || Io[7:0] == 8'h32 || Io[7:0] == 8'h35 || Io[7:0] == 8'h10 || Io[7:0] == 8'h11 || Io[7:0] == 8'h15 ||
+			Io[7:0] == 8'hD0 || Io[7:0] == 8'hD1) begin
+			$sformat(msg, "LUN is busy, and has received new %0hh command. New command will be ignored.", Io); ERROR(ERR_CMD, msg);
+		    end
+		    if ({Io[7:1], 1'b0} !== 8'h60 && {Io[7:1], 1'b0} !== 8'hD0)
+			col_valid = 1'b0; // Do not reset for case of interleaved read and erase, read did not output data
+		    row_valid = 1'b0;
+		    if ({Io[7:1], 1'b0} === 8'h60)
+			addr_start = COL_BYTES +1;
+		    else
+			addr_start = 1;
+		    addr_stop = ADDR_BYTES;
+		end
             end
         end
     end // delay_loop
@@ -2263,22 +2424,41 @@ endtask
 // FUNCTION : memory_addr_exists (addr)
 // Checks to see if memory address is already used in
 // associative array.
- //-----------------------------------------------------------------
-function memory_addr_exists;
+// 5: SV assoc array, page is programmed
+// 4: SV assoc array, page is not programmed
+// 3: Verilog fullmem array
+// 2: unused
+// 1: Verilog NUM_ROW array, page is programmed
+// 0: Verilog NUM_ROW array, page is not programmed
+//-----------------------------------------------------------------
+function [2:0] memory_addr_exists;
     input [ROW_BITS -1:0] addr;
 begin : index
-    memory_addr_exists = 0;
-    for (memory_index=0; memory_index<memory_used; memory_index=memory_index+1) begin
-        if (memory_addr[memory_index] == addr) begin
-            if (DEBUG[2]) begin $display("Memory index %0d memory address (%0h)", memory_index,  memory_addr[memory_index]); end
-            memory_addr_exists = 1;
-            disable index;
-        end
-    end
+    `ifdef MODEL_SV
+	if(mem_array.exists(addr))
+	    memory_addr_exists = 5;
+	else 
+	    memory_addr_exists = 4;
+    `else
+       `ifdef FullMem
+	memory_addr_exists = 3;
+       `else
+	memory_addr_exists = 0;
+	for (memory_index=0; memory_index<memory_used; memory_index=memory_index+1) begin
+	    if (memory_addr[memory_index] == addr) begin
+		if (DEBUG[2]) begin $display("Memory index %0d memory address (%0h)", memory_index,  memory_addr[memory_index]); end
+		memory_addr_exists = 1;
+		disable index;
+	    end
+	end
+       `endif
+    `endif
 end
 endfunction
 
 
+`ifdef MODEL_SV
+`else
 //-----------------------------------------------------------------
 // FUNCTION : pp_addr_exists (addr)
 // Checks to see if memory address is already used in
@@ -2296,6 +2476,72 @@ begin : pp_func
     end
 end
 endfunction
+`endif
+
+
+//-----------------------------------------------------------------
+// function : get_seq_page           
+ //-----------------------------------------------------------------
+function    [PAGE_BITS-1 : 0]  get_seq_page        ;
+    input   [BLCK_BITS-1 : 0]  adrs                ;
+begin
+  `ifdef MODEL_SV
+     if ( seq_page.exists(adrs) )
+        get_seq_page = seq_page[adrs];
+     else
+        get_seq_page = {PAGE_BITS{1'h0}};
+  `else
+     get_seq_page  = seq_page[adrs];
+  `endif
+end
+endfunction
+
+//-----------------------------------------------------------------
+// task : seq_page_erase           
+ //-----------------------------------------------------------------
+task      seq_page_erase      ;
+    input   [BLCK_BITS-1 : 0]  adrs                ;
+begin
+  `ifdef MODEL_SV
+     if ( seq_page.exists(adrs)) seq_page.delete(erase_block_addr);
+  `endif
+end
+endtask
+
+//-----------------------------------------------------------------
+// function : get_OTP_array          
+//-----------------------------------------------------------------
+function    [PAGE_SIZE-1 : 0]  get_OTP_array       ;
+    input   [PAGE_BITS-1 : 0]  adrs                ;
+begin
+  `ifdef MODEL_SV
+      if ( OTP_array.exists(adrs) )
+         get_OTP_array = OTP_array[adrs];
+      else
+         get_OTP_array = {PAGE_SIZE{1'h1}};
+  `else
+         get_OTP_array = OTP_array[adrs];
+  `endif
+end
+endfunction
+
+
+//-----------------------------------------------------------------
+// TASK : mem_array_erase (erase_addr)
+// Checks block for illegal random page programming
+//-----------------------------------------------------------------
+task erase_exec;
+    input [BLCK_BITS +PAGE_BITS -1: 0] erase_addr;
+begin
+    `ifdef MODEL_SV
+       mem_array.delete (erase_addr);
+       pp_counter.delete(erase_addr);
+    `elsif FullMem
+       mem_array [erase_addr] = {PAGE_SIZE{erase_data[0]}};
+       pp_counter[erase_addr] = {4{1'b0}}; //reset partial page counter
+    `endif
+end
+endtask
 
 //-----------------------------------------------------------------
 // function : fn_inc_col_counter
@@ -2375,6 +2621,7 @@ begin
     `ifdef SYNC2ASYNCRESET
         if (lastCmd === 8'hFF && sync_mode)     sync_mode <= #tITC_max 1'b0;
     `endif
+    tWB_check_en = 1'b1;
     #tWB_delay;
     Rb_reset_n = 1'b0; //  to avoid glitch in RB#(ready), time RB reset n active low before deactive Rb n int.  
     Rb_n_int = 1'b1;
@@ -2395,7 +2642,7 @@ begin
                     for (i=0;i<NUM_PLANES;i=i+1) begin
                         if (queued_plane[i]) corrupt_page(row_addr[i]); //regular array program interrupted
                     end
-                    
+		    disable program_page_from_datareg; // disable the scheduled events, cannot disable program_page b/c it also disables go_busy and nand_reset
                 end
             //erase interrupted
             end else if (~erase_done) begin
@@ -2442,17 +2689,21 @@ begin
     erase_done      = 1'b1;
     Io_buf         <= {DQ_BITS{1'bz}};
 
-    if (lastCmd === 8'hFF) begin
-        if (sync_mode) 
-            `ifdef SO
-                sync_mode <= #tITC_max 1'b1;
-            `else
-                sync_mode <= #tITC_max 1'b0;
-            `endif             
-            //some devices only reset the Data Interface, Timing Mode may be retained
-            onfi_features[8'h01] = 8'h00;
-            switch_timing_mode(onfi_features[8'h01]);
-            update_tWB;
+    if (lastCmd === 8'hFF && (sync_mode || sync_enh_mode)) begin
+        `ifdef SO
+	sync_mode <= #tITC_max 1'b1;
+        `else
+	sync_mode <= #tITC_max 1'b0;
+        `endif             
+	//some devices only reset the Data Interface, Timing Mode may be retained
+	onfi_features[8'h01] = 8'h00;
+	switch_timing_mode(onfi_features[8'h01]);
+	update_tWB;
+    end
+    if (OTP_mode) begin
+	onfi_features[8'h90] = 8'h00; // Set back to normal operation mode
+	OTP_mode = 1'b0;
+	$sformat(msg,"Entering Normal Operating mode after Reset ..."); INFO(msg);
     end
     //device now goes busy for appropriate reset time
     if (soft_reset) begin
@@ -2496,6 +2747,7 @@ begin
     // this task is usually called when any command is latched, so we can use this task to reset some signals at the start of a new command
     addr_cnt_en = 1'b1;	// enable counter again in case customer gives 05h command without also giving E0h cmd
     status_register[0] = 1'b0; // reset status fail bit to 0 in case it was previously set to 1
+    saw_cmnd_81h_jedec = 1'b0;
     if (Wp_n && OTP_mode)
          status_register[7] = Wp_n; // reset this value when doing a new otp operation after the previous otp program failed
 end
@@ -2511,7 +2763,7 @@ task update_features;
     begin
         case (featAddr)
             8'h01 : begin //Timing mode
-                        if (onfi_features[featAddr][4] === 1'b1) begin
+                        if (onfi_features[featAddr][5:4] === 2'b01) begin
                             $display("-----------------------------------------------------------");
                             $sformat(msg, "Switching to SYNC timing mode %0d ...", onfi_features[featAddr][3:0]);
                             INFO(msg);
@@ -2521,26 +2773,28 @@ task update_features;
                             if (~sync_mode) begin
                                 switch_timing_mode(onfi_features[featAddr]);
  				tCK_sync = (tCK_sync_min + tCK_sync_max) / 2;
-                               update_tWB;
                             end
                             sync_mode <= 1'b1;
+                            sync_enh_mode <= 1'b0;
                             if (~async_only_n) begin
                                 $sformat(msg, "This configuration can not be run in sync mode. %h", async_only_n);  ERROR(ERR_MISC, msg);
                             end 
-                        end else begin                        
+                        end else 
+			begin                        
                             $display("-----------------------------------------------------------");
                             $sformat(msg, "Switching to ASYNC timing mode %0d ...", onfi_features[featAddr][3:0]);
                             INFO(msg);
                             $display("-----------------------------------------------------------");
                             switch_timing_mode(onfi_features[featAddr]);
-                            update_tWB;
+                            update_tWB; // needed when going mode 0 to other modes
                             sync_mode <= 1'b0;
+                            sync_enh_mode <= 1'b0;
                         end
 			if (FEATURE_SET2[CMD_PGM_CLR] && (LUN_pgm_clear != onfi_features[featAddr][6])) begin
 			    LUN_pgm_clear = onfi_features[featAddr][6];
                             $sformat(msg, "Switching PGM CLEAR option to %0d: clear %0s", onfi_features[featAddr][6], (onfi_features[featAddr][6] ? "selected LUN" : "all LUNs"));
                             INFO(msg);
-			end    
+			end
                     end    
             8'h10 : begin //  Programmable Output Drive Strength
                         if (DEBUG[2]) $display("Programmable I/O Drive Strength is not implemented in this model.");
@@ -2551,7 +2805,7 @@ task update_features;
             8'h81 : begin // Programmable R/B# pull-down strength
                         if (DEBUG[2]) $display("Programmable R/B# Pull-Down Strength  is not implemented in this model.");          
                     end
-            
+
             8'h90 : begin //OTP operating mode
                       if(onfi_features[featAddr][3] & FEATURE_SET2[CMD_ECC]) begin 
                         update_feat_gen(onfi_features[featAddr][3]); 
@@ -2641,6 +2895,36 @@ begin
 end
 endtask
 
+//-----------------------------------------------------------------
+// TASK : die_is_selected
+// When die is selected after last row address byte, model executes some code
+// Insetad of duplicating code for dual/quad/single die case, use this task to call the code
+//-----------------------------------------------------------------
+task die_is_selected;
+begin
+    die_select = 1'b1;
+    if (DEBUG[1]) begin $sformat(msg, "DIE %d ACTIVE", thisDieNumber); INFO(msg); end
+    if (saw_cmnd_00h_stat) begin 
+	clear_queued_planes;  // ??? need to eval multiplane queues.  (latch address 00h)
+	saw_cmnd_00h_stat = 1'b0;
+    end
+    col_addr = temp_col_addr;  // wait to assign col addr until die_select has been determined.  
+    if (saw_cmnd_60h) begin 
+	if(saw_cmnd_60h_clear) begin 
+	    clear_queued_planes;
+	    saw_cmnd_60h_clear = 1'b0;
+	end 
+	lastCmd = 8'h60;
+    end
+    if (lastCmd == 8'h80 && ~cmnd_78h && LUN_pgm_clear && ~multiplane_op_wr && ~cmnd_85h) begin
+	clear_plane_register(new_addr[PAGE_BITS + (NUM_PLANES >> 2) : PAGE_BITS]);
+    end
+    if (lastCmd == 8'h85 && ~cmnd_78h && ~multiplane_op_wr) begin // clear queued planes after 85h-5addr
+	clear_queued_planes;
+    end
+end
+endtask
+
     //-----------------------------------------------------------------
     // TASK : update_tWB
     //  tWB can be different between async and sync timing modes.  Need 
@@ -2666,7 +2950,7 @@ endtask
         wait_for_cen <= #1 0;  //disable the flag until next timing mode switch
     end
 
-    always @(sync_mode) begin
+    always @(sync_mode or sync_enh_mode) begin
         update_tWB;  //the model needs to switch between sync and async tWB timing
     end
 
@@ -2748,7 +3032,7 @@ always @ (posedge row_valid) begin
         end
     end else begin
         //single plane address assignment
-        if (~cmnd_78h & (lastCmd !== 8'hFA)) row_addr[active_plane] = new_addr[ROW_BITS -1 : 0];
+	if (~cmnd_78h & (lastCmd !== 8'hFA)) row_addr[active_plane] = new_addr[ROW_BITS -1 : 0];
     end
     if (lastCmd === 8'h23 & ~LOCKTIGHT) begin
         UnlockAddrLower = {row_addr[active_plane][ROW_BITS-1:PAGE_BITS],{PAGE_BITS{1'b0}}}; // remove page bits
@@ -2762,7 +3046,7 @@ always @ (posedge row_valid) begin
     if (lastCmd === 8'h8C) begin
         copyback2_addr = new_addr[ROW_BITS -1 : 0];  //address will be used in copyback2 operation
     end
-    if ((lastCmd === 8'hFA) & die_select) begin
+    if (lastCmd === 8'hFA) begin
         nand_reset (1'b1);
     end	
 end
@@ -2775,7 +3059,7 @@ always @ (posedge We_n) begin
     if (address_enable) begin : latch_address
         if (saw_cmnd_00h) begin
             //need to distinguish between a status->00h read mode and a regular 00h->address->30h read page op
-/*
+/*	    // moved to after addr byte 5 latch to only clear_queued_planes of selected die
             if (saw_cmnd_00h_stat)
                 clear_queued_planes;  // ??? need to eval multiplane queues.  (latch address 00h)
             saw_cmnd_00h_stat = 1'b0;
@@ -2796,7 +3080,11 @@ always @ (posedge We_n) begin
             id_reg_addr [7:0] = Io [7 : 0];
             col_counter = 0;
             //special case for read ONFI params (ECh with 00h address cycle)
-            if ((ONFI_read_param === 1'b1) && (id_reg_addr === 8'h00)) begin
+            if ((ONFI_read_param === 1'b1) && (id_reg_addr === 8'h00 || (id_reg_addr === 8'h40 && FEATURE_SET2[CMD_JEDEC]))) begin
+	        if (id_reg_addr === 8'h40)
+		    JEDEC_read_param = 1;
+		else
+		    JEDEC_read_param = 0;
                 col_valid  = 1'b1;
                 col_addr = 0;
                 new_addr = 0;
@@ -2817,6 +3105,7 @@ always @ (posedge We_n) begin
                         $sformat(msg, "INVALID ONFI GET FEATURES ADDRESS 0x%2h.", id_reg_addr);  ERROR(ERR_ADDR, msg);
                     end
                 endcase
+		tWB_check_en = 1'b1;
                 go_busy(tWB_delay);
                 Rb_n_int <= 1'b0;
                 status_register[6:5]=2'b00;
@@ -2843,7 +3132,7 @@ always @ (posedge We_n) begin
             case (addr_start)
                 1 : begin
                         temp_col_addr [7 : 0] = Io [7 : 0];
-                        if ((sync_mode) && (temp_col_addr[0] !== 1'b0) && ((lastCmd != 8'hEE) && die_select)) begin
+                        if ((sync_mode || sync_enh_mode) && (temp_col_addr[0] !== 1'b0) && ((lastCmd != 8'hEE) && die_select)) begin
                             $sformat(msg, "LSB of column address must be 0 in sync mode.  lastCmd=%2h", lastCmd);
                             ERROR(ERR_ADDR, msg);
                         end
@@ -2915,24 +3204,7 @@ always @ (posedge We_n) begin
                     // on the row address
                     if ((NUM_DIE / NUM_CE) == 4) begin
                         if ( LA[1:0] == thisDieNumber[1:0]) begin
-                            die_select = 1'b1;
-                            if (DEBUG[1]) begin $sformat(msg, "DIE %d ACTIVE", thisDieNumber); INFO(msg); end
-                            if (saw_cmnd_00h_stat) begin 
-                                clear_queued_planes;  // ??? need to eval multiplane queues.  (latch address 00h)
-                                saw_cmnd_00h_stat = 1'b0;
-                            end
-                            col_addr = temp_col_addr;  // wait to assign col addr until die_select has been determined.  
-                            if (saw_cmnd_60h) begin 
-                                if(saw_cmnd_60h_clear) begin 
-                                    clear_queued_planes;
-                                    saw_cmnd_60h_clear = 1'b0;
-                                end 
-                                saw_cmnd_60h = 1'b0;
-                                lastCmd = 8'h60;
-                            end
-			    if (lastCmd == 8'h80 && ~cmnd_78h && LUN_pgm_clear) begin
-				clear_all_register;
-			    end
+			    die_is_selected;
                         end else begin
                             die_select = 1'b0;
                             if (DEBUG[1]) begin $sformat(msg, "DIE %d INACTIVE", thisDieNumber); INFO(msg); end
@@ -2944,24 +3216,8 @@ always @ (posedge We_n) begin
                         end
                     end else if ((NUM_DIE / NUM_CE) == 2) begin
                         if ( LA[0] == thisDieNumber[0]) begin
-                            die_select = 1'b1;
-                            if (DEBUG[1]) begin $sformat(msg, "DIE %d ACTIVE", thisDieNumber); INFO(msg); end
-                            if (saw_cmnd_00h_stat) begin 
-                                clear_queued_planes;  // ??? need to eval multiplane queues.  (latch address 00h)
-                                saw_cmnd_00h_stat = 1'b0;
-                            end
-                            col_addr = temp_col_addr;  // wait to assign col addr until die_select has been determined.  
-                            if (saw_cmnd_60h) begin 
-                                if(saw_cmnd_60h_clear) begin 
-                                    clear_queued_planes;
-                                    saw_cmnd_60h_clear = 1'b0;
-                                end 
-                                lastCmd = 8'h60;
-                            end
- 			    if (lastCmd == 8'h80 && ~cmnd_78h && LUN_pgm_clear) begin
-				clear_all_register;
-			    end
-                       end else begin
+			    die_is_selected;
+                        end else begin
                             die_select = 1'b0;
                             if (DEBUG[1]) begin $sformat(msg, "DIE %d INACTIVE", thisDieNumber); INFO(msg); end
                             temp_col_addr = col_addr;
@@ -2971,23 +3227,7 @@ always @ (posedge We_n) begin
                             end
                         end
                     end else begin
-                        die_select = 1'b1;
-                        if (DEBUG[1]) begin $sformat(msg, "DIE %d ACTIVE", thisDieNumber); INFO(msg); end
-                        if (saw_cmnd_00h_stat) begin 
-                            clear_queued_planes;  // ??? need to eval multiplane queues.  (latch address 00h)
-                            saw_cmnd_00h_stat = 1'b0;
-                        end
-                        col_addr = temp_col_addr;  // wait to assign col addr until die_select has been determined.  
-                        if (saw_cmnd_60h) begin 
-                            if(saw_cmnd_60h_clear) begin 
-                                clear_queued_planes;
-                                saw_cmnd_60h_clear = 1'b0;
-                            end 
-                            lastCmd = 8'h60;
-                        end
-			if (lastCmd == 8'h80 && ~cmnd_78h && LUN_pgm_clear) begin
-			    clear_all_register;
-			end
+			die_is_selected;
                     end
                     if(new_addr[PAGE_BITS-1:0] > NUM_PAGE) begin
                         $sformat(msg, "Error: Page Limit Exceeded.  Page=%2h Page Limit=%2h", new_addr[PAGE_BITS-1:0], NUM_PAGE);
@@ -3055,7 +3295,7 @@ always @ (posedge We_n) begin : cLatch
                 saw_cmnd_60h = 1'b0;
                 saw_cmnd_60h_clear = 1'b0;
                 stat_to_rd_mode_c0h  =    1'b0;
-                if(~nand_mode[0] & ~(lastCmd === 8'h31 || lastCmd == 8'hE0) & status_register[6] & ~status_register[5]) begin $sformat(msg, "ERROR: Read Operation while array busy"); INFO(msg); end   // ??? verify for all models
+                if(~nand_mode[0] & ~(lastCmd === 8'h31 || lastCmd == 8'hE0 || lastCmd === 8'h00 || lastCmd === 8'h15) & status_register[6] & ~status_register[5]) begin $sformat(msg, "ERROR: Read Operation while array busy"); INFO(msg); end   // ??? verify for all models
                 if(~nand_mode[0] & ~status_cmnd) begin
                     //if not in status mode, then this is the start of a read command
                     if ((lastCmd == 8'h00) & row_valid & FEATURE_SET[CMD_2PLANE]) begin
@@ -3113,8 +3353,7 @@ always @ (posedge We_n) begin : cLatch
                 saw_cmnd_60h_clear = 1'b0;
                 stat_to_rd_mode_c0h  =    1'b0;
                 // Some devices disable random read during cache mode
-                if ((saw_cmnd_00h || (lastCmd === 8'h30) || (lastCmd === 8'h35) || (lastCmd === 8'h3F) || (lastCmd === 8'hE0) || cache_op
-			|| (lastCmd == 8'hEC) || (lastCmd == 8'hED)) && row_valid) begin
+                if (die_select) begin
                     saw_cmnd_00h_stat = 1'b0;
                     lastCmd = 8'h05;
                     disable_rdStatus;
@@ -3162,7 +3401,10 @@ always @ (posedge We_n) begin : cLatch
                 if ((cache_op === 1) && ~nand_mode[0]) begin
                     cache_prog_last = 1'b1;
                 end
-                if ((row_valid && ~nand_mode[0] && Wp_n) 
+		if (saw_cmnd_81h_jedec && ~multiplane_op_wr) begin
+		    $sformat(msg, "81h-10h command can only be used during Multiplane Program Page"); ERROR(ERR_CMD, msg); 
+		    saw_cmnd_81h_jedec = 1'b0;
+		end else if ((row_valid && ~nand_mode[0] && Wp_n) 
                    ) begin
                     queued_plane[active_plane] = 1;
                     if(DEBUG[4]) begin $sformat(msg, "INFO: Program Page Set queued plane %0d. Value %0d", active_plane, queued_plane[active_plane]); INFO(msg); end 
@@ -3173,6 +3415,7 @@ always @ (posedge We_n) begin : cLatch
                         lastCmd = 8'h10;
                         if (~nand_mode[0]) OTP_locked = 1'b1;
 
+			tWB_check_en = 1'b1;
                         #tWB_delay;
                         Rb_n_int = 1'b0;
                         status_register [6] = 1'b0;
@@ -3188,6 +3431,7 @@ always @ (posedge We_n) begin : cLatch
                         if(~nand_mode[0]) begin
                             lastCmd = 8'h10;
                             copyback2 = 0;
+			    saw_cmnd_81h_jedec = 1'b0;
                             program_page(multiplane_op_wr,cache_op);
                         end
                     end
@@ -3222,7 +3466,8 @@ always @ (posedge We_n) begin : cLatch
                     lastCmd = 8'h11;
                     //can't actually write to mem_array yet because final program command not seen
                     //busy time required to switch planes
-                    #tWB_delay;
+		    tWB_check_en = 1'b1;
+		    go_busy(tWB_delay);
                     Rb_n_int = 1'b0;
                     status_register[6:5] = 2'b00;
                     go_busy(tDBSY_min);
@@ -3254,11 +3499,15 @@ always @ (posedge We_n) begin : cLatch
                     $sformat(msg, "Error: Program Page Cache Mode Command %0h not allowed in boot block lock mode.", Io[7:0]); ERROR(ERR_CMD, msg); 
                 end
                     
-                if (((lastCmd === 8'h80) || (lastCmd === 8'h8C)) && row_valid && Wp_n) begin
+		if (saw_cmnd_81h_jedec && ~multiplane_op_wr) begin
+		    $sformat(msg, "81h-15h command can only be used during Multiplane Program Page"); ERROR(ERR_CMD, msg); 
+		    saw_cmnd_81h_jedec = 1'b0;
+		end else if (((lastCmd === 8'h80) || (lastCmd === 8'h8C)) && row_valid && Wp_n) begin
                     queued_plane[active_plane] = 1;
                     if(DEBUG[4]) begin $sformat(msg, "INFO: Program Page Cache Set queued plane %0d. Value %0d", active_plane, queued_plane[active_plane]); INFO(msg); end 
                     lastCmd = 8'h15;
                     cache_op <= 1'b1;
+		    saw_cmnd_81h_jedec = 1'b0;
                     if(FEATURE_SET[CMD_2PLANE])
                         program_page (multiplane_op_wr, 1'b1);  // 2-Plane ops
                     else begin 
@@ -3415,6 +3664,7 @@ always @ (posedge We_n) begin : cLatch
                         cache_rd_active_plane = active_plane; // need to set this reg in the case where we do 2 sequences of full read cache cmds
                         if(DEBUG[4]) begin $sformat(msg, "INFO: Page Read Confirm Set queued plane %0d. Value %0d", active_plane,queued_plane[active_plane]); INFO(msg); end 
 //                        load_cache_register (multiplane_op_rd, 0);
+			tWB_check_en = 1'b1;
                         load_cache_en = ~ load_cache_en;
                         // pre-ONFI 2.0 : for 2plane ops, pulsing Re_n after 2plane page read should output from Plane 0 first
                         // ONFI 2.0 : last plane addressed in a multiplane operation becomes active read plane
@@ -3440,10 +3690,10 @@ always @ (posedge We_n) begin : cLatch
                         if (col_addr == 512) begin  // hex 200 (LSB of second Column Address = 02h)
                             if (FEATURE_SET[CMD_ID2]) begin
                                 do_read_id_2 = 1'b1;
-`ifdef x8
-                                    col_counter = 512;  // Byte 512 for x8
-`else
+`ifdef x16
                                     col_counter = 256;  // Byte 512 for x16
+`else
+                                    col_counter = 512;  // Byte 512 for x8
 `endif
                                 load_cache_register(0,0); 
                             end else begin
@@ -3491,7 +3741,8 @@ always @ (posedge We_n) begin : cLatch
                     sub_col_cnt = sub_col_cnt_init;  // reset sub col count
                     cache_op <= 1'b1;
                     //If sequential page read cache mode, use same queued planes as for read page for cached read
-                    if ((lastCmd === 8'h00) && !saw_cmnd_00h && (FEATURE_SET[CMD_ONFI] | NOONFIRDCACHERANDEN)) begin
+		    // !cmnd_78h is for case of die1 78h-00h, die0 78h-31h; die 0 should auto-increment row addr
+                    if ((lastCmd === 8'h00) && !saw_cmnd_00h && !cmnd_78h && (FEATURE_SET[CMD_ONFI] | NOONFIRDCACHERANDEN)) begin
 		    	// If we get (30h->00h->address->31h->3Fh) command, no need to auto-increment row addr because host inputted a new row addr
                         queued_plane[active_plane] = 1'b1;
                         copy_queued_planes;
@@ -3546,6 +3797,7 @@ always @ (posedge We_n) begin : cLatch
                     lastCmd = 8'h32;
                     queued_plane[active_plane] = 1;
                     if(DEBUG[4]) begin $sformat(msg, "INFO: Multi_plane Page Read Set queued plane %0d. Value %0d", active_plane, queued_plane[active_plane]); INFO(msg); end 
+		    tWB_check_en = 1'b1;
                     go_busy(tWB_delay);
                     Rb_n_int = 1'b0;
                     status_register[6:5]=2'b00;
@@ -3568,7 +3820,7 @@ always @ (posedge We_n) begin : cLatch
 */
                 end
             end            
-            
+
             // ********************************************************
             // Command (35h) : COPYBACK READ CONFIRM
             // ********************************************************
@@ -3591,7 +3843,10 @@ always @ (posedge We_n) begin : cLatch
 
                     //pre-ONFI 2.0 : for 2plane ops, pulsing Re_n after 2plane page read should
                     // output from Plane 0 first
-                    // ONFI 2.0 : last plane addressed in a multiplane operation becomes active read plane
+                    // ONFI 2.0 : adds option for last plane addressed in a multiplane operation becoming active read plane
+		    if (multiplane_op_rd & ~FEATURE_SET2[CMD_MP_OUTPUT] & NUM_PLANES==2) begin
+			active_plane <= #1 0; // this will override the blocking assignment made in load_cache_register task
+		    end
                 end
                 multiplane_op_rd    = 1'b0;
                 multiplane_op_wr    = 1'b0;
@@ -3599,7 +3854,7 @@ always @ (posedge We_n) begin : cLatch
                 cache_op = 1'b0;
                 copyback = 1'b0;
             end
-    
+
             // ********************************************************
             // Command (3Ah) : COPYBACK2 READ
             // ********************************************************
@@ -3783,6 +4038,9 @@ always @ (posedge We_n) begin : cLatch
                     addr_stop = ADDR_BYTES;
                     row_valid = 1'b0;
                 end
+		if (lastCmd == 8'hFA && FEATURE_SET2[CMD_RESETLUN]) begin
+		    lastCmd = 8'hAA; // set to illegal value to stop chip from executing another reset LUN during 78h cmd
+		end
             end
     
             // ********************************************************
@@ -3831,7 +4089,52 @@ always @ (posedge We_n) begin : cLatch
                     //Initial 80h command clears registers of all devices.
                     //If this is 2nd half of multiplane op, don't want to clear registers.
                     if (~multiplane_op_wr && ~LUN_pgm_clear) begin
-			clear_all_register;
+			for (pl_cnt=0;pl_cnt<NUM_PLANES;pl_cnt=pl_cnt+1) begin
+			    clear_plane_register(pl_cnt);
+			end
+                    end
+                    multiplane_op_rd	= 1'b0;  // prog page clears all cache registers on a selected target, not just lun
+                    multiplane_op_erase = 1'b0;
+                    if (OTP_mode) begin
+                        OTP_write = 1'b1;
+                        disable_md_stat = 1'b1;
+                        disable_rdStatus;
+                    end
+                end //program
+                disable_md_stat = 1'b0;
+            end
+        
+            // ********************************************************
+            // Command (81h) : JEDEC MULTI-PLANE PROGRAM PAGE START
+            // ********************************************************
+            else if (Io [7 : 0] === 8'h81 && FEATURE_SET2[CMD_JEDEC]) begin
+
+                cmnd_85h = 1'b0;
+                saw_cmnd_00h = 1'b0;
+                saw_cmnd_00h_stat = 1'b0;
+                saw_cmnd_60h = 1'b0;
+                saw_cmnd_60h_clear = 1'b0;
+                stat_to_rd_mode_c0h  =    1'b0;
+                abort_en = 1'b0;
+                if (~Wp_n) begin //Write-protect
+                    $sformat(msg, "Wp_n = 0,  PROGRAM operation disabled.");
+                    WARN(msg);
+                end else begin //end write protect ; else start program
+                    lastCmd = 8'h80; // make the model think 80h in order to re-use existing 80h code
+                    disable_rdStatus;
+		    saw_cmnd_81h_jedec = 1'b1;
+                    col_valid = 1'b0;
+                    row_valid = 1'b0;
+                    addr_start = 1'b1;
+                    addr_stop = ADDR_BYTES;
+                    col_counter = 0;
+                    sub_col_cnt = sub_col_cnt_init;  // reset sub col count
+                    //Initial 80h command clears registers of all devices.
+                    //If this is 2nd half of multiplane op, don't want to clear registers.
+                    if (~multiplane_op_wr && ~LUN_pgm_clear) begin
+			for (pl_cnt=0;pl_cnt<NUM_PLANES;pl_cnt=pl_cnt+1) begin
+			    clear_plane_register(pl_cnt);
+			end
                     end
                     multiplane_op_rd	= 1'b0;  // prog page clears all cache registers on a selected target, not just lun
                     multiplane_op_erase = 1'b0;
@@ -3880,7 +4183,7 @@ always @ (posedge We_n) begin : cLatch
                         // will remain the same
                         col_counter = 0;
                         sub_col_cnt = sub_col_cnt_init;  // reset sub col count
-                        //do net set lastCmd here since this is just random data input and not the start of a command
+                        // do not set lastCmd here since this is just random data input and not the start of a command
                         addr_start = 1;
                         addr_stop = ADDR_BYTES;
                         cmnd_85h = 1'b1;
@@ -3909,17 +4212,32 @@ always @ (posedge We_n) begin : cLatch
 
                     if(FEATURE_SET[CMD_MP]) multiplane_op_rd    = 1'b0;
 
-                end else begin // row_valid is low => we may possibly be re-enabling data input for a pgm "pause" operation
-                    if ((lastCmd === 8'h85) | (lastCmd === 8'h80)) begin
+                end else begin
+		    // row_valid is low => we may possibly be re-enabling data input for a pgm "pause" operation
+		    // we include 30h cmd as exception because model will latch 00h-30h cmd to lastCmd even for un-selected dies
+		    // we include 10h cmd as exception for case of mp_copyback read, single plane copyback pgm, other plane copyback pgm. Other plane pgm was never executed b/c lastCmd=10h
+                    if ((lastCmd === 8'h85) || (lastCmd === 8'h80) || (lastCmd === 8'h30) || (lastCmd === 8'h10)) begin
 		    	// code is directly copied from row_valid case above
                         col_valid = 1'b0;
                         col_counter = 0;
                         sub_col_cnt = sub_col_cnt_init;  // reset sub col count
-                        //do net set lastCmd here since this is just random data input and not the start of a command
+                        // do not set lastCmd here since this is just random data input and not the start of a command, except after 30h, 10h cmd
+                        if (lastCmd === 8'h30 || lastCmd === 8'h10)
+			    lastCmd = 8'h85;
                         addr_start = 1;
                         addr_stop = ADDR_BYTES;
                         cmnd_85h = 1'b1;
-                    end
+                    end else begin
+		        col_valid = 1'b0;
+                        row_valid = 1'b0;
+                        lastCmd = 8'h85;
+                        disable_rdStatus;
+                        addr_start = 1;
+                        addr_stop = ADDR_BYTES;
+                        col_counter = 0;
+                        sub_col_cnt = sub_col_cnt_init;  // reset sub col count
+                        disable_md_stat = 1'b0; 
+		    end
 		end // ends if (row_valid) else...
             end
     
@@ -4094,11 +4412,19 @@ always @ (posedge We_n) begin : cLatch
                     lastCmd = 8'hD0;
                     queued_plane[active_plane] = 1;
                     if(DEBUG[4]) begin $sformat(msg, "INFO: Block Erase Confirm Set queued plane %0d. Value %0d", active_plane, queued_plane[active_plane]); INFO(msg); end 
-                    erase_blk_en = ~ erase_blk_en;
+		    tWB_check_en = 1'b1;
+		    erase_blk_en = ~ erase_blk_en;
 //                    multiplane_op_erase = 1'b0;
 //                    multiplane_op_rd    = 1'b0;
 //                    multiplane_op_wr    = 1'b0;
 //                    cache_op <= 1'b0;
+		    // Previously, we detect D0h command, which triggers erase blk, and then this blk decodes next command.  The erase blk would schedule events instead of using go_busy.
+		    // In the case where we interrupt erase with reset command, the scheduled events would still occur in the future.
+		    // If a new erase command is given close to the scheduled event, then that new erase command might finish ahead of tBERS, but it still schedules events to happen after tBERS.
+		    // With erase suspend, we cannot use scheduled events, so we switch to go_busy method
+		    #(tWB_delay+1); // wait for erase_done to go low
+		    // need to wait for always erase_blk_pls blk to finish, o.w. this cmd detection blk will immediately end at D0h cmd, which will cause conflicts with go_busy blk 
+		    wait(erase_done);
                 end
             end
 
@@ -4130,6 +4456,7 @@ always @ (posedge We_n) begin : cLatch
                     multiplane_op_erase = 1'b1;
                     multiplane_op_rd    = 1'b0;
                     multiplane_op_wr    = 1'b0;
+		    tWB_check_en = 1'b1;
                     go_busy(tWB_delay);
                     Rb_n_int = 1'b0;
                     status_register[6:5]=2'b00;
@@ -4177,7 +4504,7 @@ always @ (posedge We_n) begin : cLatch
             // Command (ECh) : ONFI READ PARAMETER PAGE
             // Only 1 LUN returns data, to avoid collisions
             // ********************************************************
-            else if ((Io [7 : 0] === 8'hEC) & FEATURE_SET[CMD_ONFI] & id_cmd_lun) begin
+            else if ((Io [7 : 0] === 8'hEC) & (FEATURE_SET[CMD_ONFI] || FEATURE_SET2[CMD_JEDEC]) & id_cmd_lun) begin
                 cmnd_85h = 1'b0;
                 saw_cmnd_00h = 1'b0;
                 saw_cmnd_00h_stat = 1'b0;
@@ -4244,6 +4571,8 @@ always @ (posedge We_n) begin : cLatch
                 addr_start = 1;
                 addr_stop = 0;
                 col_counter = 0;
+                ONFI_read_param = 1'b0;
+                do_read_unique = 1'b0;
                 if(FEATURE_SET[CMD_MP]) multiplane_op_rd    = 1'b0;
             end
 
@@ -4310,7 +4639,7 @@ always @ (posedge We_n) begin : cLatch
                 stat_to_rd_mode_c0h  =    1'b0;
                 abort_en = 1'b0;
                 //set lastCmd register 
-                if (sync_mode) begin
+                if (sync_mode || sync_enh_mode) begin
                     lastCmd = 8'hFC;
                     if (~ResetComplete)
                         nand_reset (1'b0);
@@ -4343,6 +4672,7 @@ always @ (posedge We_n) begin : cLatch
                     nand_reset (1'b1);
                 end
             end
+
             // ********************************************************
             // Command (??h) : UNSUPPORTED COMMAND
             // ********************************************************
@@ -4392,6 +4722,9 @@ always @ (posedge We_n) begin : cLatch
                 addr_start = COL_BYTES +1;
                 addr_stop = ADDR_BYTES;
                 row_valid = 1'b0;
+		if (lastCmd == 8'hFA && FEATURE_SET2[CMD_RESETLUN]) begin
+		    lastCmd = 8'hAA; // set to illegal value to stop chip from executing another reset LUN during 78h cmd
+		end
             end
 
             // ********************************************************
@@ -4432,7 +4765,7 @@ always @ (posedge We_n) begin : cLatch
                 stat_to_rd_mode_c0h  =    1'b0;
                 // ??? saw_cmd_60 support 
                 abort_en = 1'b0;
-                if (sync_mode) begin
+                if (sync_mode || sync_enh_mode) begin
                     lastCmd = 8'hFC;
                     nand_reset (1'b1);
                 end else begin
@@ -4454,16 +4787,28 @@ always @ (posedge We_n) begin : cLatch
                 lastCmd = 8'hFF;
                 nand_reset (1'b1);
             end            
+
+            // ********************************************************
+            // Command (??h) : UNSUPPORTED COMMAND (DURING BUSY)
+            // ********************************************************
             else begin
-             // else this is a non-status command during busy.
-             // since this could be an interleaved die operation, tell this device
-             //  to look at the upcoming address cycles to de-select the die if needed
-                if(die_select) begin
-                col_valid = 1'b0;
-                row_valid = 1'b0;
-                addr_start = 1;
-                addr_stop = ADDR_BYTES;
-            end
+		// else this is a non-status command during busy.
+		// since this could be an interleaved die operation, tell this device
+		//  to look at the upcoming address cycles to de-select the die if needed
+                if (die_select) begin
+		    if (Io[7:0] == 8'h30 || Io[7:0] == 8'h32 || Io[7:0] == 8'h35 || Io[7:0] == 8'h10 || Io[7:0] == 8'h11 || Io[7:0] == 8'h15 ||
+			Io[7:0] == 8'hD0 || Io[7:0] == 8'hD1) begin
+			$sformat(msg, "LUN is busy, and has received new %0hh command. New command will be ignored.", Io); ERROR(ERR_CMD, msg);
+		    end
+		    if ({Io[7:1], 1'b0} !== 8'h60 && {Io[7:1], 1'b0} !== 8'hD0)
+			col_valid = 1'b0; // Do not reset for case of interleaved read and erase, read did not output data
+		    row_valid = 1'b0;
+		    if ({Io[7:1], 1'b0} === 8'h60)
+			addr_start = COL_BYTES +1;
+		    else
+			addr_start = 1;
+		    addr_stop = ADDR_BYTES;
+		end
             end
         end // : cLatch_unbusy/busy_command
     end // : Cle_enable
@@ -4545,15 +4890,15 @@ end
         end
     end
 
-    assign datain_sync = Cle_del & Ale_del & ~Ce_n & Re_n & Rb_n_int & sync_mode; // ??? remove CE# for new parts.
+    assign datain_sync = Cle_del & Ale_del & ~Ce_n & Re_n & Rb_n_int & sync_mode & ~sync_enh_mode; // ??? remove CE# for new parts.
 
 //async mode data input
-assign datain_async = ~Cle & ~Ale & ~Ce_n & Re_n & Rb_n_int & ~sync_mode;
+assign datain_async = ~Cle & ~Ale & ~Ce_n & Re_n & Rb_n_int & ~sync_mode & ~sync_enh_mode;
 always @(posedge We_n) begin
     if (datain_async)
     begin : latch_data_async
         //only async mode needs these two variables set for tADL calculation
-        if (die_select && ~sync_mode) begin
+        if (die_select && ~sync_mode && ~sync_enh_mode) begin
             we_adl_active <= 1'b1;
             tm_we_data_r <= $realtime;
         end
@@ -4568,7 +4913,7 @@ always @(posedge We_n) begin
                             onfi_features[id_reg_addr][7:0] = Io;
                     end  //P1
                 1:  begin
-                        if ((id_reg_addr == 8'h60) || (id_reg_addr == 8'h92)) begin
+                        if ((id_reg_addr == 8'h02) || (id_reg_addr == 8'h60) || (id_reg_addr == 8'h91) || (id_reg_addr == 8'h92)) begin
                             onfi_features[id_reg_addr][15:8] = Io;
                         end else begin
                             onfi_features[id_reg_addr][15:8]  = 8'h00;
@@ -4590,6 +4935,7 @@ always @(posedge We_n) begin
                             onfi_features[id_reg_addr][31:24]  = 8'h00;
                         end
                         //now we store the data
+			tWB_check_en = 1'b1;
                         go_busy(tWB_delay);
                         Rb_n_int = 1'b0;
                         status_register[6:5]=2'b00;
@@ -4652,7 +4998,7 @@ end
     // sync mode data input
     always @(Dqs) begin
     // data input
-        if (datain_sync)
+        if (datain_sync || datain_sync_enh)
         begin : latch_data_sync
             //also need to recognize here that the SET FEATURES command will apply to all LUNs per chip-enable
             if (lastCmd === 8'hEF) begin
@@ -4665,7 +5011,7 @@ end
                         onfi_features[id_reg_addr][7:0] = Io;
                 end //P1
                 1: begin
-                    if ((id_reg_addr == 8'h60) || (id_reg_addr == 8'h92))
+                    if ((id_reg_addr == 8'h02) || (id_reg_addr == 8'h60) || (id_reg_addr == 8'h91) || (id_reg_addr == 8'h92))
                         onfi_features[id_reg_addr][15:8] = Io;
                     else 
                         onfi_features[id_reg_addr][15:8]  = 8'h00;
@@ -4685,10 +5031,11 @@ end
                         onfi_features[id_reg_addr][31:24]  = 8'h00;
                     end
                     //now we store the data
+		    tWB_check_en = 1'b1;
                     go_busy(tWB_delay);
                     Rb_n_int = 1'b0;
                     status_register[6:5]=2'b00;
-                    if (sync_mode) 
+                    if ((id_reg_addr == 8'h01) && (sync_mode || sync_enh_mode))
                         wait_for_cen <= 1;
                     go_busy(tFEAT);
                     //now update the design based on the input features parameters
@@ -4778,20 +5125,25 @@ end
 //-----------------------------------------------------------------
 // Data output
 //-----------------------------------------------------------------
-    always @(Clk) begin
-        //#############################
-        // SYNC MODE OUTPUT
-        //#############################
-      if (sync_mode) begin
-        //check to see if last posedge Clk had Cle and Ale high, so we'll still output data after tDQSCK from negedge clock
-        //  regardless if Ale and Cle have already gone low when negedge Clk occurs
-        if (Clk)    sync_output_active = (sync_mode && Cle && Ale && ~Ce_n && die_select &&  ~Wr_n);
+always @(Clk) begin
+    //#############################
+    // SYNC MODE OUTPUT
+    //#############################
+    if (sync_mode) begin
+	//check to see if last posedge Clk had Cle and Ale high, so we'll still output data after tDQSCK from negedge clock
+	//  regardless if Ale and Cle have already gone low when negedge Clk occurs
+	if (Clk)    sync_output_active = (sync_mode && Cle && Ale && ~Ce_n && die_select && ~Wr_n);
+	data_out_sync_enh_and_sync;
+    end
+end
 
+task data_out_sync_enh_and_sync;
+    begin
         //Sync Mode status output
-        if (sync_output_active && status_cmnd) begin
+        if ((sync_output_active || data_out_enable_sync_enh) && status_cmnd) begin
             output_status;
         end else begin
-            if (sync_output_active && (Clk || (~Clk && saw_posedge_dqs)) && (Rb_n_int === 1'b1)) begin : not_busy_sync
+            if (((sync_output_active && (Clk || (~Clk && saw_posedge_dqs))) || data_out_enable_sync_enh) && (Rb_n_int === 1'b1)) begin : not_busy_sync
                 //Read ID2 and Read Unique take precedence.  Only way out is reset or power up/down
                 //-----------------
                 if (do_read_id_2) begin
@@ -4837,15 +5189,13 @@ end
                     if(lastCmd == 8'hEC) begin
                         if(bypass_cache) begin
                             data_out_reg[07:00] = data_reg[active_plane]  >> ((((col_counter+col_addr))) * 8) ;
-                            `ifdef x8
-                            `else
-                                data_out_reg[DQ_BITS-1:08] = data_reg[active_plane]  >> ((((col_counter+col_addr))) * (DQ_BITS-8)) ;
+                            `ifdef x16
+                                data_out_reg[DQ_BITS-1:08] = 8'h00;
                             `endif
                         end else begin
                             data_out_reg[07:00] = cache_reg[active_plane] >> ((((col_counter+col_addr))) * 8) ;
-                            `ifdef x8
-                            `else
-                                data_out_reg[DQ_BITS-1:08] = cache_reg[active_plane] >> ((((col_counter+col_addr))) * (DQ_BITS-8)) ;
+                            `ifdef x16
+                                data_out_reg[DQ_BITS-1:08] = 8'h00;
                             `endif
                         end
                         sync_output_data (data_out_reg);
@@ -4871,7 +5221,8 @@ end
                 //-----------------
                 end else if (~col_valid && ~row_valid && (lastCmd === 8'h35)) begin
                     // use cache mode timing
-                    sync_output_data(cache_reg[active_plane] [cache_reg[active_plane] >> ((col_counter+col_addr)*DQ_BITS)]);
+                    data_out_reg = cache_reg[active_plane] >> ((((col_counter+col_addr) * BPC_MAX) + sub_col_cnt) * DQ_BITS) ;
+                    sync_output_data(data_out_reg);
 
                     col_counter = fn_inc_col_counter(col_counter, MLC_SLC, BPC, sub_col_cnt)  ;
                     sub_col_cnt = fn_sub_col_cnt(sub_col_cnt, MLC_SLC, BPC, sub_col_cnt_init) ;
@@ -4957,9 +5308,28 @@ end
                         endcase
                         sync_output_data(data);
                         if (DEBUG[0]) begin $sformat(msg, "ONFI Read ID (%0h)", col_counter); INFO(msg); end
-
-                           col_counter = col_counter + 1;
-                    end //onfi_id_read
+                        col_counter = col_counter + 1;
+                    end else if ((id_reg_addr === 8'h40) && (FEATURE_SET2[CMD_JEDEC])) begin
+                        //-----------------
+                        //Read JEDEC ID
+                        //-----------------
+                        case (col_counter)
+                            0,1     : data = 8'h4A; //'J'
+                            2,3     : data = 8'h45; //'E'
+                            4,5     : data = 8'h44; //'D'
+                            6,7     : data = 8'h45; //'E'
+                            8,9     : data = 8'h43; //'C'
+                            10,11   : data = 8'h05; // sync mode
+                            default : begin
+                               $sformat(msg, "JEDEC read beyond 6 bytes is indeterminate.");
+                               ERROR(ERR_MISC, msg);
+                               data = {DQ_BITS{1'bx}};
+                            end
+                        endcase
+                        sync_output_data(data);
+                        if (DEBUG[0]) begin $sformat(msg, "JEDEC Read ID (%0h)", col_counter); INFO(msg); end
+                        col_counter = col_counter + 1;
+                    end // id_read
                 end else if ((lastCmd === 8'hFF) | (lastCmd === 8'hFC) | (lastCmd === 8'hFA)) begin
                     rd_out <= #tAC_sync_max 1'b0;
                     $sformat(msg, "data invalidated by reset");
@@ -4978,10 +5348,11 @@ end
                 if (~status_cmnd)    rd_out <= #tAC_sync_max 1'b0;
             end // : not_busy
         end
-      end // : sync_mode
     end
 
-assign data_out_enable_async = (~sync_mode && ~Cle && ~Ale && ~Ce_n && We_n && die_select);
+endtask
+
+assign data_out_enable_async = (~sync_mode && ~sync_enh_mode && ~Cle && ~Ale && ~Ce_n && We_n && die_select);
 always @ (negedge Re_n) begin
     //#############################
     // ASYNC MODE OUTPUT
@@ -4992,7 +5363,7 @@ always @ (negedge Re_n) begin
         output_status;
     end else begin
     //only need to go here if not a status reg read
-    if (die_select && ~sync_mode) begin : rd_die_select
+    if (die_select && ~sync_mode && ~sync_enh_mode) begin : rd_die_select
         if (data_out_enable_async && (Rb_n_int === 1'b1)) begin : not_busy
             //Read ID2 and Read Unique take precedence.  Only way out is reset or power up/down
             //-----------------
@@ -5053,7 +5424,7 @@ always @ (negedge Re_n) begin
                         if (DEBUG[2]) begin $sformat(msg, "Using tREA timing"); INFO(msg); end
                         `ifdef x16
                             Io_buf[07:00] <= #(tREA_max) cache_reg[active_plane] >> ((col_counter+col_addr)*8);
-                            Io_buf[15:08] <= #(tREA_max) cache_reg[active_plane] >> ((col_counter+col_addr)*8);
+                            Io_buf[15:08] <= #(tREA_max) 8'h00;
                         `else
                             Io_buf <= #(tREA_max) cache_reg[active_plane] >> ((col_counter+col_addr)*DQ_BITS);
                         `endif
@@ -5063,7 +5434,7 @@ always @ (negedge Re_n) begin
                         if (DEBUG[2]) begin $sformat(msg, "Using tCEA timing"); INFO(msg); end
                         `ifdef x16
                             Io_buf[07:00] <= #(tm_ce_n_f + tCEA_max - $realtime) cache_reg[active_plane] >> ((col_counter+col_addr)*8);
-                            Io_buf[15:08] <= #(tm_ce_n_f + tCEA_max - $realtime) cache_reg[active_plane] >> ((col_counter+col_addr)*8);
+                            Io_buf[15:08] <= #(tm_ce_n_f + tCEA_max - $realtime) 8'h00;
                         `else
                             Io_buf <= #(tm_ce_n_f + tCEA_max - $realtime) cache_reg[active_plane] >> ((col_counter+col_addr)*DQ_BITS);
                         `endif
@@ -5204,31 +5575,44 @@ always @ (negedge Re_n) begin
                            ERROR(ERR_MISC, msg);
                            IoX_enable <= #(tREA_max) 1'b1;
                            rd_out <= #(tREA_max) 1'b0;
-                    end
+                    end else begin
+                           rd_out <= #(tREA_max) 1'b1 ;
+		    end
             
                     case (col_counter)
-                        0 : begin
-                            Io_buf <= #(tREA_max) 8'h4F; //'O'
-                            rd_out <= #(tREA_max) 1'b1 ;
-                        end
-                        1 : begin
-                            Io_buf <= #(tREA_max) 8'h4E; //'N'
-                            rd_out <= #(tREA_max) 1'b1 ;
-                        end
-                        2 : begin
-                            Io_buf <= #(tREA_max) 8'h46; //'F'
-                            rd_out <= #(tREA_max) 1'b1 ;
-                        end
-                        3 : begin
-                            Io_buf <= #(tREA_max) 8'h49; //'I'
-                            rd_out <= #(tREA_max) 1'b1 ;
-                        end
+                        0 : Io_buf <= #(tREA_max) 8'h4F; //'O'
+                        1 : Io_buf <= #(tREA_max) 8'h4E; //'N'
+                        2 : Io_buf <= #(tREA_max) 8'h46; //'F'
+                        3 : Io_buf <= #(tREA_max) 8'h49; //'I'
                     endcase
     
                     if (DEBUG[0]) begin $sformat(msg, "ONFI Read ID (%0h)", col_counter); INFO(msg); end
-
-                       col_counter = col_counter + 1;
-                end //onfi_id_read
+                    col_counter = col_counter + 1;
+                end else if ((id_reg_addr === 8'h40) && (FEATURE_SET2[CMD_JEDEC])) begin
+                    //-----------------
+                    //Read JEDEC ID
+                    //-----------------
+                    if (col_counter > 5) begin
+                           $sformat(msg, "JEDEC read beyond 6 bytes is indeterminate.");
+                           ERROR(ERR_MISC, msg);
+                           IoX_enable <= #(tREA_max) 1'b1;
+                           rd_out <= #(tREA_max) 1'b0;
+                    end else begin
+                            rd_out <= #(tREA_max) 1'b1 ;
+		    end
+            
+                    case (col_counter)
+                        0 : Io_buf <= #(tREA_max) 8'h4A; //'J'
+                        1 : Io_buf <= #(tREA_max) 8'h45; //'E'
+                        2 : Io_buf <= #(tREA_max) 8'h44; //'D'
+                        3 : Io_buf <= #(tREA_max) 8'h45; //'E'
+                        4 : Io_buf <= #(tREA_max) 8'h43; //'C'
+                        5 : Io_buf <= #(tREA_max) 8'h01; // async mode
+                    endcase
+    
+                    if (DEBUG[0]) begin $sformat(msg, "JEDEC Read ID (%0h)", col_counter); INFO(msg); end
+                    col_counter = col_counter + 1;
+                end // id_read
             end else if (Pre) begin
                 //----------------------
                 //Power-On Preload read
@@ -5306,7 +5690,7 @@ end
 
 // reschedule these transitions for special timing cases
 always @ (posedge Ce_n) begin
-if(~sync_mode) begin
+if(~sync_mode && ~sync_enh_mode) begin
     //----------------------------------
     //posedge Ce_n with Re_n already low 
     //----------------------------------
@@ -5438,11 +5822,11 @@ end
 */
     
 always @ (posedge We_n) begin 
-    if (command_enable & ($realtime < (tVCC_delay+tRB_PU_max))) begin $sformat(msg,"Host must wait for R/B# to be valid and high before issuing the reset cmd : delay timing =%d ns", (tVCC_delay+tRB_PU_max)); ERROR(ERR_TIM, msg); end
+    if (command_enable && ($realtime < (tVCC_delay+tRB_PU_max))) begin $sformat(msg,"Host must wait for R/B# to be valid and high before issuing the reset cmd : delay timing =%d ns", (tVCC_delay+tRB_PU_max)); ERROR(ERR_TIM, msg); end
 end 
 
 always @ (We_n) begin
-  if (~sync_mode & PowerUp_Complete) begin
+  if (~sync_mode & ~sync_enh_mode & PowerUp_Complete) begin
     if (~We_n) begin : negedge_We_n
         if (~Ce_n) begin
              if (cache_op === 1) begin
@@ -5463,7 +5847,7 @@ always @ (We_n) begin
         if (~Ce_n) begin
             if (cache_op === 1) begin
                 // special cache mode timing checks
-                if ((lastCmd == 8'h85) && ~Ale && ~Cle && ~status_cmnd) begin
+                if (cmnd_85h && ~Ale && ~Cle && ~status_cmnd && ~cmnd_78h) begin
                     if ($realtime - tm_we_n_r_ale < tCCS_cache_min) begin $sformat(msg,"Cache Mode tCCS violation on We_n by %t", tm_we_n_r_ale + tCCS_cache_min - $realtime); ERROR(ERR_TIM,msg); end
                 end
                 if ($realtime - tm_we_n_f < tWP_cache_min) begin $sformat(msg,"Cache Mode tWP violation on We_n by %t ", tm_we_n_f + tWP_cache_min - $realtime); ERROR(ERR_TIM, msg); end
@@ -5479,8 +5863,8 @@ always @ (We_n) begin
                 if ($realtime - tm_cle_r < tCLSIO_min) begin $sformat(msg,"tCLSIO violation on We_n by %t ", tm_cle_r + tCLSIO_min - $realtime); ERROR(ERR_TIM, msg); end
                 if ($realtime - tm_cle_f < tCLSIO_min) begin $sformat(msg,"tCLSIO violation on We_n by %t ", tm_cle_f + tCLSIO_min - $realtime); ERROR(ERR_TIM, msg); end
                 if ($realtime - tm_io_ztodata < tDSIO_min) begin $sformat(msg,"tDSIO violation on We_n by %t ", tm_io_ztodata + tDSIO_min - $realtime); ERROR(ERR_TIM, msg); end
-            end else if ((lastCmd == 8'h85) && ~Ale && ~Cle && ~status_cmnd) begin
-                if ($realtime - tm_we_n_r_ale < tCCS_min) begin $sformat(msg,"Cache Mode tCCS violation on We_n by %t", tm_we_n_r_ale + tCCS_min - $realtime); ERROR(ERR_TIM,msg); end
+            end else if (cmnd_85h && ~Ale && ~Cle && ~status_cmnd && ~cmnd_78h && die_select) begin
+                if ($realtime - tm_we_n_r_ale < tCCS_min) begin $sformat(msg,"tCCS violation on We_n by %t", tm_we_n_r_ale + tCCS_min - $realtime); ERROR(ERR_TIM,msg); end
             end else begin
                 if ($realtime - tm_we_n_f < tWP_min) begin $sformat(msg,"tWP violation on We_n by %t ", tm_we_n_f + tWP_min - $realtime); ERROR(ERR_TIM, msg); end
                 if ($realtime - tm_ale_r < tALS_min) begin $sformat(msg,"tALS violation on We_n by %t ", tm_ale_r + tALS_min - $realtime); ERROR(ERR_TIM, msg); end
@@ -5504,12 +5888,12 @@ end
 
 
 always @ (Re_n) begin
-  if (~sync_mode & PowerUp_Complete) begin
+  if (~sync_mode & ~sync_enh_mode & PowerUp_Complete) begin
     if (~Re_n) begin : negedge_Re_n
         if (~Ce_n) begin
             if (cache_op === 1) begin
                 // special cache mode timing checks
-                if ((lastCmd == 8'hE0) && ~status_cmnd) begin
+                if ((lastCmd == 8'hE0) && ~status_cmnd && ~cmnd_78h) begin
                     if ($realtime - tm_we_n_r < tCCS_cache_min) begin $sformat(msg,"Cache Mode tCCS violation on Re_n by %t", tm_we_n_r + tCCS_cache_min - $realtime); ERROR(ERR_TIM,msg); end
                 end
                 if ($realtime - tm_io_datatoz < tIR_cache_min) begin $sformat(msg,"Cache Mode tIR violation on Re_n by %t ", tm_io_datatoz + tIR_cache_min - $realtime); ERROR(ERR_TIM, msg); end
@@ -5518,8 +5902,8 @@ always @ (Re_n) begin
                 if ($realtime - tm_we_n_r < tWHR_cache_min) begin $sformat(msg,"Cache Mode tWHR violation on Re_n by %t ", tm_we_n_r + tWHR_cache_min - $realtime); ERROR(ERR_TIM, msg); end
             end else if (lastCmd === 8'hB8) begin
                 if ($realtime - tm_we_n_r < tWHRIO_min) begin $sformat(msg,"tWHRIO violation on Re_n by %t ", tm_we_n_r + tWHRIO_min - $realtime); ERROR(ERR_TIM, msg); end
-            end else if ((lastCmd == 8'hE0) && ~status_cmnd) begin
-                    if ($realtime - tm_we_n_r < tCCS_min) begin $sformat(msg,"Cache Mode tCCS violation on Re_n by %t", tm_we_n_r + tCCS_min - $realtime); ERROR(ERR_TIM,msg); end
+            end else if ((lastCmd == 8'hE0) && ~status_cmnd && ~cmnd_78h && die_select) begin
+                    if ($realtime - tm_we_n_r < tCCS_min) begin $sformat(msg,"tCCS violation on Re_n by %t", tm_we_n_r + tCCS_min - $realtime); ERROR(ERR_TIM,msg); end
             end else begin
                 if ($realtime - tm_ale_f < tAR_min) begin $sformat(msg,"tAR violation on Re_n by %t ", tm_ale_f + tAR_min - $realtime); ERROR(ERR_TIM, msg); end
                 if ($realtime - tm_cle_f < tCLR_min) begin $sformat(msg,"tCLR violation on Re_n by %t ", tm_cle_f + tCLR_min - $realtime); ERROR(ERR_TIM, msg); end
@@ -5527,7 +5911,7 @@ always @ (Re_n) begin
                 if ($realtime - tm_re_n_r < tREH_min) begin $sformat(msg,"tREH violation on Re_n by %t ", tm_re_n_r + tREH_min - $realtime); ERROR(ERR_TIM, msg); end
                 if ($realtime - tm_we_n_r < tWHR_min) begin $sformat(msg,"tWHR violation on Re_n by %t ", tm_we_n_r + tWHR_min - $realtime); ERROR(ERR_TIM, msg); end
                 if ($realtime - tm_io_datatoz < tIR_min) begin $sformat(msg,"tIR violation on Re_n by %t ", tm_io_datatoz + tIR_min - $realtime); ERROR(ERR_TIM, msg); end
-                if (($realtime - tm_rb_n_r < tRR_min) && ~status_cmnd) begin $sformat(msg,"tRR violation on Re_n by %t ", tm_rb_n_r + tRR_min - $realtime); ERROR(ERR_TIM, msg); end
+                if (($realtime - tm_rb_n_r < tRR_min) && ~status_cmnd && die_select) begin $sformat(msg,"tRR violation on Re_n by %t ", tm_rb_n_r + tRR_min - $realtime); ERROR(ERR_TIM, msg); end
             end
 `ifdef EDO
             //read EDO mode, not supported by all devices
@@ -5560,13 +5944,13 @@ always @ (Ce_n) begin
     if (~Ce_n) begin
         tm_ce_n_f <= $realtime;
     end else begin
-        if (PowerUp_Complete && ~sync_mode) begin
+        if (PowerUp_Complete && ~sync_mode && ~sync_enh_mode) begin
             if (cache_op === 1) begin
                 // special cache mode timing checks
-                if ($realtime - tm_we_n_r < tCH_cache_min) begin $sformat(msg,"Cache Mode tCH violation on Re_n by %0t", tm_we_n_r + tCH_cache_min - $realtime);  ERROR(ERR_TIM, msg); end
-            end    else begin
+                if ($realtime - tm_we_n_r < tCH_cache_min) begin $sformat(msg,"Cache Mode tCH violation on We_n by %0t", tm_we_n_r + tCH_cache_min - $realtime);  ERROR(ERR_TIM, msg); end
+            end else begin
                 //avoid timing violation during sim init if Ce_n starts as anything other than 1'b1
-                if (($realtime - tm_we_n_r < tCH_min) && (tm_we_n_r > 0)) begin $sformat(msg,"tCH violation on Re_n by %0t", tm_we_n_r + tCH_min - $realtime); ERROR(ERR_TIM, msg); end
+                if (($realtime - tm_we_n_r < tCH_min) && (tm_we_n_r > 0)) begin $sformat(msg,"tCH violation on We_n by %0t", tm_we_n_r + tCH_min - $realtime); ERROR(ERR_TIM, msg); end
             end
         end
         tm_ce_n_r <= $realtime;
@@ -5588,7 +5972,7 @@ always @ (Cle) begin
     end else begin
         tm_cle_r <= $realtime;
     end
-    if (PowerUp_Complete && ~sync_mode) begin
+    if (PowerUp_Complete && ~sync_mode && ~sync_enh_mode) begin
         if (cache_op === 1) begin
             // special cache mode timing checks
             if ($realtime - tm_we_n_r < tCLH_cache_min) begin $sformat(msg,"Cache Mode tCLH violation on Cle by %0t", tm_we_n_r + tCLH_cache_min - $realtime); ERROR(ERR_TIM, msg); end
@@ -5598,7 +5982,7 @@ always @ (Cle) begin
             if ($realtime - tm_we_n_r < tCLH_min) begin $sformat(msg,"tCLH violation on Cle by %0t", tm_we_n_r + tCLH_min - $realtime); ERROR(ERR_TIM, msg); end
         end
     end
-  end //~sync_mode && ~Ce_n
+  end //~sync_mode && ~sync_enh_mode && ~Ce_n
 end
 
 always @ (Ale) begin
@@ -5608,7 +5992,7 @@ always @ (Ale) begin
     end else begin
         tm_ale_r <= $realtime;
     end
-    if (PowerUp_Complete && ~sync_mode) begin
+    if (PowerUp_Complete && ~sync_mode && ~sync_enh_mode) begin
         if (cache_op === 1) begin
             // special cache mode timing checks
             if ($realtime - tm_we_n_r < tALH_cache_min) begin $sformat(msg,"Cache Mode tALH violation on Ale by %0t", tm_we_n_r + tALH_cache_min - $realtime); ERROR(ERR_TIM, msg); end
@@ -5616,11 +6000,11 @@ always @ (Ale) begin
             if ($realtime - tm_we_n_r < tALH_min) begin $sformat(msg,"tALH violation on Ale by %0t", tm_we_n_r + tALH_min - $realtime); ERROR(ERR_TIM, msg); end
         end
     end
-  end //~sync_mode && ~Ce_n
+  end //~sync_mode && ~sync_enh_mode && ~Ce_n
 end
 
 always @ (Io_buf) begin
-  if (~sync_mode && ~Ce_n) begin
+  if (~sync_mode && ~sync_enh_mode && ~Ce_n) begin
     if ((Io_buf === {DQ_BITS{1'bx}}) && ($realtime == t_readtox)) begin
         if (PowerUp_Complete) begin
             if (cache_op === 1) begin
@@ -5644,8 +6028,48 @@ always @ (Io_buf) begin
     end else begin
         tm_io_ztodata <= $realtime;
     end
-  end //~sync_mode && ~Ce_n
+  end //~sync_mode && ~sync_enh_mode && ~Ce_n
 end
+
+always @(posedge tWB_check_en) begin
+    tWB_check;
+end
+
+//-----------------------------------------------------------------
+// TASK : tWB_check ()
+// Check that no commands are issued during tWB
+// template of this task comes from go_busy task
+//-----------------------------------------------------------------
+task tWB_check;
+    integer delay;
+    reg saw_edge_we_n;
+    reg last_we_n;
+    realtime tstep;
+begin
+    tstep = (1000 * TS_RES_ADJUST);
+    delay = tWB_delay;
+    last_we_n = We_n;
+    while (delay > 0) begin
+        if ((delay -tstep) >= 0) begin
+            #tstep;
+        end else begin
+            #delay;
+        end
+        delay = delay - tstep;
+        if (delay < 0) delay = 0;
+        if (last_we_n !== We_n) begin
+            saw_edge_we_n = 1'b1;
+        end else begin
+            saw_edge_we_n = 1'b0;
+        end
+        last_we_n = We_n;
+        if (Cle && We_n && ~Ale && Re_n && ~Ce_n && saw_edge_we_n) begin
+	    $sformat(msg, "Do not issue a new command during tWB, even if R/B# or RDY is ready"); ERROR(ERR_CMD, msg);
+        end
+    end
+    tWB_check_en = 1'b0;
+end
+endtask
 
     //#########################################################################
     //  High-speed sync logic
@@ -5870,7 +6294,7 @@ end
                 if (($realtime - tm_clk_r < tWHR_sync_min) && (lastState == 3'b110) && ~Wr_n) begin $sformat(msg,"Sync mode : tWHR violation by %t ", tm_clk_r + tWHR_sync_min - $realtime); ERROR(ERR_TIM, msg); end
             end else if ((Cle || Ale) && Clk) begin //posedge Clk with Command or address
                 if ($realtime - tm_wp_n < tWW_sync_min) begin $sformat(msg,"Sync mode : tWW violation by %t ", tm_wp_n + tWW_sync_min - $realtime); ERROR(ERR_TIM, msg); end
-                if (($realtime - tm_clk_r < tRHW_sync_min) && (lastState == 3'b011)) begin $sformat(msg,"Sync mode : tRHW violation by %t ", tm_clk_r + tRHW_sync_min - $realtime); ERROR(ERR_TIM, msg); end
+                if ($realtime - tm_wr_n_r < tRHW_sync_min) begin $sformat(msg,"Sync mode : tRHW violation by %t ", tm_wr_n_r + tRHW_sync_min - $realtime); ERROR(ERR_TIM, msg); end
                 // report violation if we violate tCAD or we didn't idle before switching from data in/out to cmd/addr 
                 if (($realtime - tm_cad_r) < tCAD_sync_min) begin $sformat(msg,"Sync mode : tCAD violation by %0t", tm_cad_r + tCAD_sync_min - $realtime); ERROR(ERR_TIM, msg); end
                 if (($realtime - tm_dq) < tCAS_sync_min) begin $sformat(msg, "Sync mode : tCAS violation by %0t", tCAS_sync_min - ($realtime - tm_dq)); ERROR(ERR_TIM,msg);end
@@ -5880,13 +6304,14 @@ end
             end
             if (~Wr_n) begin
                 if (($realtime - tm_wr_n_f) < tCALS_sync_min) begin $sformat(msg,"Sync mode : Wr_n tCALS violation by %0t", (tm_wr_n_f + tCALS_sync_min - $realtime)); ERROR(ERR_TIM, msg); end
-                if ((($realtime - tm_cad_r) < tCAD_sync_min) && status_cmnd) begin $sformat(msg,"Sync mode : Status read Wr_n tCAD violation by %0t", tm_cad_r + tCAD_sync_min - $realtime); ERROR(ERR_TIM, msg); end
             end
             if (Ale) begin
                 if (($realtime - tm_ale_r) < tCALS_sync_min) begin $sformat(msg,"Sync mode : Ale tCALS violation by %0t", tm_ale_r + tCALS_sync_min - $realtime); ERROR(ERR_TIM, msg); end        
+                if (~Wr_n && ($realtime - tm_wr_n_clk) < tWRCK_sync_min) begin $sformat(msg,"Sync mode : Ale tWRCK violation by %0t", tm_wr_n_clk + tWRCK_sync_min - $realtime); ERROR(ERR_TIM, msg); end        
             end
             if (Cle) begin
                 if (($realtime - tm_cle_r) < tCALS_sync_min) begin $sformat(msg,"Sync mode : Cle tCALS violation by %0t", tm_cle_r + tCALS_sync_min - $realtime); ERROR(ERR_TIM, msg); end
+                if (~Wr_n && ($realtime - tm_wr_n_clk) < tWRCK_sync_min) begin $sformat(msg,"Sync mode : Cle tWRCK violation by %0t", tm_wr_n_clk + tWRCK_sync_min - $realtime); ERROR(ERR_TIM, msg); end        
             end
         end
         if (~Ce_n && ~Clk) begin : negedge_Clk
@@ -5923,6 +6348,7 @@ end
 
     //keep track of last command or address clock edge for use in tWHR check
     always @(posedge Clk) begin
+        if(sync_mode && ~Ce_n) begin
         case ({Ale, Cle}) 
         2'b01 : begin
                     tm_cle_clk <= $realtime;
@@ -5931,6 +6357,7 @@ end
                 end
         2'b10 :  tm_ale_clk <= $realtime;
         endcase
+        end
     end
 
     always @(posedge Clk) begin
@@ -5941,7 +6368,10 @@ end
                 if (Cle && Ale) begin 
                 //check for first clock during data read, enable first_dqs control for timing checks 
                     if (($realtime - tm_ale_clk) < tADL_sync_min) begin $sformat(msg, "Sync Mode : tADL violation by %0t", tADL_sync_min - ($realtime - tm_ale_clk)); ERROR(ERR_TIM,msg); end
-                    if ((($realtime - tm_cle_r) < ($realtime - tm_clk_r)) && (($realtime - tm_ale_r) < ($realtime - tm_clk_r))) begin
+		    if (cmnd_85h && ~status_cmnd && ~cmnd_78h && die_select) begin
+			if ($realtime - tm_ale_clk < tCCS_min) begin $sformat(msg,"tCCS sync violation by %t", tCCS_min - ($realtime - tm_ale_clk )); ERROR(ERR_TIM,msg); end
+                    end
+		    if ((($realtime - tm_cle_r) < ($realtime - tm_clk_r)) && (($realtime - tm_ale_r) < ($realtime - tm_clk_r))) begin
                         first_dqs <= 1;
                         tm_wr_start <= $realtime;  //start of the write mode cycles
                         tm_wr_end   <= 0;
@@ -5953,10 +6383,13 @@ end
                 end
             end
             if (sync_mode && ~Ce_n && ~Wr_n) begin
-                if (Cle && Ale) begin
+                if (($realtime - tm_wr_n_f) < ($realtime - tm_clk_r)) begin
+		    tm_wr_n_clk <= $realtime;  // latch the time when low Wr_n is latched by clk, use this is tWRCK check
+		end
+		if (Cle && Ale) begin
                     if (($realtime - tm_cle_clk) < tWHR_sync_min) begin $sformat(msg, "Sync Mode : tWHR violation by %0t", tWHR_sync_min - ($realtime - tm_cle_clk)); ERROR(ERR_TIM,msg); end 
-                    if (($realtime - tm_ale_clk) < tWHR_sync_min) begin $sformat(msg, "Sync Mode : tWHR violation by %0t", tWHR_sync_min - ($realtime - tm_cle_clk)); ERROR(ERR_TIM,msg); end 
-                    if ((lastCmd == 8'hE0) && ~saw_cmnd_00h && ~status_cmnd) begin
+                    if (($realtime - tm_ale_clk) < tWHR_sync_min) begin $sformat(msg, "Sync Mode : tWHR violation by %0t", tWHR_sync_min - ($realtime - tm_ale_clk)); ERROR(ERR_TIM,msg); end 
+                    if ((lastCmd == 8'hE0) && ~saw_cmnd_00h && ~status_cmnd && ~cmnd_78h) begin
                         if (($realtime - tm_cle_clk) < tCCS_min) begin $sformat(msg,"tCCS sync violation by %t", tCCS_min - ($realtime - tm_cle_clk)); ERROR(ERR_TIM,msg); end
                     end
                 end
@@ -5987,7 +6420,7 @@ end
                 tm_dqs_f <= $realtime;
             end
             first_dqs <= 0;
-        end else begin
+        end else if (sync_mode && ~Ce_n) begin
         //check for postamble constraint 
             if ((tm_dqs_f > tm_wr_start) && (($realtime - tm_dqs_f) < tWPST_sync_min)) begin $sformat(msg, "Sync Mode : tWPST violation by %0t", tWPST_sync_min - ($realtime - tm_dqs_f)); ERROR(ERR_TIM,msg); end
         end
@@ -6033,6 +6466,7 @@ end
 
         end
 
+	if (sync_mode) begin
         tCKH_sync_min =     0.45 * tCK_sync;
 	    tCKH_sync_max =     0.55 * tCK_sync;
 	    tCKL_sync_min =     0.45 * tCK_sync;
@@ -6057,6 +6491,7 @@ end
 		tCKWR_sync_min = tCKWR_sync_min + 1; // if tCKWR_sync_min was rounded down, then add 1 to it
         tACmaxQHminsync     = tAC_sync_max + tQH_sync_min;
         tACmaxDQSQmaxDVWminsync = tAC_sync_max + tDQSQ_sync_max + tDVW_sync_min;
+	end
 
         if (DEBUG[0]) begin
             $display("Parameters based new clock period ");

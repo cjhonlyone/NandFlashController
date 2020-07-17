@@ -12,6 +12,9 @@ NFC_Atom_FILES = $(wildcard ../rtl/NFC_Atom*.v)
 tb_NFC_Command_FILES = $(wildcard ../tb/tb_NFC_Command*.v)
 NFC_Command_FILES = $(wildcard ../rtl/NFC_Command*.v) 
 
+tb_NFC_Top_FILES = ../tb/tb_NandFlashController_Top.v
+NFC_Top_FILES = ../rtl/NandFlashController_Top.v
+
 nand_model_FILES = $(wildcard ../tb/nandmodel/*.vh) $(wildcard ../tb/nandmodel/*.v)
 
 
@@ -21,17 +24,20 @@ prj: $(tb_NFC_Physical_FILES) $(NFC_Physical_FILES) $(NFC_Command_FILES)
 	for x in $(NFC_Atom_FILES);        do echo "add_files -fileset sources_1 $$x" >> create_project.tcl; done
 	for x in $(NFC_Physical_FILES);    do echo "add_files -fileset sources_1 $$x" >> create_project.tcl; done
 	for x in $(NFC_Command_FILES);     do echo "add_files -fileset sources_1 $$x" >> create_project.tcl; done
+	for x in $(NFC_Top_FILES);     do echo "add_files -fileset sources_1 $$x" >> create_project.tcl; done
 
 	for x in $(tb_NFC_Atom_FILES);     do echo "add_files -fileset sim_1 $$x" >> create_project.tcl; done
 	for x in $(tb_NFC_Physical_FILES); do echo "add_files -fileset sim_1 $$x" >> create_project.tcl; done
 	for x in $(tb_NFC_Command_FILES);  do echo "add_files -fileset sim_1 $$x" >> create_project.tcl; done
-
+	for x in $(tb_NFC_Top_FILES);  do echo "add_files -fileset sim_1 $$x" >> create_project.tcl; done
+	
 	for x in $(nand_model_FILES);      do echo "add_files -fileset sim_1 $$x" >> create_project.tcl; done
+
 
 	echo "add_files -fileset sources_1 ../lib/axis/rtl/axis_fifo.v" >> create_project.tcl;
 	
-	echo "set_property top NFC_Command_Issue_Top [get_filesets sources_1]" >> create_project.tcl;
-	echo "set_property top tb_NFC_Command_Issue_Top [get_filesets sim_1]" >> create_project.tcl;
+	echo "set_property top NandFlashController_Top [get_filesets sources_1]" >> create_project.tcl;
+	echo "set_property top tb_NandFlashController_Top [get_filesets sim_1]" >> create_project.tcl;
 
 	echo "update_compile_order -fileset sources_1" >> create_project.tcl;
 	echo "update_compile_order -fileset sim_1" >> create_project.tcl;

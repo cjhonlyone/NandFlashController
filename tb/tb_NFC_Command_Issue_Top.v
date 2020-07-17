@@ -335,69 +335,6 @@ module tb_NFC_Command_Issue_Top;
         //.Wp2_n()
         );  
 
-// // Parameters
-// parameter DEPTH = 32;
-// parameter DATA_WIDTH = 32;
-// parameter KEEP_ENABLE = (DATA_WIDTH>8);
-// parameter KEEP_WIDTH = (DATA_WIDTH/8);
-// parameter LAST_ENABLE = 1;
-// parameter ID_ENABLE = 1;
-// parameter ID_WIDTH = 8;
-// parameter DEST_ENABLE = 1;
-// parameter DEST_WIDTH = 8;
-// parameter USER_ENABLE = 1;
-// parameter USER_WIDTH = 1;
-// parameter FRAME_FIFO = 1;
-// parameter USER_BAD_FRAME_VALUE = 1'b1;
-// parameter USER_BAD_FRAME_MASK = 1'b1;
-// parameter DROP_BAD_FRAME = 0;
-// parameter DROP_WHEN_FULL = 0;
-
-//     reg [31:0]       s_axis_tdata  ;
-//     reg [ 3:0]       s_axis_tkeep  ;
-//     reg              s_axis_tvalid ;
-//     wire             s_axis_tready ;
-//     reg              s_axis_tlast  ;
-
-//     wire [ 3:0]      m_axis_tkeep  ;
-
-//     axis_fifo #(
-//         .DEPTH(DEPTH),
-//         .DATA_WIDTH(DATA_WIDTH),
-//         .KEEP_ENABLE(KEEP_ENABLE),
-//         .KEEP_WIDTH(KEEP_WIDTH),
-//         .LAST_ENABLE(LAST_ENABLE),
-//         .ID_ENABLE(ID_ENABLE),
-//         .ID_WIDTH(ID_WIDTH),
-//         .DEST_ENABLE(DEST_ENABLE),
-//         .DEST_WIDTH(DEST_WIDTH),
-//         .USER_ENABLE(USER_ENABLE),
-//         .USER_WIDTH(USER_WIDTH),
-//         .FRAME_FIFO(FRAME_FIFO),
-//         .USER_BAD_FRAME_VALUE(USER_BAD_FRAME_VALUE),
-//         .USER_BAD_FRAME_MASK(USER_BAD_FRAME_MASK),
-//         .DROP_BAD_FRAME(DROP_BAD_FRAME),
-//         .DROP_WHEN_FULL(DROP_WHEN_FULL)
-//     ) inst_axis_fifo (
-//             .clk               (iSystemClock),
-//             .rst               (iReset),
-
-//             .s_axis_tdata      (s_axis_tdata),
-//             .s_axis_tkeep      (s_axis_tkeep),
-//             .s_axis_tvalid     (s_axis_tvalid),
-//             .s_axis_tready     (s_axis_tready),
-//             .s_axis_tlast      (s_axis_tlast),
-
-//             .m_axis_tdata      (iCI_ACG_WriteData),
-//             .m_axis_tkeep      (m_axis_tkeep),
-//             .m_axis_tvalid     (iCI_ACG_WriteValid),
-//             .m_axis_tready     (oACG_CI_WriteReady),
-//             .m_axis_tlast      (iCI_ACG_WriteLast),
-
-//             .status_overflow   (status_overflow),
-//             .status_bad_frame  (status_bad_frame),
-//             .status_good_frame (status_good_frame)
-//         );
 
 task s_axis_input;
     begin
@@ -477,7 +414,7 @@ task NFC_CI_signal;
             iTop_CI_WriteData  <= rTop_CI_WriteData ;
             iTop_CI_WriteLast  <= rTop_CI_WriteLast ;
             iTop_CI_WriteValid <= rTop_CI_WriteValid;
-            iTop_CI_ReadReady  <= rTop_CI_ReadReady ;      
+            iTop_CI_ReadReady  <= 1 ;      
 	end
 endtask
 
@@ -514,8 +451,26 @@ endtask
 
 task progpage_80h_10h;
     begin
-    NFC_CI_signal(6'b000011, 5'b00101, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
-    NFC_CI_signal(6'b000011, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
+    NFC_CI_signal(6'b000011, 5'b00000, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    NFC_CI_signal(6'b000011, 5'b00000, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
+    @(posedge iSystemClock);
+    wait(oCI_Top_CMDReady == 0);
+    end
+endtask
+
+task progpage_80h_15h_cache;
+    begin
+    NFC_CI_signal(6'b000011, 5'b00001, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    NFC_CI_signal(6'b000011, 5'b00001, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
+    @(posedge iSystemClock);
+    wait(oCI_Top_CMDReady == 0);
+    end
+endtask
+
+task progpage_80h_10h_multplane;
+    begin
+    NFC_CI_signal(6'b000011, 5'b00010, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    NFC_CI_signal(6'b000011, 5'b00010, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
     @(posedge iSystemClock);
     wait(oCI_Top_CMDReady == 0);
     end
@@ -539,6 +494,48 @@ task eraseblock_60h_d0h;
 	end
 endtask
 
+task readstatus_70h;
+    begin
+    NFC_CI_signal(6'b000111, 5'b00100, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    NFC_CI_signal(6'b000111, 5'b00100, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
+    @(posedge iSystemClock);
+    wait(oCI_Top_CMDReady == 0);
+    end
+endtask
+
+task readstatus_78h;
+    begin
+    NFC_CI_signal(6'b000111, 5'b00101, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    NFC_CI_signal(6'b000111, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
+    @(posedge iSystemClock);
+    wait(oCI_Top_CMDReady == 0);
+    end
+endtask
+
+task select_way;
+    input [7:0] way;
+    begin
+    NFC_CI_signal(6'b100000, 5'b00000, 0, {24'd0,way}, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    end
+endtask
+
+task set_coladdr;
+    input [15:0] col;
+    begin
+    NFC_CI_signal(6'b100010, 5'b00000, 0, {16'd0,col}, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    end
+endtask
+
+task set_rowaddr;
+    input [23:0] row;
+    begin
+    NFC_CI_signal(6'b100100, 5'b00000, 0, {8'd0,row}, 16'h0008, 1, 16'h0000, 0, 0, 0);
+    end
+endtask
+
+    wire RDY  = oCI_Top_ReadData[6];
+    wire ARDY = oCI_Top_ReadData[5];
+
     integer I;
 
     initial
@@ -555,24 +552,40 @@ endtask
         for (I = 0; I < 10; I = I + 1)
             @(posedge iSystemClock);
         
-        NFC_CI_signal(6'b000000, 5'b00100, 0, 32'h00000001, 16'h0000, 1, 16'h0000, 0, 0, 0);
-        NFC_CI_signal(6'b000001, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
-        
-
-        s_axis_input;
+        select_way(8'd1);
         reset_ffh;
         setfeature_efh;
         getfeature_eeh;
-        NFC_CI_signal(6'b000001, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 1);
+
+        set_rowaddr({{5'd0},{12'd0},{7'd0}});
+        s_axis_input;
+        progpage_80h_15h_cache;
+
+        while (RDY == 0) begin
+            readstatus_70h;
+        end
+        // readstatus_78h;
+        // # 1000000
+        // readstatus_70h;
+        // readstatus_78h;
+        // # 1000000;
+
+        set_rowaddr({{5'd0},{12'd0},{7'd1}});
+        s_axis_input;
         progpage_80h_10h;
-        # 2000000;
-        readpage_00h_30h;
-        NFC_CI_signal(6'b000001, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 1);
+
+        while (1) begin
+            readstatus_70h;
+        end
+
+
+        // wait(wACG_CI_ReadyBusy[0] == 1);
+
+        // readpage_00h_30h;
         
-        eraseblock_60h_d0h;
-        readpage_00h_30h;
-        NFC_CI_signal(6'b000001, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 1);
-        repeat (50) @(posedge iSystemClock);
+        // eraseblock_60h_d0h;
+        // readpage_00h_30h;
+        // repeat (50) @(posedge iSystemClock);
         // $finish;
         end
     

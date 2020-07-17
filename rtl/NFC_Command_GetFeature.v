@@ -138,16 +138,16 @@ module NFC_Command_GetFeature
 
     reg   [31:0]                  rfeatures;
     // FSM Parameters/Wires/Regs
-    localparam rST_FSM_BIT    = 8;
-    localparam rST_RESET      = 8'b0000_0001;
-    localparam rST_READY      = 8'b0000_0010; // 
-    localparam rST_CMDIssue   = 8'b0000_0100; // 
-    localparam rST_ADDRIssue  = 8'b0000_1000; // 
-    localparam rST_DATAIssue  = 8'b0001_0000; // 
-    localparam rST_CMD2Issue  = 8'b0010_0000; // 
-    localparam rST_WaitRBLow  = 8'b0100_0000; // 
-    localparam rST_WaitRBHigh = 8'b1000_0000; // 
-    // localparam rST_WaitRBHigh = 8'b1000_0000; // 
+    localparam rST_FSM_BIT    = 9;
+    localparam rST_RESET      = 9'b00000_0001;
+    localparam rST_READY      = 9'b00000_0010; //
+    localparam rST_CMDLatch   = 9'b00000_0100; // 
+    localparam rST_CMDIssue   = 9'b00000_1000; // 
+    localparam rST_ADDRIssue  = 9'b00001_0000; // 
+    localparam rST_DATAIssue  = 9'b00010_0000; // 
+    localparam rST_CMD2Issue  = 9'b00100_0000; // 
+    localparam rST_WaitRBLow  = 9'b01000_0000; // 
+    localparam rST_WaitRBHigh = 9'b10000_0000; // 
 
     reg     [rST_FSM_BIT-1:0]       rST_cur_state          ;
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
@@ -188,7 +188,10 @@ module NFC_Command_GetFeature
                 rST_nxt_state <= rST_READY;
             end
             rST_READY: begin
-                rST_nxt_state <= (wStart)? rST_CMDIssue : rST_READY;
+                rST_nxt_state <= (wStart)? rST_CMDLatch : rST_READY;
+            end
+            rST_CMDLatch: begin
+                rST_nxt_state <= rST_CMDIssue;
             end
             rST_CMDIssue: begin
                 rST_nxt_state <= (wACSDone) ? rST_ADDRIssue : rST_CMDIssue;
@@ -196,9 +199,6 @@ module NFC_Command_GetFeature
             rST_ADDRIssue: begin
                 rST_nxt_state <= (wACSDone) ? rST_WaitRBLow : rST_ADDRIssue;
             end
-            // rST_CMD2Issue: begin
-            //     rST_nxt_state <= (wACSDone) ? rST_WaitRBLow : rST_CMD2Issue;
-            // end
             rST_WaitRBLow: begin
                 rST_nxt_state <= (rWay_ReadyBusy == 0) ? rST_WaitRBHigh : rST_WaitRBLow; // wait for Valid
             end
@@ -208,8 +208,6 @@ module NFC_Command_GetFeature
             rST_DATAIssue: begin
                 rST_nxt_state <= (rLastStep == 1) ? rST_READY : rST_DATAIssue;
             end
-
-
             default:
                 rST_nxt_state <= rST_READY;
         endcase
@@ -258,11 +256,24 @@ module NFC_Command_GetFeature
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
                 end
+                rST_CMDLatch: begin
+                    rCMDReady          <= 0;
+                    rLastStep          <= 0;
+                    rAddress           <= iAddress ;
+                    rLength            <= iLength  ;
+
+                    rACG_Command       <= 8'b0000_0000;
+                    rACG_CommandOption <= 3'b000;
+                    rACG_TargetWay     <= iWaySelect;
+                    rACG_NumOfData     <= 16'h0000;
+                    rACG_CASelect      <= 1'b1;
+                    rACG_CAData        <= 40'h00_00_00_00_00;
+                end
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rAddress           <= (wStart) ? iAddress : rAddress ;
-					rLength            <= (wStart) ? iLength  : rLength  ;
+					rAddress           <= rAddress ;
+					rLength            <= rLength  ;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -284,19 +295,6 @@ module NFC_Command_GetFeature
                     rACG_CASelect      <= 1'b0;
                     rACG_CAData        <= 40'h01_00_00_00_00; // RESET FFh
                 end
-     //            rST_CMD2Issue: begin
-     //                rCMDReady          <= 0;
-     //                rLastStep          <= 0;
-					// rAddress           <= rAddress;
-					// rLength            <= rLength ;
-
-     //                rACG_Command       <= 8'b0000_1000;
-     //                rACG_CommandOption <= 3'b000;
-     //                rACG_TargetWay     <= rACG_TargetWay;
-     //                rACG_NumOfData     <= 16'h0001;
-     //                rACG_CASelect      <= 1'b1;
-     //                rACG_CAData        <= 40'h30_00_00_00_00; // RESET FFh
-     //            end
                 rST_WaitRBLow : begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
@@ -325,7 +323,7 @@ module NFC_Command_GetFeature
 					rAddress           <= rAddress;
 					rLength            <= rLength ;
 
-                    rACG_Command       <= 8'b0000_0010;
+                    rACG_Command       <= wDISDone ? 8'b0000_0000 : 8'b0000_0010;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 8'd8;

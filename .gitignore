@@ -1,4 +1,6 @@
 ##ignore this file##
-*.gtkw
-*.vcd
-/firmware/hex/
+/prj/NandFlashController/
+/prj/*.dmp
+/prj/*.log
+/prj/*.jou
+/prj/transcript

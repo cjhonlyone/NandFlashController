@@ -175,6 +175,8 @@ module NFC_Command_Issue_Top
     wire                          wProg_CMDValid            ;
     wire                          wProg_CMDReady            ;
     wire  [NumberOfWays - 1:0]    wProg_WaySelect           ;
+    wire  [15:0]                  wProg_ColAddress          ;
+    wire  [23:0]                  wProg_RowAddress          ;
     wire                          wProg_Start               ;
     wire                          wProg_LastStep            ;
 
@@ -196,6 +198,8 @@ module NFC_Command_Issue_Top
     wire                          wRead_CMDValid            ;
     wire                          wRead_CMDReady            ;
     wire  [NumberOfWays - 1:0]    wRead_WaySelect           ;
+    wire  [15:0]                  wRead_ColAddress          ;
+    wire  [23:0]                  wRead_RowAddress          ;
     wire                          wRead_Start               ;
     wire                          wRead_LastStep            ;
 
@@ -238,6 +242,8 @@ module NFC_Command_Issue_Top
     wire                          wEB_CMDValid            ;
     wire                          wEB_CMDReady            ;
     wire  [NumberOfWays - 1:0]    wEB_WaySelect           ;
+    wire  [15:0]                  wEB_ColAddress          ;
+    wire  [23:0]                  wEB_RowAddress          ;
     wire                          wEB_Start               ;
     wire                          wEB_LastStep            ;
 
@@ -250,6 +256,29 @@ module NFC_Command_Issue_Top
     wire                          wACG_EB_CASelect        ;
     wire   [39:0]                 wACG_EB_CAData          ;
     wire   [NumberOfWays - 1:0]   wACG_EB_ReadyBusy       ;
+
+    wire  [5:0]                   wRS_Opcode              ;
+    wire  [4:0]                   wRS_TargetID            ;
+    wire  [4:0]                   wRS_SourceID            ;
+    wire  [31:0]                  wRS_Address             ;
+    wire  [15:0]                  wRS_Length              ;
+    wire                          wRS_CMDValid            ;
+    wire                          wRS_CMDReady            ;
+    wire  [NumberOfWays - 1:0]    wRS_WaySelect           ;
+    wire  [15:0]                  wRS_ColAddress          ;
+    wire  [23:0]                  wRS_RowAddress          ;
+    wire                          wRS_Start               ;
+    wire                          wRS_LastStep            ;
+
+    wire   [7:0]                  wACG_RS_Command         ;
+    wire   [2:0]                  wACG_RS_CommandOption   ;
+    wire   [7:0]                  wACG_RS_Ready           ;
+    wire   [7:0]                  wACG_RS_LastStep        ;
+    wire   [NumberOfWays - 1:0]   wACG_RS_TargetWay       ;
+    wire   [15:0]                 wACG_RS_NumOfData       ;
+    wire                          wACG_RS_CASelect        ;
+    wire   [39:0]                 wACG_RS_CAData          ;
+    wire   [NumberOfWays - 1:0]   wACG_RS_ReadyBusy       ;
 
     wire    [NumberOfWays - 1:0]    wTargetWay              ;
     wire    [15:0]                  wTargetCol              ;
@@ -340,10 +369,33 @@ module NFC_Command_Issue_Top
     assign wACG_EB_LastStep  = iACG_CI_LastStep  ;
     assign wACG_EB_ReadyBusy = iACG_CI_ReadyBusy ;
 
-    assign wTGC_waySELECT = (iTop_CI_TargetID[4:0] == 5'b00100) & (iTop_CI_Opcode[5:0] == 6'b000000) & (iTop_CI_CMDValid);
-    assign wTGC_colADDR   = (iTop_CI_TargetID[4:0] == 5'b00100) & (iTop_CI_Opcode[5:0] == 6'b000010) & (iTop_CI_CMDValid);
-    assign wTGC_rowADDR   = (iTop_CI_TargetID[4:0] == 5'b00100) & (iTop_CI_Opcode[5:0] == 6'b000100) & (iTop_CI_CMDValid);
+    assign wRS_Opcode        = iTop_CI_Opcode        ;
+    assign wRS_TargetID      = iTop_CI_TargetID      ;
+    assign wRS_SourceID      = iTop_CI_SourceID      ;
+    assign wRS_Address       = iTop_CI_Address       ;
+    assign wRS_Length        = iTop_CI_Length        ;
+    assign wRS_CMDValid      = iTop_CI_CMDValid      ;
+    assign wRS_WaySelect     = rTargetWay1B   ;
 
+    assign wACG_RS_Ready     = iACG_CI_Ready     ;
+    assign wACG_RS_LastStep  = iACG_CI_LastStep  ;
+    assign wACG_RS_ReadyBusy = iACG_CI_ReadyBusy ;
+
+    assign wTGC_waySELECT = (iTop_CI_Opcode[5:0] == 6'b100000) & (iTop_CI_CMDValid);
+    assign wTGC_colADDR   = (iTop_CI_Opcode[5:0] == 6'b100010) & (iTop_CI_CMDValid);
+    assign wTGC_rowADDR   = (iTop_CI_Opcode[5:0] == 6'b100100) & (iTop_CI_CMDValid);
+
+    assign wRead_ColAddress = rColAddr2B;
+    assign wRead_RowAddress = rRowAddr3B;
+
+    assign wProg_ColAddress = rColAddr2B;
+    assign wProg_RowAddress = rRowAddr3B;
+
+    assign wEB_ColAddress = rColAddr2B;
+    assign wEB_RowAddress = rRowAddr3B;
+
+    assign wRS_ColAddress = rColAddr2B;
+    assign wRS_RowAddress = rRowAddr3B;
     always @ (posedge iSystemClock, posedge iReset) begin
         if (iReset) begin
             rTargetWay1B[7:0]   <= 0;
@@ -376,11 +428,12 @@ module NFC_Command_Issue_Top
     parameter Readpage_CommandID   = 6'b000100;
     parameter GetFeature_CommandID = 6'b000101;
     parameter EraseBlock_CommandID = 6'b000110;
+    parameter ReadStatus_CommandID = 6'b000111;
     parameter TargetID             = 5'b00101;
     parameter NumofCMD             = 14;
 
     wire [NumofCMD - 1:0]        wCMD_Active                ;
-    assign wCMD_Active = ~{wReset_CMDReady, wSTF_CMDReady,wProg_CMDReady,wRead_CMDReady, wGTF_CMDReady,wEB_CMDReady,8'b1111_1111};
+    assign wCMD_Active = ~{wReset_CMDReady, wSTF_CMDReady,wProg_CMDReady,wRead_CMDReady, wGTF_CMDReady,wEB_CMDReady,wRS_CMDReady,7'b111_1111};
 
     NFC_Command_Idle #(
             .NumberOfWays(NumberOfWays)
@@ -475,6 +528,8 @@ module NFC_Command_Issue_Top
             .iCMDValid          (wProg_CMDValid),
             .oCMDReady          (wProg_CMDReady),
             .iWaySelect         (wProg_WaySelect),
+            .iColAddress        (wProg_ColAddress),
+            .iRowAddress        (wProg_RowAddress),
             .oStart             (wProg_Start),
             .oLastStep          (wProg_LastStep),
 
@@ -506,6 +561,8 @@ module NFC_Command_Issue_Top
             .iCMDValid          (wRead_CMDValid),
             .oCMDReady          (wRead_CMDReady),
             .iWaySelect         (wRead_WaySelect),
+            // .iColAddress        (wRead_ColAddress),
+            // .iRowAddress        (wRead_RowAddress),
             .oStart             (wRead_Start),
             .oLastStep          (wRead_LastStep),
 
@@ -538,7 +595,7 @@ module NFC_Command_Issue_Top
             .oCMDReady          (wGTF_CMDReady),
             .iWaySelect         (wGTF_WaySelect),
             .oStart             (wGTF_Start),
-            .oLastStep          (wGTFLastStep),
+            .oLastStep          (wGTF_LastStep),
 
             .oACG_Command       (wACG_GTF_Command),
             .oACG_CommandOption (wACG_GTF_CommandOption),
@@ -567,6 +624,8 @@ module NFC_Command_Issue_Top
             .iCMDValid          (wEB_CMDValid),
             .oCMDReady          (wEB_CMDReady),
             .iWaySelect         (wEB_WaySelect),
+            // .iColAddress        (wEB_ColAddress),
+            // .iRowAddress        (wEB_RowAddress),
             .oStart             (wEB_Start),
             .oLastStep          (wEB_LastStep),
 
@@ -579,6 +638,38 @@ module NFC_Command_Issue_Top
             .oACG_CASelect      (wACG_EB_CASelect),
             .oACG_CAData        (wACG_EB_CAData),
             .iACG_ReadyBusy     (wACG_EB_ReadyBusy)
+        );
+
+    NFC_Command_ReadStatus #(
+            .NumberOfWays(NumberOfWays),
+            .CommandID(ReadStatus_CommandID),
+            .TargetID(TargetID)
+        ) inst_NFC_Command_ReadStatus (
+            .iSystemClock       (iSystemClock),
+            .iReset             (iReset),
+
+            .iOpcode            (wRS_Opcode),
+            .iTargetID          (wRS_TargetID),
+            .iSourceID          (wRS_SourceID),
+            .iAddress           (wRS_Address),
+            .iLength            (wRS_Length),
+            .iCMDValid          (wRS_CMDValid),
+            .oCMDReady          (wRS_CMDReady),
+            .iWaySelect         (wRS_WaySelect),
+            // .iColAddress        (wRS_ColAddress),
+            // .iRowAddress        (wRS_RowAddress),
+            .oStart             (wRS_Start),
+            .oLastStep          (wRS_LastStep),
+
+            .oACG_Command       (wACG_RS_Command),
+            .oACG_CommandOption (wACG_RS_CommandOption),
+            .iACG_Ready         (wACG_RS_Ready),
+            .iACG_LastStep      (wACG_RS_LastStep),
+            .oACG_TargetWay     (wACG_RS_TargetWay),
+            .oACG_NumOfData     (wACG_RS_NumOfData),
+            .oACG_CASelect      (wACG_RS_CASelect),
+            .oACG_CAData        (wACG_RS_CAData),
+            .iACG_ReadyBusy     (wACG_RS_ReadyBusy)
         );
 
 
@@ -643,6 +734,13 @@ module NFC_Command_Issue_Top
             .iACG_EB_NumOfData        (wACG_EB_NumOfData),
             .iACG_EB_CASelect         (wACG_EB_CASelect),
             .iACG_EB_CAData           (wACG_EB_CAData),
+
+            .iACG_RS_Command          (wACG_RS_Command),
+            .iACG_RS_CommandOption    (wACG_RS_CommandOption),
+            .iACG_RS_TargetWay        (wACG_RS_TargetWay),
+            .iACG_RS_NumOfData        (wACG_RS_NumOfData),
+            .iACG_RS_CASelect         (wACG_RS_CASelect),
+            .iACG_RS_CAData           (wACG_RS_CAData),
 
             .iFifo_WriteData          (wFifo_WriteData),
             .iFifo_WriteLast          (wFifo_WriteLast),
@@ -757,4 +855,7 @@ module NFC_Command_Issue_Top
         );
 
     assign oCI_Top_CMDReady = |wCMD_Active;
+
+
+    assign oCI_Top_ReadyBusy = iACG_CI_ReadyBusy;
 endmodule

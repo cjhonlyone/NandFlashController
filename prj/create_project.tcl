@@ -19,18 +19,23 @@ add_files -fileset sources_1 ../rtl/NFC_Command_Issue_to_Atom_Command_Generator_
 add_files -fileset sources_1 ../rtl/NFC_Command_Issue_Top.v
 add_files -fileset sources_1 ../rtl/NFC_Command_ProgramPage.v
 add_files -fileset sources_1 ../rtl/NFC_Command_ReadPage.v
+add_files -fileset sources_1 ../rtl/NFC_Command_ReadStatus.v
 add_files -fileset sources_1 ../rtl/NFC_Command_Reset.v
 add_files -fileset sources_1 ../rtl/NFC_Command_SetFeature.v
+add_files -fileset sources_1 ../rtl/NandFlashController_Top.v
 add_files -fileset sim_1 ../tb/tb_NFC_Atom_Command_Generator_Top.v
 add_files -fileset sim_1 ../tb/tb_NFC_Physical_Top.v
 add_files -fileset sim_1 ../tb/tb_NFC_Command_Issue_Top.v
+add_files -fileset sim_1 ../tb/tb_NandFlashController_Top.v
 add_files -fileset sim_1 ../tb/nandmodel/nand_defines.vh
 add_files -fileset sim_1 ../tb/nandmodel/nand_parameters.vh
+add_files -fileset sim_1 ../tb/nandmodel/subtest.vh
 add_files -fileset sim_1 ../tb/nandmodel/nand_die_model.v
 add_files -fileset sim_1 ../tb/nandmodel/nand_model.v
+add_files -fileset sim_1 ../tb/nandmodel/tb.v
 add_files -fileset sources_1 ../lib/axis/rtl/axis_fifo.v
-set_property top NFC_Atom_Command_Generator_Top [get_filesets sources_1]
-set_property top tb_NFC_Atom_Command_Generator_Top [get_filesets sim_1]
+set_property top NandFlashController_Top [get_filesets sources_1]
+set_property top tb_NandFlashController_Top [get_filesets sim_1]
 update_compile_order -fileset sources_1
 update_compile_order -fileset sim_1
 set_property target_simulator ModelSim [current_project]

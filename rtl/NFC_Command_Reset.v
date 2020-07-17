@@ -129,13 +129,16 @@ module NFC_Command_Reset
 
     wire                          wLastStep          ;
     // FSM Parameters/Wires/Regs
-    localparam rST_FSM_BIT    = 6;
-    localparam rST_RESET      = 6'b00_0001;
-    localparam rST_READY      = 6'b00_0010; // 
-    localparam rST_CMDIssue   = 6'b00_0100; // 
-    localparam rST_WaitLast   = 6'b00_1000; // 
-    localparam rST_WaitRBLow  = 6'b01_0000; // 
-    localparam rST_WaitRBHigh = 6'b10_0000; // 
+    localparam rST_FSM_BIT    = 9;
+    localparam rST_RESET      = 9'b00000_0001;
+    localparam rST_READY      = 9'b00000_0010; //
+    localparam rST_CMDLatch   = 9'b00000_0100; // 
+    localparam rST_CMDIssue   = 9'b00000_1000; // 
+    localparam rST_ADDRIssue  = 9'b00001_0000; // 
+    localparam rST_DATAIssue  = 9'b00010_0000; // 
+    localparam rST_CMD2Issue  = 9'b00100_0000; // 
+    localparam rST_WaitRBLow  = 9'b01000_0000; // 
+    localparam rST_WaitRBHigh = 9'b10000_0000; // 
 
     reg     [rST_FSM_BIT-1:0]       rST_cur_state          ;
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
@@ -169,14 +172,17 @@ module NFC_Command_Reset
                 rST_nxt_state <= rST_READY;
             end
             rST_READY: begin
-                rST_nxt_state <= (wStart)? rST_CMDIssue : rST_READY;
+                rST_nxt_state <= (wStart)? rST_CMDLatch : rST_READY;
+            end
+            rST_CMDLatch: begin
+                rST_nxt_state <= rST_CMDIssue;
             end
             rST_CMDIssue: begin
-                rST_nxt_state <= (wACAReady) ? rST_WaitLast : rST_CMDIssue;
+                rST_nxt_state <= (wACADone) ? rST_WaitRBLow : rST_CMDIssue;
             end
-            rST_WaitLast: begin
-                rST_nxt_state <= (wACADone) ? rST_WaitRBLow : rST_WaitLast; // 50ns
-            end
+            // rST_WaitLast: begin
+            //     rST_nxt_state <= (wACADone) ? rST_WaitRBLow : rST_WaitLast; // 50ns
+            // end
             rST_WaitRBLow: begin
                 rST_nxt_state <= (rWay_ReadyBusy == 0) ? rST_WaitRBHigh : rST_WaitRBLow; // wait for Valid
             end
@@ -224,6 +230,20 @@ module NFC_Command_Reset
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
                 end
+                rST_CMDLatch: begin
+                    rCMDReady          <= 0;
+                    rLastStep          <= 0;
+                    // rAddress           <= iAddress ;
+                    // rLength            <= iLength  ;
+                    // rTargetID          <= iTargetID;
+
+                    rACG_Command       <= 8'b0000_0000;
+                    rACG_CommandOption <= 3'b000;
+                    rACG_TargetWay     <= iWaySelect;
+                    rACG_NumOfData     <= 16'h0000;
+                    rACG_CASelect      <= 1'b1;
+                    rACG_CAData        <= 40'h00_00_00_00_00;
+                end
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
@@ -235,17 +255,17 @@ module NFC_Command_Reset
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'hff_00_00_00_00; // RESET FFh
                 end
-                rST_WaitLast: begin
-                    rCMDReady          <= 0;
-                    rLastStep          <= 0;
+                // rST_WaitLast: begin
+                //     rCMDReady          <= 0;
+                //     rLastStep          <= 0;
                     
-                    rACG_Command       <= rACG_Command;
-                    rACG_CommandOption <= 3'b000;
-                    rACG_TargetWay     <= rACG_TargetWay;
-                    rACG_NumOfData     <= rACG_NumOfData;
-                    rACG_CASelect      <= rACG_CASelect;
-                    rACG_CAData        <= rACG_CAData; // RESET FFh
-                end
+                //     rACG_Command       <= rACG_Command;
+                //     rACG_CommandOption <= 3'b000;
+                //     rACG_TargetWay     <= rACG_TargetWay;
+                //     rACG_NumOfData     <= rACG_NumOfData;
+                //     rACG_CASelect      <= rACG_CASelect;
+                //     rACG_CAData        <= rACG_CAData; // RESET FFh
+                // end
                 rST_WaitRBLow : begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;

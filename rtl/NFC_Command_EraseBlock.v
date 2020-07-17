@@ -4,7 +4,7 @@ module NFC_Command_EraseBlock
 #
 (
     parameter NumberOfWays    =   4,
-    parameter CommandID       =   6'b000110,
+    parameter CommandID       =   6'b000111,
     parameter TargetID        =   5'b00101
 )
 (
@@ -138,16 +138,16 @@ module NFC_Command_EraseBlock
 
     reg   [31:0]                  rfeatures;
     // FSM Parameters/Wires/Regs
-    localparam rST_FSM_BIT    = 8;
-    localparam rST_RESET      = 8'b0000_0001;
-    localparam rST_READY      = 8'b0000_0010; // 
-    localparam rST_CMDIssue   = 8'b0000_0100; // 
-    localparam rST_ADDRIssue  = 8'b0000_1000; // 
-    localparam rST_DATAIssue  = 8'b0001_0000; // 
-    localparam rST_CMD2Issue  = 8'b0010_0000; // 
-    localparam rST_WaitRBLow  = 8'b0100_0000; // 
-    localparam rST_WaitRBHigh = 8'b1000_0000; // 
-    // localparam rST_WaitRBHigh = 8'b1000_0000; // 
+    localparam rST_FSM_BIT    = 9;
+    localparam rST_RESET      = 9'b00000_0001;
+    localparam rST_READY      = 9'b00000_0010; //
+    localparam rST_CMDLatch   = 9'b00000_0100; // 
+    localparam rST_CMDIssue   = 9'b00000_1000; // 
+    localparam rST_ADDRIssue  = 9'b00001_0000; // 
+    localparam rST_DATAIssue  = 9'b00010_0000; // 
+    localparam rST_CMD2Issue  = 9'b00100_0000; // 
+    localparam rST_WaitRBLow  = 9'b01000_0000; // 
+    localparam rST_WaitRBHigh = 9'b10000_0000; // 
 
     reg     [rST_FSM_BIT-1:0]       rST_cur_state          ;
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
@@ -188,7 +188,10 @@ module NFC_Command_EraseBlock
                 rST_nxt_state <= rST_READY;
             end
             rST_READY: begin
-                rST_nxt_state <= (wStart)? rST_CMDIssue : rST_READY;
+                rST_nxt_state <= (wStart)? rST_CMDLatch : rST_READY;
+            end
+            rST_CMDLatch: begin
+                rST_nxt_state <= rST_CMDIssue;
             end
             rST_CMDIssue: begin
                 rST_nxt_state <= (wACSDone) ? rST_ADDRIssue : rST_CMDIssue;
@@ -197,14 +200,14 @@ module NFC_Command_EraseBlock
                 rST_nxt_state <= (wACSDone) ? rST_CMD2Issue : rST_ADDRIssue;
             end
             rST_CMD2Issue: begin
-                rST_nxt_state <= (wACSDone) ? rST_WaitRBLow : rST_CMD2Issue;
+                rST_nxt_state <= (rLastStep == 1) ? rST_WaitRBLow : rST_CMD2Issue;
             end
-            rST_WaitRBLow: begin
-                rST_nxt_state <= (rWay_ReadyBusy == 0) ? rST_WaitRBHigh : rST_WaitRBLow; // wait for Valid
-            end
-            rST_WaitRBHigh: begin
-                rST_nxt_state <= (rLastStep == 1) ? rST_READY : rST_WaitRBHigh; // wait for Valid
-            end
+            // rST_WaitRBLow: begin
+            //     rST_nxt_state <= (rWay_ReadyBusy == 0) ? rST_WaitRBHigh : rST_WaitRBLow; // wait for Valid
+            // end
+            // rST_WaitRBHigh: begin
+            //     rST_nxt_state <= (rLastStep == 1) ? rST_READY : rST_WaitRBHigh; // wait for Valid
+            // end
             // rST_DATAIssue: begin
             //     rST_nxt_state <= (rLastStep == 1) ? rST_READY : rST_DATAIssue;
             // end
@@ -258,11 +261,24 @@ module NFC_Command_EraseBlock
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
                 end
+                rST_CMDLatch: begin
+                    rCMDReady          <= 0;
+                    rLastStep          <= 0;
+                    rAddress           <= iAddress ;
+                    rLength            <= iLength  ;
+
+                    rACG_Command       <= 8'b0000_0000;
+                    rACG_CommandOption <= 3'b000;
+                    rACG_TargetWay     <= iWaySelect;
+                    rACG_NumOfData     <= 16'h0000;
+                    rACG_CASelect      <= 1'b1;
+                    rACG_CAData        <= 40'h00_00_00_00_00;
+                end
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rAddress           <= (wStart) ? iAddress : rAddress ;
-					rLength            <= (wStart) ? iLength  : rLength  ;
+					rAddress           <= rAddress ;
+					rLength            <= rLength  ;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -286,11 +302,11 @@ module NFC_Command_EraseBlock
                 end
                 rST_CMD2Issue: begin
                     rCMDReady          <= 0;
-                    rLastStep          <= 0;
+                    rLastStep          <= wACSDone ? 1 :0 ;
 					rAddress           <= rAddress;
 					rLength            <= rLength ;
 
-                    rACG_Command       <= 8'b0000_1000;
+                    rACG_Command       <= wACSDone ? 8'b0000_0000: 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 16'h0000;

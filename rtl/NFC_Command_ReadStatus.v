@@ -1,10 +1,10 @@
 `timescale 1ns / 1ps
 
-module NFC_Command_SetFeature
+module NFC_Command_ReadStatus
 #
 (
     parameter NumberOfWays    =   4,
-    parameter CommandID       =   6'b000010,
+    parameter CommandID       =   6'b000111,
     parameter TargetID        =   5'b00101
 )
 (
@@ -14,8 +14,8 @@ module NFC_Command_SetFeature
     iOpcode                  ,  
     iTargetID                ,  
     iSourceID                ,  
-    // iAddress                 ,  
-    // iLength                  ,  
+    iAddress                 ,  
+    iLength                  ,  
     iCMDValid                ,  
     oCMDReady                ,  
     iWaySelect               ,
@@ -46,10 +46,10 @@ module NFC_Command_SetFeature
     oACG_CASelect         ,  
     oACG_CAData           ,  
 
-    oACG_WriteData        ,  
-    oACG_WriteLast        ,  
-    oACG_WriteValid       ,  
-    iACG_WriteReady       ,  
+    // oACG_WriteData        ,  
+    // oACG_WriteLast        ,  
+    // oACG_WriteValid       ,  
+    // iACG_WriteReady       ,  
 
     // iACG_ReadData         ,  
     // iACG_ReadLast         ,  
@@ -66,8 +66,8 @@ module NFC_Command_SetFeature
     input   [5:0]                   iOpcode              ;
     input   [4:0]                   iTargetID            ;
     input   [4:0]                   iSourceID            ;
-    // input   [31:0]                  iAddress             ;
-    // input   [15:0]                  iLength              ;
+    input   [31:0]                  iAddress             ;
+    input   [15:0]                  iLength              ;
     input                           iCMDValid            ;
     output                          oCMDReady            ;
 
@@ -75,7 +75,7 @@ module NFC_Command_SetFeature
     output                          oStart               ;
     output                          oLastStep            ;
 
-    // input   [31:0]                  iWriteData           ;
+    // input   [15:0]                  iWriteData           ;
     // input                           iWriteLast           ;
     // input                           iWriteValid          ;
     // output                          oWriteReady          ;
@@ -99,10 +99,10 @@ module NFC_Command_SetFeature
     output                           oACG_CASelect            ;
     output   [39:0]                  oACG_CAData              ;
 
-    output   [15:0]                  oACG_WriteData           ;
-    output                           oACG_WriteLast           ;
-    output                           oACG_WriteValid          ;
-    input                            iACG_WriteReady          ;
+    // output   [15:0]                  oACG_WriteData           ;
+    // output                           oACG_WriteLast           ;
+    // output                           oACG_WriteValid          ;
+    // input                            iACG_WriteReady          ;
   
     // input    [15:0]                  iACG_ReadData            ;
     // input                            iACG_ReadLast            ;
@@ -111,9 +111,11 @@ module NFC_Command_SetFeature
 
     input    [NumberOfWays - 1:0]    iACG_ReadyBusy           ;
 
+    reg   [4:0]                   rTargetID            ; //option
     // reg                           rStart             ;
     reg                           rLastStep          ;
-
+    reg   [31:0]                  rAddress             ;
+    reg   [15:0]                  rLength              ;
     reg                           rCMDReady          ;  
     // reg  [NumberOfWays - 1:0]     rReadyBusy     
 
@@ -125,7 +127,9 @@ module NFC_Command_SetFeature
     reg   [39:0]                  rACG_CAData        ;   
 
     reg   [NumberOfWays - 1:0]    rACG_ReadyBusy     ;
-    reg                           rWay_ReadyBusy     ;
+    // reg                           rWay_ReadyBusy     ;
+
+    // reg                           rWriteReady          ;
 
     wire                          wLastStep          ;
 
@@ -134,6 +138,9 @@ module NFC_Command_SetFeature
     reg                           rACG_WriteValid          ;
 
     reg   [31:0]                  rfeatures;
+
+    reg   [3:0]                   rTimer;
+
     // FSM Parameters/Wires/Regs
     localparam rST_FSM_BIT    = 9;
     localparam rST_RESET      = 9'b00000_0001;
@@ -146,27 +153,30 @@ module NFC_Command_SetFeature
     localparam rST_WaitRBLow  = 9'b01000_0000; // 
     localparam rST_WaitRBHigh = 9'b10000_0000; // 
 
-
-
     reg     [rST_FSM_BIT-1:0]       rST_cur_state          ;
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
 
-    assign wStart    = (iOpcode[5:0] == CommandID) & (iTargetID[4:0] == TargetID) & iCMDValid;
+    assign wStart    = (iOpcode[5:0] == CommandID) & iCMDValid;
+
+    assign wReadStatusEnhanced = (rTargetID[0] == 1) ? 1 : 0;
     
     assign wACGReady  = (iACG_Ready[6:0] == 7'b111_1111);
     
-    assign wACAReady = wACGReady;
-    assign wACAStart = wACAReady & rACG_Command[6];
-    assign wACADone  = iACG_LastStep[6];
+    // assign wACAReady = wACGReady;
+    // assign wACAStart = wACAReady & rACG_Command[6];
+    // assign wACADone  = iACG_LastStep[6];
 
-    // assign wACSReady = wACGReady;
-    // assign wACSStart = wACSReady & rACG_Command[3];
-    // assign wACSDone  = iACG_LastStep[3];
+    assign wACSReady = wACGReady;
+    assign wACSStart = wACSReady & rACG_Command[3];
+    assign wACSDone  = iACG_LastStep[3];
 
-    assign wDOAReady = wACGReady;
-    assign wDOAStart = wDOAReady & rACG_Command[5];
-    assign wDOADone  = iACG_LastStep[5];
+    // assign wDOAReady = wACGReady;
+    // assign wDOAStart = wDOAReady & rACG_Command[5];
+    // assign wDOADone  = iACG_LastStep[5];
 
+    assign wDISReady = wACGReady;
+    assign wDISStart = wDISReady & rACG_Command[1];
+    assign wDISDone  = iACG_LastStep[1];
 
     // update current state to next state
     always @ (posedge iSystemClock, posedge iReset) begin
@@ -190,19 +200,16 @@ module NFC_Command_SetFeature
                 rST_nxt_state <= rST_CMDIssue;
             end
             rST_CMDIssue: begin
-                rST_nxt_state <= (wACADone) ? rST_ADDRIssue : rST_CMDIssue;
+                rST_nxt_state <= (wACSDone) ? (wReadStatusEnhanced) ? rST_ADDRIssue : rST_DATAIssue : rST_CMDIssue;
             end
             rST_ADDRIssue: begin
-                rST_nxt_state <= (wACADone) ? rST_DATAIssue : rST_ADDRIssue;
+                rST_nxt_state <= (wACSDone) ? rST_DATAIssue : rST_ADDRIssue;
             end
             rST_DATAIssue: begin
-                rST_nxt_state <= (wDOADone) ? rST_WaitRBLow : rST_DATAIssue;
+                rST_nxt_state <= wDISDone ? rST_WaitRBLow : rST_DATAIssue;
             end
-            rST_WaitRBLow: begin
-                rST_nxt_state <= (rWay_ReadyBusy == 0) ? rST_WaitRBHigh : rST_WaitRBLow; // wait for Valid
-            end
-            rST_WaitRBHigh: begin
-                rST_nxt_state <= (rLastStep == 1) ? rST_READY : rST_WaitRBHigh; // wait for Valid
+            rST_WaitRBLow: begin //delay 120ns
+                rST_nxt_state <= (rLastStep == 1) ? rST_READY : rST_WaitRBLow;
             end
             default:
                 rST_nxt_state <= rST_READY;
@@ -214,6 +221,9 @@ module NFC_Command_SetFeature
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
+            rAddress           <= 32'd0;
+            rLength            <= 16'd0;
+            rTargetID          <= 5'd0;
 
             rACG_Command       <= 8'b0000_0000;
             rACG_CommandOption <= 3'b000;
@@ -221,11 +231,16 @@ module NFC_Command_SetFeature
             rACG_NumOfData     <= 16'h0000;
             rACG_CASelect      <= 1'b1;
             rACG_CAData        <= 40'h00_00_00_00_00;
+
+            rTimer             <= 0;
         end else begin
             case (rST_nxt_state)
                 rST_RESET: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
+                    rAddress           <= 32'd0;
+                    rLength            <= 16'd0;
+                    rTargetID          <= 5'd0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -233,24 +248,32 @@ module NFC_Command_SetFeature
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
+
+                    rTimer             <= 0;
                 end
                 rST_READY: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
 
+                    rAddress           <= 32'd0;
+                    rLength            <= 16'd0;
+                    rTargetID          <= 5'd0;
+
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= iWaySelect;
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
+
+                    rTimer             <= 0;
                 end
                 rST_CMDLatch: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    // rAddress           <= iAddress ;
-                    // rLength            <= iLength  ;
-                    // rTargetID          <= iTargetID;
+                    rAddress           <= iAddress ;
+                    rLength            <= iLength  ;
+                    rTargetID          <= iTargetID;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -258,65 +281,80 @@ module NFC_Command_SetFeature
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
+
+                    rTimer             <= 0;
                 end
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rAddress           <= rAddress ;
+                    rLength            <= rLength  ;
+                    rTargetID          <= rTargetID;
 
-                    rACG_Command       <= 8'b0100_0000;
+                    rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
-                    rACG_NumOfData     <= 16'h0001;
+                    rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
-                    rACG_CAData        <= 40'hef_00_00_00_00; // RESET FFh
+                    rACG_CAData        <= wReadStatusEnhanced ? 40'h78_00_00_00_00 : 40'h70_00_00_00_00;
+
+                    rTimer             <= 0;
                 end
                 rST_ADDRIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rAddress           <= rAddress;
+                    rLength            <= rLength ;
+                    rTargetID          <= rTargetID;
 
-                    rACG_Command       <= 8'b0100_0000;
+                    rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
-                    rACG_NumOfData     <= 16'h0001;
+                    rACG_NumOfData     <= 16'h0002;
                     rACG_CASelect      <= 1'b0;
-                    rACG_CAData        <= 40'h01_00_00_00_00; // RESET FFh
+                    rACG_CAData        <= 40'h00_00_00_00_00; // RESET FFh
+
+                    rTimer             <= 0;
                 end
                 rST_DATAIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rAddress           <= rAddress;
+                    rLength            <= rLength ;
+                    rTargetID          <= rTargetID;
 
-                    rACG_Command       <= 8'b0010_0000;
+                    rACG_Command       <= wDISDone ? 8'b0000_0000 : 8'b0000_0010;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
-                    rACG_NumOfData     <= 16'h0004;
+                    rACG_NumOfData     <= 16'h0002;
                     rACG_CASelect      <= 1'b0;
                     rACG_CAData        <= 40'h00_00_00_00_00; // RESET FFh
+
+                    rTimer             <= 0;
                 end
-                rST_WaitRBLow : begin
+                rST_WaitRBLow: begin
                     rCMDReady          <= 0;
-                    rLastStep          <= 0;
+                    rLastStep          <= (rTimer == 4'd12) ? 1 : 0;
+                    rAddress           <= rAddress;
+                    rLength            <= rLength ;
+                    rTargetID          <= rTargetID;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 16'h0000;
-                    rACG_CASelect      <= 1'b1;
-                    rACG_CAData        <= 40'h00_00_00_00_00;
-                end
-                rST_WaitRBHigh : begin
-                    rCMDReady          <= 0;
-                    rLastStep          <= rWay_ReadyBusy ? 1 : 0;
+                    rACG_CASelect      <= 1'b0;
+                    rACG_CAData        <= 40'h00_00_00_00_00; // RESET FFh
 
-                    rACG_Command       <= 8'b0000_0000;
-                    rACG_CommandOption <= 3'b000;
-                    rACG_TargetWay     <= rACG_TargetWay;
-                    rACG_NumOfData     <= 16'h0000;
-                    rACG_CASelect      <= 1'b1;
-                    rACG_CAData        <= 40'h00_00_00_00_00;
+                    rTimer             <= (rTimer == 4'd12) ? 0 :rTimer + 1;
                 end
+
                 default: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rAddress           <= 0;
+                    rLength            <= 0 ;
+                    rTargetID          <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -324,44 +362,17 @@ module NFC_Command_SetFeature
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
+
+                    rTimer             <= 0;
                 end
             endcase
         end
     end
 
-    always @ (posedge iSystemClock, posedge iReset) begin
-        rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
-        rWay_ReadyBusy <= | rACG_ReadyBusy;
-    end
-
-    always @ (posedge iSystemClock, posedge iReset) begin
-        if (iReset) begin
-            rACG_WriteData  <= 0;
-            rACG_WriteLast  <= 0;
-            rACG_WriteValid <= 1;
-            rfeatures          <= 32'h14_00_00_00;
-        end else begin
-        	rACG_WriteValid <= 1;
-        	case ({iACG_WriteReady,rACG_WriteLast})
-        	2'b00: begin
-	            rACG_WriteData  <= rfeatures[31:16];
-	            rACG_WriteLast  <= 0;
-        	end
-        	2'b01: begin
-	            rACG_WriteData  <= rfeatures[15:0];
-	            rACG_WriteLast  <= 1;
-        	end
-        	2'b10: begin
-	            rACG_WriteData  <= rfeatures[15:0];
-	            rACG_WriteLast  <= 1;
-        	end
-        	2'b11: begin
-	            rACG_WriteData  <= rfeatures[31:16];
-	            rACG_WriteLast  <= 0;
-        	end
-        	endcase
-        end
-    end
+    // always @ (posedge iSystemClock, posedge iReset) begin
+    //     rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
+    //     rWay_ReadyBusy <= | rACG_ReadyBusy;
+    // end
 
     assign oStart             = wStart             ;
     assign oLastStep          = rLastStep          ;
@@ -373,9 +384,5 @@ module NFC_Command_SetFeature
     assign oACG_NumOfData     = rACG_NumOfData     ;
     assign oACG_CASelect      = rACG_CASelect      ;
     assign oACG_CAData        = rACG_CAData        ;
-
-    assign oACG_WriteData     = rACG_WriteData     ;
-    assign oACG_WriteLast     = rACG_WriteLast     ;
-    assign oACG_WriteValid    = rACG_WriteValid    ;
 
 endmodule

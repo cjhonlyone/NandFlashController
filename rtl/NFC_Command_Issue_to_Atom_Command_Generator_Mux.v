@@ -68,6 +68,13 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
     iACG_EB_CASelect        ,
     iACG_EB_CAData          ,
 
+    iACG_RS_Command         ,
+    iACG_RS_CommandOption   ,
+    iACG_RS_TargetWay       ,
+    iACG_RS_NumOfData       ,
+    iACG_RS_CASelect        ,
+    iACG_RS_CAData          ,
+
     iFifo_WriteData     ,  
     iFifo_WriteLast     ,  
     iFifo_WriteValid    ,  
@@ -150,6 +157,13 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
     input                           iACG_EB_CASelect        ;
     input   [39:0]                  iACG_EB_CAData          ;
 
+    input   [7:0]                   iACG_RS_Command         ;
+    input   [2:0]                   iACG_RS_CommandOption   ;
+    input   [NumberOfWays - 1:0]    iACG_RS_TargetWay       ;
+    input   [15:0]                  iACG_RS_NumOfData       ;
+    input                           iACG_RS_CASelect        ;
+    input   [39:0]                  iACG_RS_CAData          ;
+
     input   [15:0]                  iFifo_WriteData           ;
     input                           iFifo_WriteLast           ;
     input                           iFifo_WriteValid          ;
@@ -190,7 +204,7 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
         end else if (iCMD_Active[10]) begin rCI_ACG_Command <= iACG_Read_Command;
         end else if (iCMD_Active[ 9]) begin rCI_ACG_Command <= iACG_GTF_Command;
         end else if (iCMD_Active[ 8]) begin rCI_ACG_Command <= iACG_EB_Command;
-        // end else if (iCMD_Active[ 7]) begin rCI_ACG_Command <= rCI_ACG_Command;
+        end else if (iCMD_Active[ 7]) begin rCI_ACG_Command <= iACG_RS_Command;
         // end else if (iCMD_Active[ 6]) begin rCI_ACG_Command <= rCI_ACG_Command;
         // end else if (iCMD_Active[ 5]) begin rCI_ACG_Command <= rCI_ACG_Command;
         // end else if (iCMD_Active[ 4]) begin rCI_ACG_Command <= rCI_ACG_Command;
@@ -209,7 +223,7 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
         end else if (iCMD_Active[10]) begin rCI_ACG_CommandOption <= iACG_Read_CommandOption;
         end else if (iCMD_Active[ 9]) begin rCI_ACG_CommandOption <= iACG_GTF_CommandOption;
         end else if (iCMD_Active[ 8]) begin rCI_ACG_CommandOption <= iACG_EB_CommandOption;
-        // end else if (iCMD_Active[ 7]) begin rCI_ACG_CommandOption <= rCI_ACG_CommandOption;
+        end else if (iCMD_Active[ 7]) begin rCI_ACG_CommandOption <= iACG_RS_CommandOption;
         // end else if (iCMD_Active[ 6]) begin rCI_ACG_CommandOption <= rCI_ACG_CommandOption;
         // end else if (iCMD_Active[ 5]) begin rCI_ACG_CommandOption <= rCI_ACG_CommandOption;
         // end else if (iCMD_Active[ 4]) begin rCI_ACG_CommandOption <= rCI_ACG_CommandOption;
@@ -228,7 +242,7 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
         end else if (iCMD_Active[10]) begin rCI_ACG_TargetWay <= iACG_Read_TargetWay;
         end else if (iCMD_Active[ 9]) begin rCI_ACG_TargetWay <= iACG_GTF_TargetWay;
         end else if (iCMD_Active[ 8]) begin rCI_ACG_TargetWay <= iACG_EB_TargetWay;
-        // end else if (iCMD_Active[ 7]) begin rCI_ACG_TargetWay <= rCI_ACG_TargetWay;
+        end else if (iCMD_Active[ 7]) begin rCI_ACG_TargetWay <= iACG_RS_TargetWay;
         // end else if (iCMD_Active[ 6]) begin rCI_ACG_TargetWay <= rCI_ACG_TargetWay;
         // end else if (iCMD_Active[ 5]) begin rCI_ACG_TargetWay <= rCI_ACG_TargetWay;
         // end else if (iCMD_Active[ 4]) begin rCI_ACG_TargetWay <= rCI_ACG_TargetWay;
@@ -247,7 +261,7 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
         end else if (iCMD_Active[10]) begin rCI_ACG_NumOfData <= iACG_Read_NumOfData;
         end else if (iCMD_Active[ 9]) begin rCI_ACG_NumOfData <= iACG_GTF_NumOfData;
         end else if (iCMD_Active[ 8]) begin rCI_ACG_NumOfData <= iACG_EB_NumOfData;
-        // end else if (iCMD_Active[ 7]) begin rCI_ACG_NumOfData <= rCI_ACG_NumOfData;
+        end else if (iCMD_Active[ 7]) begin rCI_ACG_NumOfData <= iACG_RS_NumOfData;
         // end else if (iCMD_Active[ 6]) begin rCI_ACG_NumOfData <= rCI_ACG_NumOfData;
         // end else if (iCMD_Active[ 5]) begin rCI_ACG_NumOfData <= rCI_ACG_NumOfData;
         // end else if (iCMD_Active[ 4]) begin rCI_ACG_NumOfData <= rCI_ACG_NumOfData;
@@ -266,7 +280,7 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
         end else if (iCMD_Active[10]) begin rCI_ACG_CASelect <= iACG_Read_CASelect;
         end else if (iCMD_Active[ 9]) begin rCI_ACG_CASelect <= iACG_GTF_CASelect;
         end else if (iCMD_Active[ 8]) begin rCI_ACG_CASelect <= iACG_EB_CASelect;
-        // end else if (iCMD_Active[ 7]) begin rCI_ACG_CASelect <= rCI_ACG_CASelect;
+        end else if (iCMD_Active[ 7]) begin rCI_ACG_CASelect <= iACG_RS_CASelect;
         // end else if (iCMD_Active[ 6]) begin rCI_ACG_CASelect <= rCI_ACG_CASelect;
         // end else if (iCMD_Active[ 5]) begin rCI_ACG_CASelect <= rCI_ACG_CASelect;
         // end else if (iCMD_Active[ 4]) begin rCI_ACG_CASelect <= rCI_ACG_CASelect;
@@ -285,7 +299,7 @@ module NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux
         end else if (iCMD_Active[10]) begin rCI_ACG_CAData <= iACG_Read_CAData;
         end else if (iCMD_Active[ 9]) begin rCI_ACG_CAData <= iACG_GTF_CAData;
         end else if (iCMD_Active[ 8]) begin rCI_ACG_CAData <= iACG_EB_CAData;
-        // end else if (iCMD_Active[ 7]) begin rCI_ACG_CAData <= rCI_ACG_CAData;
+        end else if (iCMD_Active[ 7]) begin rCI_ACG_CAData <= iACG_RS_CAData;
         // end else if (iCMD_Active[ 6]) begin rCI_ACG_CAData <= rCI_ACG_CAData;
         // end else if (iCMD_Active[ 5]) begin rCI_ACG_CAData <= rCI_ACG_CAData;
         // end else if (iCMD_Active[ 4]) begin rCI_ACG_CAData <= rCI_ACG_CAData;
