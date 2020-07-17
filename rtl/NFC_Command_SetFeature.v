@@ -8,54 +8,54 @@ module NFC_Command_SetFeature
     parameter TargetID        =   5'b00101
 )
 (
-    iSystemClock             ,  
-    iReset                   ,  
-
-    iOpcode                  ,  
-    iTargetID                ,  
-    iSourceID                ,  
-    // iAddress                 ,  
-    // iLength                  ,  
-    iCMDValid                ,  
-    oCMDReady                ,  
-    iWaySelect               ,
-
-    oStart                   ,
-    oLastStep                ,
-
-    // iWriteData               ,  
-    // iWriteLast               ,  
-    // iWriteValid              ,  
-    // oWriteReady              ,  
-
-    // oReadData                ,  
-    // oReadLast                ,  
-    // oReadValid               ,  
-    // iReadReady               , 
-
-    // oReadyBusy               ,  
-
-    oACG_Command          ,  
-    oACG_CommandOption    ,  
-
-    iACG_Ready            ,  
-    iACG_LastStep         ,  
-    oACG_TargetWay        ,  
-    oACG_NumOfData        ,  
-
-    oACG_CASelect         ,  
-    oACG_CAData           ,  
-
-    oACG_WriteData        ,  
-    oACG_WriteLast        ,  
-    oACG_WriteValid       ,  
-    iACG_WriteReady       ,  
-
-    // iACG_ReadData         ,  
-    // iACG_ReadLast         ,  
-    // iACG_ReadValid        ,  
-    // oACG_ReadReady        ,  
-
+    iSystemClock      ,  
+    iReset            ,  
+    
+    iOpcode           ,  
+    // iTargetID      ,  
+    // iSourceID      ,  
+    // iAddress       ,  
+    // iLength        ,  
+    iCMDValid         ,  
+    oCMDReady         ,  
+    iWaySelect        ,
+    
+    oStart            ,
+    oLastStep         ,
+    
+    // iWriteData     ,  
+    // iWriteLast     ,  
+    // iWriteValid    ,  
+    // oWriteReady    ,  
+    
+    // oReadData      ,  
+    // oReadLast      ,  
+    // oReadValid     ,  
+    // iReadReady     , 
+    
+    // oReadyBusy     ,  
+    
+    oACG_Command      ,  
+    oACG_CommandOption,  
+    
+    iACG_Ready        ,  
+    iACG_LastStep     ,  
+    oACG_TargetWay    ,  
+    oACG_NumOfData    ,  
+    
+    oACG_CASelect     ,  
+    oACG_CAData       ,  
+    
+    oACG_WriteData    ,  
+    oACG_WriteLast    ,  
+    oACG_WriteValid   ,  
+    iACG_WriteReady   ,  
+    
+    // iACG_ReadData  ,  
+    // iACG_ReadLast  ,  
+    // iACG_ReadValid ,  
+    // oACG_ReadReady ,  
+    
     iACG_ReadyBusy        
 );
 
@@ -64,8 +64,8 @@ module NFC_Command_SetFeature
     input                           iReset               ;
  
     input   [5:0]                   iOpcode              ;
-    input   [4:0]                   iTargetID            ;
-    input   [4:0]                   iSourceID            ;
+    // input   [4:0]                   iTargetID            ;
+    // input   [4:0]                   iSourceID            ;
     // input   [31:0]                  iAddress             ;
     // input   [15:0]                  iLength              ;
     input                           iCMDValid            ;
@@ -151,7 +151,7 @@ module NFC_Command_SetFeature
     reg     [rST_FSM_BIT-1:0]       rST_cur_state          ;
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
 
-    assign wStart    = (iOpcode[5:0] == CommandID) & (iTargetID[4:0] == TargetID) & iCMDValid;
+    assign wStart    = (iOpcode[5:0] == CommandID) & iCMDValid;
     
     assign wACGReady  = (iACG_Ready[6:0] == 7'b111_1111);
     
@@ -248,9 +248,6 @@ module NFC_Command_SetFeature
                 rST_CMDLatch: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    // rAddress           <= iAddress ;
-                    // rLength            <= iLength  ;
-                    // rTargetID          <= iTargetID;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;

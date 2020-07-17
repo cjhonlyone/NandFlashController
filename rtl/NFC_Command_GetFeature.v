@@ -12,10 +12,10 @@ module NFC_Command_GetFeature
     iReset                   ,  
 
     iOpcode                  ,  
-    iTargetID                ,  
-    iSourceID                ,  
-    iAddress                 ,  
-    iLength                  ,  
+    // iTargetID                ,  
+    // iSourceID                ,  
+    // iAddress                 ,  
+    // iLength                  ,  
     iCMDValid                ,  
     oCMDReady                ,  
     iWaySelect               ,
@@ -64,10 +64,10 @@ module NFC_Command_GetFeature
     input                           iReset               ;
  
     input   [5:0]                   iOpcode              ;
-    input   [4:0]                   iTargetID            ;
-    input   [4:0]                   iSourceID            ;
-    input   [31:0]                  iAddress             ;
-    input   [15:0]                  iLength              ;
+    // input   [4:0]                   iTargetID            ;
+    // input   [4:0]                   iSourceID            ;
+    // input   [31:0]                  iAddress             ;
+    // input   [15:0]                  iLength              ;
     input                           iCMDValid            ;
     output                          oCMDReady            ;
 
@@ -113,8 +113,8 @@ module NFC_Command_GetFeature
 
     // reg                           rStart             ;
     reg                           rLastStep          ;
-    reg   [31:0]                  rAddress             ;
-    reg   [15:0]                  rLength              ;
+    // reg   [31:0]                  rAddress             ;
+    // reg   [15:0]                  rLength              ;
     reg                           rCMDReady          ;  
     // reg  [NumberOfWays - 1:0]     rReadyBusy     
 
@@ -152,7 +152,7 @@ module NFC_Command_GetFeature
     reg     [rST_FSM_BIT-1:0]       rST_cur_state          ;
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
 
-    assign wStart    = (iOpcode[5:0] == CommandID) & (iTargetID[4:0] == TargetID) & iCMDValid;
+    assign wStart    = (iOpcode[5:0] == CommandID) & iCMDValid;
     
     assign wACGReady  = (iACG_Ready[6:0] == 7'b111_1111);
     
@@ -218,8 +218,6 @@ module NFC_Command_GetFeature
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
-			rAddress           <= 32'd0;
-			rLength            <= 16'd0;
 
             rACG_Command       <= 8'b0000_0000;
             rACG_CommandOption <= 3'b000;
@@ -232,8 +230,6 @@ module NFC_Command_GetFeature
                 rST_RESET: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
-					rAddress           <= 32'd0;
-					rLength            <= 16'd0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -246,9 +242,6 @@ module NFC_Command_GetFeature
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
 
-					rAddress           <= 32'd0;
-					rLength            <= 16'd0;
-
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= iWaySelect;
@@ -259,8 +252,6 @@ module NFC_Command_GetFeature
                 rST_CMDLatch: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    rAddress           <= iAddress ;
-                    rLength            <= iLength  ;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -272,8 +263,6 @@ module NFC_Command_GetFeature
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rAddress           <= rAddress ;
-					rLength            <= rLength  ;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -285,8 +274,6 @@ module NFC_Command_GetFeature
                 rST_ADDRIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rAddress           <= rAddress;
-					rLength            <= rLength ;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -320,8 +307,6 @@ module NFC_Command_GetFeature
                 rST_DATAIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= wDISDone ? 1 : 0;
-					rAddress           <= rAddress;
-					rLength            <= rLength ;
 
                     rACG_Command       <= wDISDone ? 8'b0000_0000 : 8'b0000_0010;
                     rACG_CommandOption <= 3'b000;

@@ -12,8 +12,8 @@ module NFC_Command_Reset
 	iReset                   ,  
 
 	iOpcode                  ,  
-	iTargetID                ,  
-	iSourceID                ,  
+	// iTargetID                ,  
+	// iSourceID                ,  
 	// iAddress                 ,  
 	// iLength                  ,  
 	iCMDValid                ,  
@@ -64,8 +64,8 @@ module NFC_Command_Reset
     input                           iReset               ;
  
     input   [5:0]                   iOpcode              ;
-    input   [4:0]                   iTargetID            ;
-    input   [4:0]                   iSourceID            ;
+    // input   [4:0]                   iTargetID            ;
+    // input   [4:0]                   iSourceID            ;
     // input   [31:0]                  iAddress             ;
     // input   [15:0]                  iLength              ;
     input                           iCMDValid            ;
@@ -144,7 +144,7 @@ module NFC_Command_Reset
     reg     [rST_FSM_BIT-1:0]       rST_nxt_state          ;
 
 
-    assign wStart    = (iOpcode[5:0] == CommandID) & (iTargetID[4:0] == TargetID) & iCMDValid;
+    assign wStart    = (iOpcode[5:0] == CommandID) & iCMDValid;
     
     assign wACGReady  = (iACG_Ready[6:0] == 7'b111_1111);
     

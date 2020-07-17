@@ -55,198 +55,178 @@ module NFC_Command_Issue_Top
     iACG_CI_ReadyBusy        
 );
 
-    input                           iSystemClock                ;
-    input                           iReset                      ;
- 
-    input   [5:0]                   iTop_CI_Opcode              ;
-    input   [4:0]                   iTop_CI_TargetID            ;
-    input   [4:0]                   iTop_CI_SourceID            ;
-    input   [31:0]                  iTop_CI_Address             ;
-    input   [15:0]                  iTop_CI_Length              ;
-    input                           iTop_CI_CMDValid            ;
-    output                          oCI_Top_CMDReady            ;
-
-    input   [15:0]                  iTop_CI_WriteData           ;
-    input                           iTop_CI_WriteLast           ;
-    input                           iTop_CI_WriteValid          ;
-    input   [1:0]                   iTop_CI_WriteKeep           ;
-    output                          oCI_Top_WriteReady          ;
-
-    output  [15:0]                  oCI_Top_ReadData            ;
-    output                          oCI_Top_ReadLast            ;
-    output                          oCI_Top_ReadValid           ;
-    output  [1:0]                   oCI_Top_ReadKeep            ;
-    input                           iTop_CI_ReadReady           ;
-
-    output  [NumberOfWays - 1:0]    oCI_Top_ReadyBusy           ;
-
-
-    output   [7:0]                  oCI_ACG_Command             ;
-    output   [2:0]                  oCI_ACG_CommandOption       ;
-
-    input    [7:0]                  iACG_CI_Ready               ;
-    input    [7:0]                  iACG_CI_LastStep            ;
-    output   [NumberOfWays - 1:0]   oCI_ACG_TargetWay           ;
-    output   [15:0]                 oCI_ACG_NumOfData           ;
-
-    output                          oCI_ACG_CASelect            ;
-    output   [39:0]                 oCI_ACG_CAData              ;
-
-    output   [15:0]                 oCI_ACG_WriteData           ;
-    output                          oCI_ACG_WriteLast           ;
-    output                          oCI_ACG_WriteValid          ;
-    input                           iACG_CI_WriteReady          ;
-  
-    input    [15:0]                 iACG_CI_ReadData            ;
-    input                           iACG_CI_ReadLast            ;
-    input                           iACG_CI_ReadValid           ;
-    output                          oCI_ACG_ReadReady           ;
-
-    input    [NumberOfWays - 1:0]   iACG_CI_ReadyBusy           ;
-
-
-    reg    [NumberOfWays - 1:0]   rWaySelect                 ;
-
-    wire                          wCI_Top_CMDReady            ;
-
-    wire   [7:0]                  wACG_Idle_Command          ;
-    wire   [2:0]                  wACG_Idle_CommandOption    ;
-    wire   [NumberOfWays - 1:0]   wACG_Idle_TargetWay        ;
-    wire   [15:0]                 wACG_Idle_NumOfData        ;
-    wire                          wACG_Idle_CASelect         ;
-    wire   [39:0]                 wACG_Idle_CAData           ;
-    wire   [15:0]                 wACG_Idle_WriteData        ;
-    wire                          wACG_Idle_WriteLast        ;
-    wire                          wACG_Idle_WriteValid       ;
-    wire                          wACG_Idle_ReadReady        ;
-
-    wire  [5:0]                   wReset_Opcode              ;
-    wire  [4:0]                   wReset_TargetID            ;
-    wire  [4:0]                   wReset_SourceID            ;
-    wire  [31:0]                  wReset_Address             ;
-    wire  [15:0]                  wReset_Length              ;
-    wire                          wReset_CMDValid            ;
-    wire                          wReset_CMDReady            ;
-    wire  [NumberOfWays - 1:0]    wReset_WaySelect           ;
-    wire                          wReset_Start               ;
-    wire                          wReset_LastStep            ;
-
-    wire   [7:0]                  wACG_Reset_Command         ;
-    wire   [2:0]                  wACG_Reset_CommandOption   ;
-    wire   [7:0]                  wACG_Reset_Ready           ;
-    wire   [7:0]                  wACG_Reset_LastStep        ;
-    wire   [NumberOfWays - 1:0]   wACG_Reset_TargetWay       ;
-    wire   [15:0]                 wACG_Reset_NumOfData       ;
-    wire                          wACG_Reset_CASelect        ;
-    wire   [39:0]                 wACG_Reset_CAData          ;
-    wire   [NumberOfWays - 1:0]   wACG_Reset_ReadyBusy       ;
-
-    wire  [5:0]                   wSTF_Opcode              ;
-    wire  [4:0]                   wSTF_TargetID            ;
-    wire  [4:0]                   wSTF_SourceID            ;
-    wire  [31:0]                  wSTF_Address             ;
-    wire  [15:0]                  wSTF_Length              ;
-    wire                          wSTF_CMDValid            ;
-    wire                          wSTF_CMDReady            ;
-    wire  [NumberOfWays - 1:0]    wSTF_WaySelect           ;
-    wire                          wSTF_Start               ;
-    wire                          wSTF_LastStep            ;
-
-    wire   [7:0]                  wACG_STF_Command         ;
-    wire   [2:0]                  wACG_STF_CommandOption   ;
-    wire   [7:0]                  wACG_STF_Ready           ;
-    wire   [7:0]                  wACG_STF_LastStep        ;
-    wire   [NumberOfWays - 1:0]   wACG_STF_TargetWay       ;
-    wire   [15:0]                 wACG_STF_NumOfData       ;
-    wire                          wACG_STF_CASelect        ;
-    wire   [39:0]                 wACG_STF_CAData          ;
-    wire   [NumberOfWays - 1:0]   wACG_STF_ReadyBusy       ;
-
-    wire   [15:0]                 wACG_STF_WriteData       ;
-    wire                          wACG_STF_WriteLast       ;
-    wire                          wACG_STF_WriteValid      ;
-    wire                          wACG_STF_WriteReady      ;
-
-    wire  [5:0]                   wProg_Opcode              ;
-    wire  [4:0]                   wProg_TargetID            ;
-    wire  [4:0]                   wProg_SourceID            ;
-    wire  [31:0]                  wProg_Address             ;
-    wire  [15:0]                  wProg_Length              ;
-    wire                          wProg_CMDValid            ;
-    wire                          wProg_CMDReady            ;
-    wire  [NumberOfWays - 1:0]    wProg_WaySelect           ;
-    wire  [15:0]                  wProg_ColAddress          ;
-    wire  [23:0]                  wProg_RowAddress          ;
-    wire                          wProg_Start               ;
-    wire                          wProg_LastStep            ;
-
-    wire   [7:0]                  wACG_Prog_Command         ;
-    wire   [2:0]                  wACG_Prog_CommandOption   ;
-    wire   [7:0]                  wACG_Prog_Ready           ;
-    wire   [7:0]                  wACG_Prog_LastStep        ;
-    wire   [NumberOfWays - 1:0]   wACG_Prog_TargetWay       ;
-    wire   [15:0]                 wACG_Prog_NumOfData       ;
-    wire                          wACG_Prog_CASelect        ;
-    wire   [39:0]                 wACG_Prog_CAData          ;
-    wire   [NumberOfWays - 1:0]   wACG_Prog_ReadyBusy       ;
-
-    wire  [5:0]                   wRead_Opcode              ;
-    wire  [4:0]                   wRead_TargetID            ;
-    wire  [4:0]                   wRead_SourceID            ;
-    wire  [31:0]                  wRead_Address             ;
-    wire  [15:0]                  wRead_Length              ;
-    wire                          wRead_CMDValid            ;
-    wire                          wRead_CMDReady            ;
-    wire  [NumberOfWays - 1:0]    wRead_WaySelect           ;
-    wire  [15:0]                  wRead_ColAddress          ;
-    wire  [23:0]                  wRead_RowAddress          ;
-    wire                          wRead_Start               ;
-    wire                          wRead_LastStep            ;
-
-    wire   [7:0]                  wACG_Read_Command         ;
-    wire   [2:0]                  wACG_Read_CommandOption   ;
-    wire   [7:0]                  wACG_Read_Ready           ;
-    wire   [7:0]                  wACG_Read_LastStep        ;
-    wire   [NumberOfWays - 1:0]   wACG_Read_TargetWay       ;
-    wire   [15:0]                 wACG_Read_NumOfData       ;
-    wire                          wACG_Read_CASelect        ;
-    wire   [39:0]                 wACG_Read_CAData          ;
-    wire   [NumberOfWays - 1:0]   wACG_Read_ReadyBusy       ;
-
-    wire  [5:0]                   wGTF_Opcode              ;
-    wire  [4:0]                   wGTF_TargetID            ;
-    wire  [4:0]                   wGTF_SourceID            ;
-    wire  [31:0]                  wGTF_Address             ;
-    wire  [15:0]                  wGTF_Length              ;
-    wire                          wGTF_CMDValid            ;
-    wire                          wGTF_CMDReady            ;
-    wire  [NumberOfWays - 1:0]    wGTF_WaySelect           ;
-    wire                          wGTF_Start               ;
-    wire                          wGTF_LastStep            ;
-
-    wire   [7:0]                  wACG_GTF_Command         ;
-    wire   [2:0]                  wACG_GTF_CommandOption   ;
-    wire   [7:0]                  wACG_GTF_Ready           ;
-    wire   [7:0]                  wACG_GTF_LastStep        ;
-    wire   [NumberOfWays - 1:0]   wACG_GTF_TargetWay       ;
-    wire   [15:0]                 wACG_GTF_NumOfData       ;
-    wire                          wACG_GTF_CASelect        ;
-    wire   [39:0]                 wACG_GTF_CAData          ;
-    wire   [NumberOfWays - 1:0]   wACG_GTF_ReadyBusy       ;
-
+    input                           iSystemClock          ;
+    input                           iReset                ;
+    
+    input   [5:0]                   iTop_CI_Opcode        ;
+    input   [4:0]                   iTop_CI_TargetID      ;
+    input   [4:0]                   iTop_CI_SourceID      ;
+    input   [31:0]                  iTop_CI_Address       ;
+    input   [15:0]                  iTop_CI_Length        ;
+    input                           iTop_CI_CMDValid      ;
+    output                          oCI_Top_CMDReady      ;
+    
+    input   [15:0]                  iTop_CI_WriteData     ;
+    input                           iTop_CI_WriteLast     ;
+    input                           iTop_CI_WriteValid    ;
+    input   [1:0]                   iTop_CI_WriteKeep     ;
+    output                          oCI_Top_WriteReady    ;
+    
+    output  [15:0]                  oCI_Top_ReadData      ;
+    output                          oCI_Top_ReadLast      ;
+    output                          oCI_Top_ReadValid     ;
+    output  [1:0]                   oCI_Top_ReadKeep      ;
+    input                           iTop_CI_ReadReady     ;
+    
+    output  [NumberOfWays - 1:0]    oCI_Top_ReadyBusy     ;
+    
+    
+    output   [7:0]                  oCI_ACG_Command       ;
+    output   [2:0]                  oCI_ACG_CommandOption ;
+    
+    input    [7:0]                  iACG_CI_Ready         ;
+    input    [7:0]                  iACG_CI_LastStep      ;
+    output   [NumberOfWays - 1:0]   oCI_ACG_TargetWay     ;
+    output   [15:0]                 oCI_ACG_NumOfData     ;
+    
+    output                          oCI_ACG_CASelect      ;
+    output   [39:0]                 oCI_ACG_CAData        ;
+    
+    output   [15:0]                 oCI_ACG_WriteData     ;
+    output                          oCI_ACG_WriteLast     ;
+    output                          oCI_ACG_WriteValid    ;
+    input                           iACG_CI_WriteReady    ;
+    
+    input    [15:0]                 iACG_CI_ReadData      ;
+    input                           iACG_CI_ReadLast      ;
+    input                           iACG_CI_ReadValid     ;
+    output                          oCI_ACG_ReadReady     ;
+    
+    input    [NumberOfWays - 1:0]   iACG_CI_ReadyBusy     ;
+    
+    
+    reg    [NumberOfWays - 1:0]   rWaySelect              ;
+    
+    wire                          wCI_Top_CMDReady        ;
+    
+    wire   [7:0]                  wACG_Idle_Command       ;
+    wire   [2:0]                  wACG_Idle_CommandOption ;
+    wire   [NumberOfWays - 1:0]   wACG_Idle_TargetWay     ;
+    wire   [15:0]                 wACG_Idle_NumOfData     ;
+    wire                          wACG_Idle_CASelect      ;
+    wire   [39:0]                 wACG_Idle_CAData        ;
+    wire   [15:0]                 wACG_Idle_WriteData     ;
+    wire                          wACG_Idle_WriteLast     ;
+    wire                          wACG_Idle_WriteValid    ;
+    wire                          wACG_Idle_ReadReady     ;
+    
+    wire  [5:0]                   wReset_Opcode           ;
+    wire                          wReset_CMDValid         ;
+    wire                          wReset_CMDReady         ;
+    wire  [NumberOfWays - 1:0]    wReset_WaySelect        ;
+    wire                          wReset_Start            ;
+    wire                          wReset_LastStep         ;
+    
+    wire   [7:0]                  wACG_Reset_Command      ;
+    wire   [2:0]                  wACG_Reset_CommandOption;
+    wire   [7:0]                  wACG_Reset_Ready        ;
+    wire   [7:0]                  wACG_Reset_LastStep     ;
+    wire   [NumberOfWays - 1:0]   wACG_Reset_TargetWay    ;
+    wire   [15:0]                 wACG_Reset_NumOfData    ;
+    wire                          wACG_Reset_CASelect     ;
+    wire   [39:0]                 wACG_Reset_CAData       ;
+    wire   [NumberOfWays - 1:0]   wACG_Reset_ReadyBusy    ;
+    
+    wire  [5:0]                   wSTF_Opcode             ;
+    wire                          wSTF_CMDValid           ;
+    wire                          wSTF_CMDReady           ;
+    wire  [NumberOfWays - 1:0]    wSTF_WaySelect          ;
+    wire                          wSTF_Start              ;
+    wire                          wSTF_LastStep           ;
+    
+    wire   [7:0]                  wACG_STF_Command        ;
+    wire   [2:0]                  wACG_STF_CommandOption  ;
+    wire   [7:0]                  wACG_STF_Ready          ;
+    wire   [7:0]                  wACG_STF_LastStep       ;
+    wire   [NumberOfWays - 1:0]   wACG_STF_TargetWay      ;
+    wire   [15:0]                 wACG_STF_NumOfData      ;
+    wire                          wACG_STF_CASelect       ;
+    wire   [39:0]                 wACG_STF_CAData         ;
+    wire   [NumberOfWays - 1:0]   wACG_STF_ReadyBusy      ;
+    
+    wire   [15:0]                 wACG_STF_WriteData      ;
+    wire                          wACG_STF_WriteLast      ;
+    wire                          wACG_STF_WriteValid     ;
+    wire                          wACG_STF_WriteReady     ;
+    
+    wire  [5:0]                   wProg_Opcode            ;
+    wire  [4:0]                   wProg_TargetID          ;
+    wire  [15:0]                  wProg_Length            ;
+    wire                          wProg_CMDValid          ;
+    wire                          wProg_CMDReady          ;
+    wire  [NumberOfWays - 1:0]    wProg_WaySelect         ;
+    wire  [15:0]                  wProg_ColAddress        ;
+    wire  [23:0]                  wProg_RowAddress        ;
+    wire                          wProg_Start             ;
+    wire                          wProg_LastStep          ;
+    
+    wire   [7:0]                  wACG_Prog_Command       ;
+    wire   [2:0]                  wACG_Prog_CommandOption ;
+    wire   [7:0]                  wACG_Prog_Ready         ;
+    wire   [7:0]                  wACG_Prog_LastStep      ;
+    wire   [NumberOfWays - 1:0]   wACG_Prog_TargetWay     ;
+    wire   [15:0]                 wACG_Prog_NumOfData     ;
+    wire                          wACG_Prog_CASelect      ;
+    wire   [39:0]                 wACG_Prog_CAData        ;
+    wire   [NumberOfWays - 1:0]   wACG_Prog_ReadyBusy     ;
+    
+    wire  [5:0]                   wRead_Opcode            ;
+    wire  [4:0]                   wRead_TargetID          ;
+    wire  [15:0]                  wRead_Length            ;
+    wire                          wRead_CMDValid          ;
+    wire                          wRead_CMDReady          ;
+    wire  [NumberOfWays - 1:0]    wRead_WaySelect         ;
+    wire  [15:0]                  wRead_ColAddress        ;
+    wire  [23:0]                  wRead_RowAddress        ;
+    wire                          wRead_Start             ;
+    wire                          wRead_LastStep          ;
+    
+    wire   [7:0]                  wACG_Read_Command       ;
+    wire   [2:0]                  wACG_Read_CommandOption ;
+    wire   [7:0]                  wACG_Read_Ready         ;
+    wire   [7:0]                  wACG_Read_LastStep      ;
+    wire   [NumberOfWays - 1:0]   wACG_Read_TargetWay     ;
+    wire   [15:0]                 wACG_Read_NumOfData     ;
+    wire                          wACG_Read_CASelect      ;
+    wire   [39:0]                 wACG_Read_CAData        ;
+    wire   [NumberOfWays - 1:0]   wACG_Read_ReadyBusy     ;
+    
+    wire  [5:0]                   wGTF_Opcode             ;
+    wire                          wGTF_CMDValid           ;
+    wire                          wGTF_CMDReady           ;
+    wire  [NumberOfWays - 1:0]    wGTF_WaySelect          ;
+    wire                          wGTF_Start              ;
+    wire                          wGTF_LastStep           ;
+    
+    wire   [7:0]                  wACG_GTF_Command        ;
+    wire   [2:0]                  wACG_GTF_CommandOption  ;
+    wire   [7:0]                  wACG_GTF_Ready          ;
+    wire   [7:0]                  wACG_GTF_LastStep       ;
+    wire   [NumberOfWays - 1:0]   wACG_GTF_TargetWay      ;
+    wire   [15:0]                 wACG_GTF_NumOfData      ;
+    wire                          wACG_GTF_CASelect       ;
+    wire   [39:0]                 wACG_GTF_CAData         ;
+    wire   [NumberOfWays - 1:0]   wACG_GTF_ReadyBusy      ;
+    
     wire  [5:0]                   wEB_Opcode              ;
     wire  [4:0]                   wEB_TargetID            ;
-    wire  [4:0]                   wEB_SourceID            ;
-    wire  [31:0]                  wEB_Address             ;
-    wire  [15:0]                  wEB_Length              ;
     wire                          wEB_CMDValid            ;
     wire                          wEB_CMDReady            ;
     wire  [NumberOfWays - 1:0]    wEB_WaySelect           ;
-    wire  [15:0]                  wEB_ColAddress          ;
     wire  [23:0]                  wEB_RowAddress          ;
     wire                          wEB_Start               ;
     wire                          wEB_LastStep            ;
-
+    
     wire   [7:0]                  wACG_EB_Command         ;
     wire   [2:0]                  wACG_EB_CommandOption   ;
     wire   [7:0]                  wACG_EB_Ready           ;
@@ -256,20 +236,16 @@ module NFC_Command_Issue_Top
     wire                          wACG_EB_CASelect        ;
     wire   [39:0]                 wACG_EB_CAData          ;
     wire   [NumberOfWays - 1:0]   wACG_EB_ReadyBusy       ;
-
+    
     wire  [5:0]                   wRS_Opcode              ;
     wire  [4:0]                   wRS_TargetID            ;
-    wire  [4:0]                   wRS_SourceID            ;
-    wire  [31:0]                  wRS_Address             ;
-    wire  [15:0]                  wRS_Length              ;
     wire                          wRS_CMDValid            ;
     wire                          wRS_CMDReady            ;
     wire  [NumberOfWays - 1:0]    wRS_WaySelect           ;
-    wire  [15:0]                  wRS_ColAddress          ;
     wire  [23:0]                  wRS_RowAddress          ;
     wire                          wRS_Start               ;
     wire                          wRS_LastStep            ;
-
+    
     wire   [7:0]                  wACG_RS_Command         ;
     wire   [2:0]                  wACG_RS_CommandOption   ;
     wire   [7:0]                  wACG_RS_Ready           ;
@@ -279,123 +255,100 @@ module NFC_Command_Issue_Top
     wire                          wACG_RS_CASelect        ;
     wire   [39:0]                 wACG_RS_CAData          ;
     wire   [NumberOfWays - 1:0]   wACG_RS_ReadyBusy       ;
+    
+    wire    [NumberOfWays - 1:0]  wTargetWay              ;
+    wire    [15:0]                wTargetCol              ;
+    wire    [23:0]                wTargetRow              ;
+    
+    reg     [7:0]                 rTargetWay1B            ;
+    reg     [15:0]                rColAddr2B              ;
+    reg     [23:0]                rRowAddr3B              ;
+    
+    wire   [15:0]                 wFifo_WriteData         ;
+    wire                          wFifo_WriteLast         ;
+    wire                          wFifo_WriteValid        ;
+    wire                          wFifo_WriteReady        ;
 
-    wire    [NumberOfWays - 1:0]    wTargetWay              ;
-    wire    [15:0]                  wTargetCol              ;
-    wire    [23:0]                  wTargetRow              ;
+    assign wReset_Opcode        = iTop_CI_Opcode;
+    assign wReset_CMDValid      = iTop_CI_CMDValid;
+    assign wReset_WaySelect     = rTargetWay1B;
 
-    reg     [7:0]                   rTargetWay1B            ;
-    reg     [15:0]                  rColAddr2B              ;
-    reg     [23:0]                  rRowAddr3B              ;
+    assign wACG_Reset_Ready     = iACG_CI_Ready;
+    assign wACG_Reset_LastStep  = iACG_CI_LastStep;
+    assign wACG_Reset_ReadyBusy = iACG_CI_ReadyBusy;
 
-    wire   [15:0]                  wFifo_WriteData           ;
-    wire                           wFifo_WriteLast           ;
-    wire                           wFifo_WriteValid          ;
-    wire                           wFifo_WriteReady          ;
+    assign wSTF_Opcode          = iTop_CI_Opcode;
+    assign wSTF_CMDValid        = iTop_CI_CMDValid;
+    assign wSTF_WaySelect       = rTargetWay1B;
 
-    assign wReset_Opcode        = iTop_CI_Opcode        ;
-    assign wReset_TargetID      = iTop_CI_TargetID      ;
-    assign wReset_SourceID      = iTop_CI_SourceID      ;
-    assign wReset_Address       = iTop_CI_Address       ;
-    assign wReset_Length        = iTop_CI_Length        ;
-    assign wReset_CMDValid      = iTop_CI_CMDValid      ;
-    assign wReset_WaySelect     = rTargetWay1B   ;
+    assign wACG_STF_Ready       = iACG_CI_Ready;
+    assign wACG_STF_LastStep    = iACG_CI_LastStep;
+    assign wACG_STF_ReadyBusy   = iACG_CI_ReadyBusy;
 
-    assign wACG_Reset_Ready     = iACG_CI_Ready     ;
-    assign wACG_Reset_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_Reset_ReadyBusy = iACG_CI_ReadyBusy ;
+    assign wACG_STF_WriteReady  = iACG_CI_WriteReady;
 
-    assign wSTF_Opcode        = iTop_CI_Opcode        ;
-    assign wSTF_TargetID      = iTop_CI_TargetID      ;
-    assign wSTF_SourceID      = iTop_CI_SourceID      ;
-    assign wSTF_Address       = iTop_CI_Address       ;
-    assign wSTF_Length        = iTop_CI_Length        ;
-    assign wSTF_CMDValid      = iTop_CI_CMDValid      ;
-    assign wSTF_WaySelect     = rTargetWay1B   ;
+    assign wProg_Opcode         = iTop_CI_Opcode;
+    assign wProg_TargetID       = iTop_CI_TargetID;
+    assign wProg_Length         = iTop_CI_Length;
+    assign wProg_CMDValid       = iTop_CI_CMDValid;
+    assign wProg_WaySelect      = rTargetWay1B;
 
-    assign wACG_STF_Ready     = iACG_CI_Ready     ;
-    assign wACG_STF_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_STF_ReadyBusy = iACG_CI_ReadyBusy ;
+    assign wACG_Prog_Ready      = iACG_CI_Ready;
+    assign wACG_Prog_LastStep   = iACG_CI_LastStep;
+    assign wACG_Prog_ReadyBusy  = iACG_CI_ReadyBusy;
 
-    assign wACG_STF_WriteReady = iACG_CI_WriteReady;
+    assign wRead_Opcode         = iTop_CI_Opcode;
+    assign wRead_TargetID       = iTop_CI_TargetID;
+    assign wRead_Length         = iTop_CI_Length;
+    assign wRead_CMDValid       = iTop_CI_CMDValid;
+    assign wRead_WaySelect      = rTargetWay1B;
 
-    assign wProg_Opcode        = iTop_CI_Opcode        ;
-    assign wProg_TargetID      = iTop_CI_TargetID      ;
-    assign wProg_SourceID      = iTop_CI_SourceID      ;
-    assign wProg_Address       = iTop_CI_Address       ;
-    assign wProg_Length        = iTop_CI_Length        ;
-    assign wProg_CMDValid      = iTop_CI_CMDValid      ;
-    assign wProg_WaySelect     = rTargetWay1B   ;
+    assign wACG_Read_Ready      = iACG_CI_Ready;
+    assign wACG_Read_LastStep   = iACG_CI_LastStep;
+    assign wACG_Read_ReadyBusy  = iACG_CI_ReadyBusy;
 
-    assign wACG_Prog_Ready     = iACG_CI_Ready     ;
-    assign wACG_Prog_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_Prog_ReadyBusy = iACG_CI_ReadyBusy ;
+    assign wGTF_Opcode          = iTop_CI_Opcode;
+    assign wGTF_CMDValid        = iTop_CI_CMDValid;
+    assign wGTF_WaySelect       = rTargetWay1B;
 
-    assign wFifo_WriteReady = iACG_CI_WriteReady & (~wProg_CMDReady);
+    assign wACG_GTF_Ready       = iACG_CI_Ready;
+    assign wACG_GTF_LastStep    = iACG_CI_LastStep;
+    assign wACG_GTF_ReadyBusy   = iACG_CI_ReadyBusy;
 
-    assign wRead_Opcode        = iTop_CI_Opcode        ;
-    assign wRead_TargetID      = iTop_CI_TargetID      ;
-    assign wRead_SourceID      = iTop_CI_SourceID      ;
-    assign wRead_Address       = iTop_CI_Address       ;
-    assign wRead_Length        = iTop_CI_Length        ;
-    assign wRead_CMDValid      = iTop_CI_CMDValid      ;
-    assign wRead_WaySelect     = rTargetWay1B   ;
+    assign wEB_Opcode           = iTop_CI_Opcode;
+    assign wEB_TargetID         = iTop_CI_TargetID;
+    assign wEB_CMDValid         = iTop_CI_CMDValid;
+    assign wEB_WaySelect        = rTargetWay1B;
 
-    assign wACG_Read_Ready     = iACG_CI_Ready     ;
-    assign wACG_Read_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_Read_ReadyBusy = iACG_CI_ReadyBusy ;
+    assign wACG_EB_Ready        = iACG_CI_Ready;
+    assign wACG_EB_LastStep     = iACG_CI_LastStep;
+    assign wACG_EB_ReadyBusy    = iACG_CI_ReadyBusy;
 
-    assign wGTF_Opcode        = iTop_CI_Opcode        ;
-    assign wGTF_TargetID      = iTop_CI_TargetID      ;
-    assign wGTF_SourceID      = iTop_CI_SourceID      ;
-    assign wGTF_Address       = iTop_CI_Address       ;
-    assign wGTF_Length        = iTop_CI_Length        ;
-    assign wGTF_CMDValid      = iTop_CI_CMDValid      ;
-    assign wGTF_WaySelect     = rTargetWay1B   ;
+    assign wRS_Opcode           = iTop_CI_Opcode;
+    assign wRS_TargetID         = iTop_CI_TargetID;
+    assign wRS_CMDValid         = iTop_CI_CMDValid;
+    assign wRS_WaySelect        = rTargetWay1B;
 
-    assign wACG_GTF_Ready     = iACG_CI_Ready     ;
-    assign wACG_GTF_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_GTF_ReadyBusy = iACG_CI_ReadyBusy ;
+    assign wACG_RS_Ready        = iACG_CI_Ready;
+    assign wACG_RS_LastStep     = iACG_CI_LastStep;
+    assign wACG_RS_ReadyBusy    = iACG_CI_ReadyBusy;
 
-    assign wEB_Opcode        = iTop_CI_Opcode        ;
-    assign wEB_TargetID      = iTop_CI_TargetID      ;
-    assign wEB_SourceID      = iTop_CI_SourceID      ;
-    assign wEB_Address       = iTop_CI_Address       ;
-    assign wEB_Length        = iTop_CI_Length        ;
-    assign wEB_CMDValid      = iTop_CI_CMDValid      ;
-    assign wEB_WaySelect     = rTargetWay1B   ;
+    assign wTGC_waySELECT       = (iTop_CI_Opcode[5:0] == 6'b100000) & (iTop_CI_CMDValid);
+    assign wTGC_colADDR         = (iTop_CI_Opcode[5:0] == 6'b100010) & (iTop_CI_CMDValid);
+    assign wTGC_rowADDR         = (iTop_CI_Opcode[5:0] == 6'b100100) & (iTop_CI_CMDValid);
 
-    assign wACG_EB_Ready     = iACG_CI_Ready     ;
-    assign wACG_EB_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_EB_ReadyBusy = iACG_CI_ReadyBusy ;
+    assign wRead_ColAddress     = rColAddr2B;
+    assign wRead_RowAddress     = rRowAddr3B;
 
-    assign wRS_Opcode        = iTop_CI_Opcode        ;
-    assign wRS_TargetID      = iTop_CI_TargetID      ;
-    assign wRS_SourceID      = iTop_CI_SourceID      ;
-    assign wRS_Address       = iTop_CI_Address       ;
-    assign wRS_Length        = iTop_CI_Length        ;
-    assign wRS_CMDValid      = iTop_CI_CMDValid      ;
-    assign wRS_WaySelect     = rTargetWay1B   ;
+    assign wProg_ColAddress     = rColAddr2B;
+    assign wProg_RowAddress     = rRowAddr3B;
 
-    assign wACG_RS_Ready     = iACG_CI_Ready     ;
-    assign wACG_RS_LastStep  = iACG_CI_LastStep  ;
-    assign wACG_RS_ReadyBusy = iACG_CI_ReadyBusy ;
+    // assign wEB_ColAddress       = rColAddr2B;
+    assign wEB_RowAddress       = rRowAddr3B;
 
-    assign wTGC_waySELECT = (iTop_CI_Opcode[5:0] == 6'b100000) & (iTop_CI_CMDValid);
-    assign wTGC_colADDR   = (iTop_CI_Opcode[5:0] == 6'b100010) & (iTop_CI_CMDValid);
-    assign wTGC_rowADDR   = (iTop_CI_Opcode[5:0] == 6'b100100) & (iTop_CI_CMDValid);
+    // assign wRS_ColAddress       = rColAddr2B;
+    assign wRS_RowAddress       = rRowAddr3B;
 
-    assign wRead_ColAddress = rColAddr2B;
-    assign wRead_RowAddress = rRowAddr3B;
-
-    assign wProg_ColAddress = rColAddr2B;
-    assign wProg_RowAddress = rRowAddr3B;
-
-    assign wEB_ColAddress = rColAddr2B;
-    assign wEB_RowAddress = rRowAddr3B;
-
-    assign wRS_ColAddress = rColAddr2B;
-    assign wRS_RowAddress = rRowAddr3B;
     always @ (posedge iSystemClock, posedge iReset) begin
         if (iReset) begin
             rTargetWay1B[7:0]   <= 0;
@@ -421,6 +374,8 @@ module NFC_Command_Issue_Top
             end
         end
     end
+
+    assign wFifo_WriteReady     = iACG_CI_WriteReady & (~wProg_CMDReady);
 
     parameter Reset_CommandID      = 6'b000001;
     parameter SetFeature_CommandID = 6'b000010;
@@ -459,8 +414,6 @@ module NFC_Command_Issue_Top
             .iReset             (iReset),
 
             .iOpcode            (wReset_Opcode),
-            .iTargetID          (wReset_TargetID),
-            .iSourceID          (wReset_SourceID),
             .iCMDValid          (wReset_CMDValid),
             .oCMDReady          (wReset_CMDReady),
             .iWaySelect         (wReset_WaySelect),
@@ -487,8 +440,6 @@ module NFC_Command_Issue_Top
             .iReset             (iReset),
 
             .iOpcode            (wSTF_Opcode),
-            .iTargetID          (wSTF_TargetID),
-            .iSourceID          (wSTF_SourceID),
             .iCMDValid          (wSTF_CMDValid),
             .oCMDReady          (wSTF_CMDReady),
             .iWaySelect         (wSTF_WaySelect),
@@ -522,8 +473,6 @@ module NFC_Command_Issue_Top
 
             .iOpcode            (wProg_Opcode),
             .iTargetID          (wProg_TargetID),
-            .iSourceID          (wProg_SourceID),
-            .iAddress           (wProg_Address),
             .iLength            (wProg_Length),
             .iCMDValid          (wProg_CMDValid),
             .oCMDReady          (wProg_CMDReady),
@@ -555,14 +504,12 @@ module NFC_Command_Issue_Top
 
             .iOpcode            (wRead_Opcode),
             .iTargetID          (wRead_TargetID),
-            .iSourceID          (wRead_SourceID),
-            .iAddress           (wRead_Address),
             .iLength            (wRead_Length),
             .iCMDValid          (wRead_CMDValid),
             .oCMDReady          (wRead_CMDReady),
             .iWaySelect         (wRead_WaySelect),
-            // .iColAddress        (wRead_ColAddress),
-            // .iRowAddress        (wRead_RowAddress),
+            .iColAddress        (wRead_ColAddress),
+            .iRowAddress        (wRead_RowAddress),
             .oStart             (wRead_Start),
             .oLastStep          (wRead_LastStep),
 
@@ -587,10 +534,6 @@ module NFC_Command_Issue_Top
             .iReset             (wReset),
 
             .iOpcode            (wGTF_Opcode),
-            .iTargetID          (wGTF_TargetID),
-            .iSourceID          (wGTF_SourceID),
-            .iAddress           (wGTF_Address),
-            .iLength            (wGTF_Length),
             .iCMDValid          (wGTF_CMDValid),
             .oCMDReady          (wGTF_CMDReady),
             .iWaySelect         (wGTF_WaySelect),
@@ -618,14 +561,10 @@ module NFC_Command_Issue_Top
 
             .iOpcode            (wEB_Opcode),
             .iTargetID          (wEB_TargetID),
-            .iSourceID          (wEB_SourceID),
-            .iAddress           (wEB_Address),
-            .iLength            (wEB_Length),
             .iCMDValid          (wEB_CMDValid),
             .oCMDReady          (wEB_CMDReady),
             .iWaySelect         (wEB_WaySelect),
-            // .iColAddress        (wEB_ColAddress),
-            // .iRowAddress        (wEB_RowAddress),
+            .iRowAddress        (wEB_RowAddress),
             .oStart             (wEB_Start),
             .oLastStep          (wEB_LastStep),
 
@@ -650,14 +589,10 @@ module NFC_Command_Issue_Top
 
             .iOpcode            (wRS_Opcode),
             .iTargetID          (wRS_TargetID),
-            .iSourceID          (wRS_SourceID),
-            .iAddress           (wRS_Address),
-            .iLength            (wRS_Length),
             .iCMDValid          (wRS_CMDValid),
             .oCMDReady          (wRS_CMDReady),
             .iWaySelect         (wRS_WaySelect),
-            // .iColAddress        (wRS_ColAddress),
-            // .iRowAddress        (wRS_RowAddress),
+            .iRowAddress        (wRS_RowAddress),
             .oStart             (wRS_Start),
             .oLastStep          (wRS_LastStep),
 

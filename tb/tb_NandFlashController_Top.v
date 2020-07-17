@@ -308,6 +308,10 @@ task readstatus_70h;
     NFC_signal(6'b000111, 5'b00100, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
     @(posedge iSystemClock);
     wait(oCMDReady == 0);
+    // while(oCMDReady == 1)
+	   //  begin
+	    	
+	   //  end
     end
 endtask
 
@@ -403,6 +407,9 @@ endtask
         readpage_00h_30h;
         
         eraseblock_60h_d0h;
+        while (ARDY == 0) begin
+            readstatus_70h;
+        end
         readpage_00h_30h;
         repeat (50) @(posedge iSystemClock);
         // $finish;

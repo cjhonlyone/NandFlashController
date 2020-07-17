@@ -13,12 +13,14 @@ module NFC_Command_ReadStatus
 
     iOpcode                  ,  
     iTargetID                ,  
-    iSourceID                ,  
-    iAddress                 ,  
-    iLength                  ,  
+    // iSourceID                ,  
+    // iAddress                 ,  
+    // iLength                  ,  
     iCMDValid                ,  
     oCMDReady                ,  
     iWaySelect               ,
+    // iColAddress              ,
+    iRowAddress              ,
 
     oStart                   ,
     oLastStep                ,
@@ -65,13 +67,15 @@ module NFC_Command_ReadStatus
  
     input   [5:0]                   iOpcode              ;
     input   [4:0]                   iTargetID            ;
-    input   [4:0]                   iSourceID            ;
-    input   [31:0]                  iAddress             ;
-    input   [15:0]                  iLength              ;
+    // input   [4:0]                   iSourceID            ;
+    // input   [31:0]                  iAddress             ;
+    // input   [15:0]                  iLength              ;
     input                           iCMDValid            ;
     output                          oCMDReady            ;
 
     input   [NumberOfWays - 1:0]    iWaySelect           ;
+    // input   [15:0]                  iColAddress          ;
+    input   [23:0]                  iRowAddress          ;
     output                          oStart               ;
     output                          oLastStep            ;
 
@@ -114,10 +118,12 @@ module NFC_Command_ReadStatus
     reg   [4:0]                   rTargetID            ; //option
     // reg                           rStart             ;
     reg                           rLastStep          ;
-    reg   [31:0]                  rAddress             ;
-    reg   [15:0]                  rLength              ;
+    // reg   [31:0]                  rAddress             ;
+    // reg   [15:0]                  rLength              ;
     reg                           rCMDReady          ;  
     // reg  [NumberOfWays - 1:0]     rReadyBusy     
+    // reg   [15:0]                  rColAddress          ;
+    reg   [23:0]                  rRowAddress          ;
 
     reg   [7:0]                   rACG_Command       ;      
     reg   [2:0]                   rACG_CommandOption ;      
@@ -221,9 +227,8 @@ module NFC_Command_ReadStatus
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
-            rAddress           <= 32'd0;
-            rLength            <= 16'd0;
             rTargetID          <= 5'd0;
+            rRowAddress        <= 0;
 
             rACG_Command       <= 8'b0000_0000;
             rACG_CommandOption <= 3'b000;
@@ -238,9 +243,8 @@ module NFC_Command_ReadStatus
                 rST_RESET: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
-                    rAddress           <= 32'd0;
-                    rLength            <= 16'd0;
                     rTargetID          <= 5'd0;
+                    rRowAddress        <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -254,10 +258,8 @@ module NFC_Command_ReadStatus
                 rST_READY: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
-
-                    rAddress           <= 32'd0;
-                    rLength            <= 16'd0;
                     rTargetID          <= 5'd0;
+                    rRowAddress        <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -271,9 +273,8 @@ module NFC_Command_ReadStatus
                 rST_CMDLatch: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    rAddress           <= iAddress ;
-                    rLength            <= iLength  ;
                     rTargetID          <= iTargetID;
+                    rRowAddress        <= iRowAddress;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -287,9 +288,8 @@ module NFC_Command_ReadStatus
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    rAddress           <= rAddress ;
-                    rLength            <= rLength  ;
                     rTargetID          <= rTargetID;
+                    rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -303,41 +303,38 @@ module NFC_Command_ReadStatus
                 rST_ADDRIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    rAddress           <= rAddress;
-                    rLength            <= rLength ;
                     rTargetID          <= rTargetID;
+                    rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 16'h0002;
                     rACG_CASelect      <= 1'b0;
-                    rACG_CAData        <= 40'h00_00_00_00_00; // RESET FFh
+                    rACG_CAData        <= {rRowAddress[7:0],rRowAddress[15:8],rRowAddress[23:16],16'd0}; 
 
                     rTimer             <= 0;
                 end
                 rST_DATAIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    rAddress           <= rAddress;
-                    rLength            <= rLength ;
                     rTargetID          <= rTargetID;
+                    rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= wDISDone ? 8'b0000_0000 : 8'b0000_0010;
                     rACG_CommandOption <= 3'b000;
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 16'h0002;
                     rACG_CASelect      <= 1'b0;
-                    rACG_CAData        <= 40'h00_00_00_00_00; // RESET FFh
+                    rACG_CAData        <= 40'h00_00_00_00_00; 
 
                     rTimer             <= 0;
                 end
                 rST_WaitRBLow: begin
                     rCMDReady          <= 0;
                     rLastStep          <= (rTimer == 4'd12) ? 1 : 0;
-                    rAddress           <= rAddress;
-                    rLength            <= rLength ;
                     rTargetID          <= rTargetID;
+                    rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -352,9 +349,8 @@ module NFC_Command_ReadStatus
                 default: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-                    rAddress           <= 0;
-                    rLength            <= 0 ;
                     rTargetID          <= 0;
+                    rRowAddress        <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
