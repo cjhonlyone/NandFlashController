@@ -92,8 +92,9 @@ module NFC_Atom_Datainput_Sync
 
     wire                          wBuff_Ready             ;
  
+localparam tWPST_timer = 3;
 
-    wire                          wtWPSTDone = (rDIS_TimeCounter == 4'd5) ? 1 : 0 ; // tCKWR
+    wire                          wtWPSTDone = (rDIS_TimeCounter == tWPST_timer) ? 1 : 0 ; // tCKWR
     wire                          wTimerDone = (rDIS_TimeCounter == 4'd3) ? 1 : 0 ; // tCAD
     // wire                          wTimerHalf = (rDIS_TimeCounter <= 4'd4) ? 1 : 0 ;
     wire                          wDISDone   = (rDIS_DataCounter == rNumOfData) ? 1 : 0 ;
@@ -339,8 +340,8 @@ module NFC_Atom_Datainput_Sync
 
                     
                     
-                    rChipEnable         <= (rDIS_TimeCounter < 5) ? {rTargetWay ,rTargetWay} : 0;
-                    rReadEnable         <= (rDIS_TimeCounter < 4) ? 4'b0000 : 4'b0011;
+                    rChipEnable         <= (rDIS_TimeCounter < tWPST_timer) ? {rTargetWay ,rTargetWay} : 0;
+                    rReadEnable         <= (rDIS_TimeCounter < tWPST_timer) ? 4'b0000 : 4'b0011;
                     rWriteEnable        <= 4'b0001;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
