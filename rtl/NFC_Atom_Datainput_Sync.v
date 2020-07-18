@@ -230,7 +230,7 @@ module NFC_Atom_Datainput_Sync
                     
                     rChipEnable         <= { 2*NumberOfWays{1'b0} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0000;
+                    rWriteEnable        <= 4'b0001;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 
