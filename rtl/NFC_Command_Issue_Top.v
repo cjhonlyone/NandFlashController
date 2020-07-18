@@ -31,6 +31,9 @@ module NFC_Command_Issue_Top
 
     oCI_Top_ReadyBusy        ,  
 
+    oCI_Top_Status           ,
+    oCI_Top_StatusValid      ,
+
     oCI_ACG_Command          ,  
     oCI_ACG_CommandOption    ,  
 
@@ -79,7 +82,9 @@ module NFC_Command_Issue_Top
     input                           iTop_CI_ReadReady     ;
     
     output  [NumberOfWays - 1:0]    oCI_Top_ReadyBusy     ;
-    
+
+    output  [23:0]                  oCI_Top_Status        ;
+    output                          oCI_Top_StatusValid   ;
     
     output   [7:0]                  oCI_ACG_Command       ;
     output   [2:0]                  oCI_ACG_CommandOption ;
@@ -246,6 +251,9 @@ module NFC_Command_Issue_Top
     wire                          wRS_Start               ;
     wire                          wRS_LastStep            ;
     
+    wire  [23:0]                  wRS_Status              ;
+    wire                          wRS_StatusValid         ;
+
     wire   [7:0]                  wACG_RS_Command         ;
     wire   [2:0]                  wACG_RS_CommandOption   ;
     wire   [7:0]                  wACG_RS_Ready           ;
@@ -600,6 +608,9 @@ module NFC_Command_Issue_Top
             .oStart             (wRS_Start),
             .oLastStep          (wRS_LastStep),
 
+            .oStatus            (wRS_Status),
+            .oStatusValid       (wRS_StatusValid),
+
             .oACG_Command       (wACG_RS_Command),
             .oACG_CommandOption (wACG_RS_CommandOption),
             .iACG_Ready         (wACG_RS_Ready),
@@ -608,6 +619,11 @@ module NFC_Command_Issue_Top
             .oACG_NumOfData     (wACG_RS_NumOfData),
             .oACG_CASelect      (wACG_RS_CASelect),
             .oACG_CAData        (wACG_RS_CAData),
+
+            .iACG_ReadData      (iACG_CI_ReadData),
+            .iACG_ReadLast      (iACG_CI_ReadValid),
+            .iACG_ReadValid     (iACG_CI_ReadLast),
+
             .iACG_ReadyBusy     (wACG_RS_ReadyBusy)
         );
 
@@ -699,7 +715,7 @@ module NFC_Command_Issue_Top
 
 
     // Parameters
-    parameter DEPTH = 32;
+    parameter DEPTH = 4320;
     parameter DATA_WIDTH = 16;
     parameter KEEP_ENABLE = (DATA_WIDTH>8);
     parameter KEEP_WIDTH = (DATA_WIDTH/8);
@@ -710,7 +726,7 @@ module NFC_Command_Issue_Top
     parameter DEST_WIDTH = 8;
     parameter USER_ENABLE = 1;
     parameter USER_WIDTH = 1;
-    parameter FRAME_FIFO = 1;
+    parameter FRAME_FIFO = 0;
     parameter USER_BAD_FRAME_VALUE = 1'b1;
     parameter USER_BAD_FRAME_MASK = 1'b1;
     parameter DROP_BAD_FRAME = 0;
@@ -778,7 +794,7 @@ module NFC_Command_Issue_Top
 
             .s_axis_tdata      (iACG_CI_ReadData),
             .s_axis_tkeep      (2'b11),
-            .s_axis_tvalid     (iACG_CI_ReadValid),
+            .s_axis_tvalid     (iACG_CI_ReadValid & wRS_CMDReady),
             .s_axis_tready     (oCI_ACG_ReadReady),
             .s_axis_tlast      (iACG_CI_ReadLast),
 
@@ -797,4 +813,8 @@ module NFC_Command_Issue_Top
 
 
     assign oCI_Top_ReadyBusy = iACG_CI_ReadyBusy;
+
+
+    assign oCI_Top_Status      = wRS_Status     ; 
+    assign oCI_Top_StatusValid = wRS_StatusValid; 
 endmodule

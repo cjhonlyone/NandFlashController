@@ -376,7 +376,7 @@ module NFC_Atom_Datainput_Sync
     end
 
 	// Parameters
-	parameter DEPTH = 2048;
+	parameter DEPTH = 4320;
 	parameter DATA_WIDTH = 16;
 	parameter KEEP_ENABLE = (DATA_WIDTH>8);
 	parameter KEEP_WIDTH = (DATA_WIDTH/8);
@@ -387,7 +387,7 @@ module NFC_Atom_Datainput_Sync
 	parameter DEST_WIDTH = 8;
 	parameter USER_ENABLE = 1;
 	parameter USER_WIDTH = 1;
-	parameter FRAME_FIFO = 1;
+	parameter FRAME_FIFO = 0;
 	parameter USER_BAD_FRAME_VALUE = 1'b1;
 	parameter USER_BAD_FRAME_MASK = 1'b1;
 	parameter DROP_BAD_FRAME = 0;

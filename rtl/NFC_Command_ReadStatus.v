@@ -25,6 +25,8 @@ module NFC_Command_ReadStatus
     oStart                   ,
     oLastStep                ,
 
+    oStatus                  ,
+    oStatusValid             ,
     // iWriteData               ,  
     // iWriteLast               ,  
     // iWriteValid              ,  
@@ -53,9 +55,9 @@ module NFC_Command_ReadStatus
     // oACG_WriteValid       ,  
     // iACG_WriteReady       ,  
 
-    // iACG_ReadData         ,  
-    // iACG_ReadLast         ,  
-    // iACG_ReadValid        ,  
+    iACG_ReadData         ,  
+    iACG_ReadLast         ,  
+    iACG_ReadValid        ,  
     // oACG_ReadReady        ,  
 
     iACG_ReadyBusy        
@@ -78,6 +80,8 @@ module NFC_Command_ReadStatus
     input   [23:0]                  iRowAddress          ;
     output                          oStart               ;
     output                          oLastStep            ;
+    output  [23:0]                  oStatus              ;
+    output                          oStatusValid         ;
 
     // input   [15:0]                  iWriteData           ;
     // input                           iWriteLast           ;
@@ -108,44 +112,46 @@ module NFC_Command_ReadStatus
     // output                           oACG_WriteValid          ;
     // input                            iACG_WriteReady          ;
   
-    // input    [15:0]                  iACG_ReadData            ;
-    // input                            iACG_ReadLast            ;
-    // input                            iACG_ReadValid           ;
+    input    [15:0]                  iACG_ReadData            ;
+    input                            iACG_ReadLast            ;
+    input                            iACG_ReadValid           ;
     // output                           oACG_ReadReady           ;
 
     input    [NumberOfWays - 1:0]    iACG_ReadyBusy           ;
 
-    reg   [4:0]                   rTargetID            ; //option
-    // reg                           rStart             ;
-    reg                           rLastStep          ;
-    // reg   [31:0]                  rAddress             ;
-    // reg   [15:0]                  rLength              ;
-    reg                           rCMDReady          ;  
+    reg   [4:0]                   rTargetID         ; //option
+    // reg                           rStart         ;
+    reg                           rLastStep         ;
+    reg  [23:0]                   rStatus           ;
+    reg                           rStatusValid      ;
+    // reg   [31:0]                  rAddress       ;
+    // reg   [15:0]                  rLength        ;
+    reg                           rCMDReady         ;  
     // reg  [NumberOfWays - 1:0]     rReadyBusy     
-    // reg   [15:0]                  rColAddress          ;
-    reg   [23:0]                  rRowAddress          ;
-
-    reg   [7:0]                   rACG_Command       ;      
-    reg   [2:0]                   rACG_CommandOption ;      
-    reg   [NumberOfWays - 1:0]    rACG_TargetWay     ;      
-    reg   [15:0]                  rACG_NumOfData     ;      
-    reg                           rACG_CASelect      ;      
-    reg   [39:0]                  rACG_CAData        ;   
-
-    reg   [NumberOfWays - 1:0]    rACG_ReadyBusy     ;
-    // reg                           rWay_ReadyBusy     ;
-
-    // reg                           rWriteReady          ;
-
-    wire                          wLastStep          ;
-
-    reg   [15:0]                  rACG_WriteData           ;
-    reg                           rACG_WriteLast           ;
-    reg                           rACG_WriteValid          ;
-
-    reg   [31:0]                  rfeatures;
-
-    reg   [3:0]                   rTimer;
+    // reg   [15:0]                  rColAddress    ;
+    reg   [23:0]                  rRowAddress       ;
+    
+    reg   [7:0]                   rACG_Command      ;      
+    reg   [2:0]                   rACG_CommandOption;      
+    reg   [NumberOfWays - 1:0]    rACG_TargetWay    ;      
+    reg   [15:0]                  rACG_NumOfData    ;      
+    reg                           rACG_CASelect     ;      
+    reg   [39:0]                  rACG_CAData       ;   
+    
+    reg   [NumberOfWays - 1:0]    rACG_ReadyBusy    ;
+    // reg                           rWay_ReadyBusy ;
+    
+    // reg                           rWriteReady    ;
+    
+    wire                          wLastStep         ;
+    
+    reg   [15:0]                  rACG_WriteData    ;
+    reg                           rACG_WriteLast    ;
+    reg                           rACG_WriteValid   ;
+    
+    reg   [31:0]                  rfeatures         ;
+    
+    reg   [3:0]                   rTimer            ;
 
     // FSM Parameters/Wires/Regs
     localparam rST_FSM_BIT    = 9;
@@ -370,15 +376,28 @@ module NFC_Command_ReadStatus
     //     rWay_ReadyBusy <= | rACG_ReadyBusy;
     // end
 
-    assign oStart             = wStart             ;
-    assign oLastStep          = rLastStep          ;
+    always @ (posedge iSystemClock) begin
+        if (iACG_ReadValid & iACG_ReadLast & (~rCMDReady)) begin
+            rStatus      <= {wReadStatusEnhanced,3'd0,rRowAddress[18:7],iACG_ReadData[7:0]};
+            rStatusValid <= 1;
+        end else begin
+            rStatus      <= 23'd0;
+            rStatusValid <= 0;
+        end
+    end
 
-    assign oCMDReady          = rCMDReady          ;
-    assign oACG_Command       = rACG_Command       ;
-    assign oACG_CommandOption = rACG_CommandOption ;
-    assign oACG_TargetWay     = rACG_TargetWay     ;
-    assign oACG_NumOfData     = rACG_NumOfData     ;
-    assign oACG_CASelect      = rACG_CASelect      ;
-    assign oACG_CAData        = rACG_CAData        ;
+    assign oStart             = wStart            ;
+    assign oLastStep          = rLastStep         ;
+    
+    assign oCMDReady          = rCMDReady         ;
+    assign oACG_Command       = rACG_Command      ;
+    assign oACG_CommandOption = rACG_CommandOption;
+    assign oACG_TargetWay     = rACG_TargetWay    ;
+    assign oACG_NumOfData     = rACG_NumOfData    ;
+    assign oACG_CASelect      = rACG_CASelect     ;
+    assign oACG_CAData        = rACG_CAData       ;
+    
+    assign oStatus            = rStatus           ;
+    assign oStatusValid       = rStatusValid      ;
 
 endmodule

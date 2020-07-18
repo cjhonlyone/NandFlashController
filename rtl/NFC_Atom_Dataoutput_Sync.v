@@ -84,7 +84,7 @@ module NFC_Atom_Dataoutput_Sync
     reg  [31:0]                   rDQ_m2                  ;
 
     wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd5) ? 1 : 0 ;
-    wire                          wTimerDone = (rDOS_TimeCounter == 4'd2) ? 1 : 0 ;
+    wire                          wTimerDone = (rDOS_TimeCounter == 4'd1) ? 1 : 0 ;
     wire                          wTimerHalf = (rDOS_TimeCounter <= 4'd4) ? 1 : 0 ;
     wire                          wDOSDone   = (rDOS_DataCounter == rNumOfData) ? 1 : 0 ;
 
@@ -407,10 +407,10 @@ module NFC_Atom_Dataoutput_Sync
 			rDQ_m2 <= 32'd0;
 		end
 		else begin
-			rDQStrobe_m1 <= rDQStrobe;
-			rDQStrobe_m2 <= rDQStrobe_m1;
-			rDQ_m1 <= rDQ;
-			rDQ_m2 <= rDQ_m1;
+			rDQStrobe_m1 <= {rDQStrobe[3:0], rDQStrobe[1:0], rDQStrobe_m1[7:6]};
+			rDQStrobe_m2 <= rDQStrobe_m2;
+			rDQ_m1 <= {rDQ[15:0], rDQ[7:0], rDQ_m1[31:24]};
+			rDQ_m2 <= rDQ_m2;
 		end
 	end
 
@@ -421,8 +421,8 @@ module NFC_Atom_Dataoutput_Sync
 
     assign oDQSOutEnable       = rDQSOutEnable           ;   
     assign oDQOutEnable        = rDQOutEnable            ;   
-    assign oDQStrobe           = rDQStrobe_m2            ;   
-    assign oDQ                 = rDQ_m2                  ;   
+    assign oDQStrobe           = rDQStrobe_m1            ;   
+    assign oDQ                 = rDQ_m1                  ;   
     assign oChipEnable         = rChipEnable             ;   
     assign oReadEnable         = rReadEnable             ;   
     assign oWriteEnable        = rWriteEnable            ;   
