@@ -84,6 +84,9 @@ module tb_NandFlashController_Top;
 
     wire  [NumberOfWays - 1:0]    oReadyBusy           ;
 
+    wire  [23:0]                  oStatus                 ;
+    wire                          oStatusValid            ;
+
 // pinpad
     wire                          IO_NAND_DQS                 ;
     wire                  [7:0]   IO_NAND_DQ                  ;
@@ -127,6 +130,9 @@ module tb_NandFlashController_Top;
 
             .oReadyBusy          (oReadyBusy),
 
+            .oStatus             (oStatus     ),
+            .oStatusValid        (oStatusValid),
+
             .IO_NAND_DQS         (IO_NAND_DQS),
             .IO_NAND_DQ          (IO_NAND_DQ),
             .O_NAND_CE           (O_NAND_CE),
@@ -168,35 +174,18 @@ module tb_NandFlashController_Top;
         );  
 
 
-    task s_axis_input;
-        begin
-            @(posedge iSystemClock);   
-            iWriteValid <= 1;
-            iWriteData<= 16'h0102;
-            iWriteKeep<= 2'b11;
-            iWriteLast<= 0;
-            @(posedge iSystemClock);   
-            iWriteValid <= 1;
-            iWriteData<= 16'h0304;
-            iWriteKeep<= 2'b11;
-            iWriteLast<= 0;
-            @(posedge iSystemClock);   
-            iWriteValid <= 1;
-            iWriteData<= 16'h0506;
-            iWriteKeep<= 2'b11;
-            iWriteLast<= 0;
-            @(posedge iSystemClock);   
-            iWriteValid <= 1;
-            iWriteData<= 16'h0708;
-            iWriteKeep<= 2'b11;
-            iWriteLast<= 1;
-            @(posedge iSystemClock);   
-            iWriteValid <= 0;
-            iWriteData<= 16'h0000;
-            iWriteKeep<= 2'b11;
-            iWriteLast<= 1;
-        end
-    endtask
+    reg [7:0]  global_way;
+    reg [15:0] global_col;
+    reg [23:0] global_row;
+
+    reg RDY  ;
+    reg ARDY ;
+
+    integer seed;
+
+    initial  begin seed =  0; end
+
+    reg [15:0] memory [0:12*2160-1];
 
     task NFC_signal;
         input   [5:0]                   rOpcode              ;
@@ -258,8 +247,9 @@ module tb_NandFlashController_Top;
 
 
     task progpage_80h_10h;
+        input [15:0] number;
         begin
-        NFC_signal(6'b000011, 5'b00000, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+        NFC_signal(6'b000011, 5'b00000, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000011, 5'b00000, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
         @(posedge iSystemClock);
         wait(oCMDReady == 0);
@@ -267,8 +257,9 @@ module tb_NandFlashController_Top;
     endtask
 
     task progpage_80h_15h_cache;
+        input [15:0] number;
         begin
-        NFC_signal(6'b000011, 5'b00001, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+        NFC_signal(6'b000011, 5'b00001, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000011, 5'b00001, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
         @(posedge iSystemClock);
         wait(oCMDReady == 0);
@@ -276,8 +267,9 @@ module tb_NandFlashController_Top;
     endtask
 
     task progpage_80h_10h_multplane;
+        input [15:0] number;
         begin
-        NFC_signal(6'b000011, 5'b00010, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+        NFC_signal(6'b000011, 5'b00010, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000011, 5'b00010, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
         @(posedge iSystemClock);
         wait(oCMDReady == 0);
@@ -285,11 +277,32 @@ module tb_NandFlashController_Top;
     endtask
 
     task readpage_00h_30h;
+        input [15:0] number;
+        input check;
+        integer m;
+        integer base_adr;
         begin
-        NFC_signal(6'b000100, 5'b00101, 0, 32'h00000000, 16'h0008, 1, 16'h0000, 0, 0, 0);
+        NFC_signal(6'b000100, 5'b00101, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000100, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
-        @(posedge iSystemClock);
-        wait(oCMDReady == 0);
+
+        if (check) begin
+            m = 0;
+            base_adr = global_row[7]*6 + global_row[2:0];
+            @(posedge iSystemClock);
+            wait(oReadValid == 1);
+            while (oReadValid & (~ oReadLast)) begin
+                @(posedge iSystemClock);
+                if (memory[base_adr*2160 + m] != oReadData) begin
+                    $display("Error Read data wrong %d %d %04x %04x",base_adr,m,memory[base_adr*2160 + m],oReadData);
+                    $stop;
+                end
+                m <= m + 1;
+            end 
+        end else begin
+            @(posedge iSystemClock);
+            wait(oCMDReady == 0);
+        end
+
         end
     endtask
 
@@ -329,9 +342,12 @@ module tb_NandFlashController_Top;
         end
     endtask
 
+
+
     task select_way;
         input [7:0] way;
         begin
+        global_way = way;
         NFC_signal(6'b100000, 5'b00000, 0, {24'd0,way}, 16'h0008, 1, 16'h0000, 0, 0, 0);
         end
     endtask
@@ -339,6 +355,7 @@ module tb_NandFlashController_Top;
     task set_coladdr;
         input [15:0] col;
         begin
+        global_col = col;
         NFC_signal(6'b100010, 5'b00000, 0, {16'd0,col}, 16'h0008, 1, 16'h0000, 0, 0, 0);
         end
     endtask
@@ -346,13 +363,68 @@ module tb_NandFlashController_Top;
     task set_rowaddr;
         input [23:0] row;
         begin
+        global_row = row;
         NFC_signal(6'b100100, 5'b00000, 0, {8'd0,row}, 16'h0008, 1, 16'h0000, 0, 0, 0);
         end
     endtask
 
 
-    wire RDY  = oReadData[6];
-    wire ARDY = oReadData[5];
+
+    always @ (posedge iSystemClock) begin
+        if (iReset) begin
+            RDY  <= 0;
+            ARDY <= 0;
+        end else if (oStatusValid)  begin
+            RDY  <= oStatus[6];
+            ARDY <= oStatus[5];
+        end
+    end
+
+
+    task s_axis_input;
+        input [23:0] rowaddr;
+        input [15:0] number;
+        integer base_adr;
+        integer j;
+        begin
+            base_adr = rowaddr[7]*6 + rowaddr[2:0];
+            for(j=0;j<number[15:1];j=j+1)
+            begin
+                if (j == 0) begin
+                    @(posedge iSystemClock);   
+                    iWriteValid = 1;
+                    iWriteData  = rowaddr[15:0];
+                    iWriteKeep  = 2'b11;
+                    iWriteLast  = 0;
+                end else if (j == 1) begin
+                    @(posedge iSystemClock);   
+                    iWriteValid = 1;
+                    iWriteData  = {8'h00, rowaddr[23:16]};
+                    iWriteKeep  = 2'b11;
+                    iWriteLast  = 0;
+                end else if (j == 2159) begin
+                    @(posedge iSystemClock);   
+                    iWriteValid = 1;
+                    iWriteData  = $random(seed);
+                    iWriteKeep  = 2'b11;
+                    iWriteLast  = 1;
+                end else begin
+                    @(posedge iSystemClock);   
+                    iWriteValid = 1;
+                    iWriteData  = $random(seed);
+                    iWriteKeep  = 2'b11;
+                    iWriteLast  = 0;
+                end
+                memory[base_adr*2160 + j] = iWriteData;
+            end
+            @(posedge iSystemClock);   
+            iWriteValid = 0;
+            iWriteData  = 16'h0000;
+            iWriteKeep  = 2'b00;
+            iWriteLast  = 1;
+        end
+    endtask
+
 
     integer I;
     task program_multiplane_cache;
@@ -366,40 +438,43 @@ module tb_NandFlashController_Top;
             rblock <= block + 1'b1;
             rpage <= page + 1'b1;
             // plane0 page0
-            s_axis_input;
+            s_axis_input({{5'd0},{block},{page}}, 16'd4320);
             set_rowaddr({{5'd0},{block},page});
             readstatus_70h;
             while (RDY == 0) begin
                 readstatus_70h;
             end
-            progpage_80h_10h_multplane;
+            progpage_80h_10h_multplane(16'd4320);
+
             // plane1 page0
-            s_axis_input;
+            s_axis_input({{5'd0},{rblock},{page}}, 16'd4320);
             set_rowaddr({{5'd0},{rblock},page});
             readstatus_78h;
             while (RDY == 0) begin
                 readstatus_78h;
             end
-            progpage_80h_15h_cache;
+            progpage_80h_15h_cache(16'd4320);
+
             // plane0 page1 cache
-            s_axis_input;
+            s_axis_input({{5'd0},{block},{rpage}}, 16'd4320);
             set_rowaddr({{5'd0},{block},{rpage}});
             readstatus_78h;
             while (RDY == 0) begin
                 readstatus_78h;
             end
-            progpage_80h_10h_multplane;
+            progpage_80h_10h_multplane(16'd4320);
+
             // plane1 page1 cache
-            s_axis_input;
+            s_axis_input({{5'd0},{rblock},{rpage}}, 16'd4320);
             set_rowaddr({{5'd0},{rblock},{rpage}});
             readstatus_78h;
             while (RDY == 0) begin
                 readstatus_78h;
             end
             if (finished)
-                progpage_80h_10h;
+                progpage_80h_10h(16'd4320);
             else
-                progpage_80h_15h_cache;
+                progpage_80h_15h_cache(16'd4320);
 
         end
     endtask
@@ -432,31 +507,31 @@ module tb_NandFlashController_Top;
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd0},{7'd1}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd0},{7'd2}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd0},{7'd3}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd0},{7'd4}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd0},{7'd5}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
 
 
         set_rowaddr({{5'd0},{11'd1},{7'd0}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd1},{7'd1}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd1},{7'd2}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd1},{7'd3}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd1},{7'd4}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
         set_rowaddr({{5'd0},{11'd1},{7'd5}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,1);
 
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
@@ -474,32 +549,33 @@ module tb_NandFlashController_Top;
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd0},{7'd1}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd0},{7'd2}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd0},{7'd3}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd0},{7'd4}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd0},{7'd5}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
 
 
         set_rowaddr({{5'd0},{11'd1},{7'd0}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd1},{7'd1}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd1},{7'd2}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd1},{7'd3}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd1},{7'd4}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
         set_rowaddr({{5'd0},{11'd1},{7'd5}});
-        readpage_00h_30h;
+        readpage_00h_30h(16'd4320,0);
 
+        $display("test finished!");
         repeat (50) @(posedge iSystemClock);
         // $finish;
         end

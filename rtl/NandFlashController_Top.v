@@ -27,6 +27,9 @@ module NandFlashController_Top
     iWriteKeep                  ,
     oWriteReady                 ,
 
+    oStatus                     ,
+    oStatusValid                ,
+
     oReadData                   ,
     oReadLast                   ,
     oReadValid                  ,
@@ -65,6 +68,9 @@ module NandFlashController_Top
     input                          iWriteValid             ;
     input   [1:0]                  iWriteKeep              ;
     output                         oWriteReady             ;
+
+    output  [23:0]                 oStatus                 ;
+    output                         oStatusValid            ;
 
     output  [15:0]                 oReadData               ;
     output                         oReadLast               ;
@@ -178,6 +184,9 @@ module NandFlashController_Top
             .iTop_CI_ReadReady     (iReadReady),
 
             .oCI_Top_ReadyBusy     (oReadyBusy),
+
+            .oCI_Top_Status        (oStatus),
+            .oCI_Top_StatusValid   (oStatusValid),
 
             .oCI_ACG_Command       (wCI_ACG_Command),
             .oCI_ACG_CommandOption (wCI_ACG_CommandOption),

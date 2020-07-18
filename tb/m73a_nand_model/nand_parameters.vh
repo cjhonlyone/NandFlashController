@@ -95,23 +95,23 @@ real  tREA_cache_max; // RE# access time
 real  tCHZ_cache_max; // CE# HIGH to output High-Z
 
 //PROGRAM/ERASE Characteristics
-parameter  tBERS_min            =     1500000; // BLOCK ERASE operation time
-parameter  tBERS_max            =     7000000; // BLOCK ERASE operation time
-parameter  tCBSY_min            =       12000; // Busy time for PROGRAM CACHE operation
-parameter  tCBSY_max            =      560000; // Busy time for PROGRAM CACHE operation
+parameter  tBERS_min            =      700000; // BLOCK ERASE operation time
+parameter  tBERS_max            =     3500000; // BLOCK ERASE operation time
+parameter  tCBSY_min            =        3000; // Busy time for PROGRAM CACHE operation
+parameter  tCBSY_max            =      500000; // Busy time for PROGRAM CACHE operation
 parameter  tDBSY_min            =         500; // Busy time for TWO-PLANE PROGRAM PAGE operation
 parameter  tDBSY_max            =        1000; // Busy time for TWO-PLANE PROGRAM PAGE operation
 parameter  tFEAT                =        1000; // Busy time for SET FEATURES and GET FEATURES operations
 parameter  tITC_max             =        1000; // Busy time for sync interface switch
 parameter  tLBSY_min            =        2000; // Busy time for PROGRAM/ERASE on locked block
 parameter  tLBSY_max            =        3000; // Busy time for PROGRAM/ERASE on locked block
-parameter  tOBSY_max            =       40000; // Busy time for OTP DATA PROGRAM if OTP is protected
-parameter  tPROG_typ            =      350000; // Busy time for PAGE PROGRAM operation
-parameter  tPROG_max            =      560000; // Busy time for PAGE PROGRAM operation
+parameter  tOBSY_max            =       30000; // Busy time for OTP DATA PROGRAM if OTP is protected
+parameter  tPROG_typ            =      230000; // Busy time for PAGE PROGRAM operation
+parameter  tPROG_max            =      500000; // Busy time for PAGE PROGRAM operation
 integer    tLPROG_cache_typ                  ;
 parameter  NPP                  =           4; // Number of partial page programs
 parameter  tDCBSYR1_max         =        9000; // Cache busy in page read cache mode (first 31h) (tRCBSY)
-parameter  tR_max               =       35000; // Data transfer from Flash array to data register
+parameter  tR_max               =       25000; // Data transfer from Flash array to data register
 parameter  tR_mp_max            =      tR_max; // Data transfer from Flash array to data register (multi-plane) // ???
 parameter  tRST_read            =        5000; // RESET time issued during READ
 parameter  tRST_prog            =       10000; // RESET time issued during PROGRAM

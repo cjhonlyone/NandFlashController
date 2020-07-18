@@ -342,7 +342,7 @@ module NFC_Physical_Input
         .WRCLK(iDelayRefClock), // 1-bit input: Write clock
         .WREN(rDQSFromNAND_m2), // 1-bit input: Write enable
         // Write Data: 32-bit (each) input: Write input data
-        .DI({16'd0,rDQAtFalling,rDQAtRising_m1}), // 32-bit input: Data input
+        .DI({16'd0,rDQAtRising_m1, rDQAtFalling}), // 32-bit input: Data input
         .DIP(4'b0) // 4-bit input: Parity input
         );
 
