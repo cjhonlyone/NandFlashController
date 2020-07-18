@@ -190,7 +190,7 @@ module nand_die_model (Io, Cle, Ale, Ce_n_i, Clk_We_n, Wr_Re_n, Wp_n, Rb_n, Pre,
 // DEBUG[2] = data debug
 // DEBUG[3] = command debug
 // DEBUG[4] = queued planes debug
-parameter DEBUG = 5'b00000;
+parameter DEBUG = 5'b11111;
 
 // set this parameter to match the inverse of the timescale "a / b" ratio
 // This parameter is used to make small adjustments to timing checks that

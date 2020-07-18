@@ -140,11 +140,8 @@ module NFC_Command_ProgramPage
 
     wire                          wLastStep          ;
 
-    reg   [15:0]                  rACG_WriteData           ;
-    reg                           rACG_WriteLast           ;
-    reg                           rACG_WriteValid          ;
-
-    reg   [31:0]                  rfeatures;
+    wire     wProgCache;    
+    wire wProgMultplane;
     // FSM Parameters/Wires/Regs
     localparam rST_FSM_BIT    = 9;
     localparam rST_RESET      = 9'b00000_0001;
@@ -191,7 +188,7 @@ module NFC_Command_ProgramPage
             rST_cur_state <= rST_nxt_state;
         end
     end
-    
+
     // deside next state
     always @ ( * ) begin
         case (rST_cur_state)

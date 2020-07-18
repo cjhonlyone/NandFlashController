@@ -31,7 +31,8 @@
 //**************************************
 // This devices supports different async timing modes (0 through MAX_ASYNC_TIM_MODE)
 parameter MAX_ASYNC_TIM_MODE = 4;
-
+`define NAND_SYNC
+`define SHORT_RESET
 //setup and hold times
 //Command, Data, and Address Input
 real  tADL_min; // ALE to data start
@@ -115,7 +116,7 @@ parameter  tR_mp_max            =      tR_max; // Data transfer from Flash array
 parameter  tRST_read            =        5000; // RESET time issued during READ
 parameter  tRST_prog            =       10000; // RESET time issued during PROGRAM
 parameter  tRST_erase           =      500000; // RESET time issued during ERASE
-parameter  tRST_powerup         =     1000000; // RESET time issued after power-up
+parameter  tRST_powerup         =       10000; // RESET time issued after power-up
 parameter  tRST_ready           =        5000; // RESET time issued during idle
 `ifdef SHORT_RESET
 parameter  tVCC_delay           =         100; // VCC valid to R/B# low valid

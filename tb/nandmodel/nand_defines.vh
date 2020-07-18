@@ -27,6 +27,7 @@
 `define CLASS
 `define CLASSF
 
+
 `ifdef CLASSE
     `define T2B2C2D2;  // 2 Die, 2 Target, 2 R/B, Separate Cmd (2 cmd buses), Separate Data (2 data buses)
 `else `ifdef CLASSF

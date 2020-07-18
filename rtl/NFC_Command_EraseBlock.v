@@ -115,6 +115,7 @@ module NFC_Command_EraseBlock
 
     input    [NumberOfWays - 1:0]    iACG_ReadyBusy           ;
 
+    reg   [4:0]                   rTargetID            ; //option
     // reg                           rStart             ;
     reg                           rLastStep          ;
     reg   [31:0]                  rAddress             ;
@@ -138,11 +139,8 @@ module NFC_Command_EraseBlock
 
     wire                          wLastStep          ;
 
-    reg   [15:0]                  rACG_WriteData           ;
-    reg                           rACG_WriteLast           ;
-    reg                           rACG_WriteValid          ;
+    wire wEraseMultplane;
 
-    reg   [31:0]                  rfeatures;
     // FSM Parameters/Wires/Regs
     localparam rST_FSM_BIT    = 9;
     localparam rST_RESET      = 9'b00000_0001;
@@ -160,6 +158,8 @@ module NFC_Command_EraseBlock
 
     assign wStart    = (iOpcode[5:0] == CommandID) & iCMDValid;
     
+    assign wEraseMultplane = (rTargetID[1:0] == 2'b10) ? 1 : 0;
+
     assign wACGReady  = (iACG_Ready[6:0] == 7'b111_1111);
     
     // assign wACAReady = wACGReady;
@@ -231,6 +231,7 @@ module NFC_Command_EraseBlock
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
+            rTargetID          <= 5'd0;
 			rRowAddress        <= 0;
 
             rACG_Command       <= 8'b0000_0000;
@@ -244,6 +245,7 @@ module NFC_Command_EraseBlock
                 rST_RESET: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
+                    rTargetID          <= 5'd0;
 					rRowAddress        <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
@@ -256,7 +258,7 @@ module NFC_Command_EraseBlock
                 rST_READY: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
-
+                    rTargetID          <= 5'd0;
 					rRowAddress        <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
@@ -269,6 +271,7 @@ module NFC_Command_EraseBlock
                 rST_CMDLatch: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rTargetID          <= iTargetID;
                     rRowAddress        <= iRowAddress;
 
                     rACG_Command       <= 8'b0000_0000;
@@ -281,6 +284,7 @@ module NFC_Command_EraseBlock
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rTargetID          <= rTargetID;
 					rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= 8'b0000_1000;
@@ -293,6 +297,7 @@ module NFC_Command_EraseBlock
                 rST_ADDRIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rTargetID          <= rTargetID;
 					rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= 8'b0000_1000;
@@ -300,11 +305,12 @@ module NFC_Command_EraseBlock
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 16'h0002;
                     rACG_CASelect      <= 1'b0;
-                    rACG_CAData        <= {rRowAddress[7:0],rRowAddress[15:8],rRowAddress[23:16],16'd0}; // RESET FFh
+                    rACG_CAData        <= {rRowAddress[7],7'd0,rRowAddress[15:8],rRowAddress[23:16],16'd0}; // ignore page addr
                 end
                 rST_CMD2Issue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= wLastStep ? 1 :0 ;
+                    rTargetID          <= rTargetID;
 					rRowAddress        <= rRowAddress;
 
                     rACG_Command       <= wLastStep ? 8'b0000_0000: 8'b0000_1000;
@@ -312,7 +318,7 @@ module NFC_Command_EraseBlock
                     rACG_TargetWay     <= rACG_TargetWay;
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
-                    rACG_CAData        <= 40'hd0_00_00_00_00; // RESET FFh
+                    rACG_CAData        <= wEraseMultplane ? 40'hd1_00_00_00_00 : 40'hd0_00_00_00_00; // RESET FFh
                 end
                 // rST_WaitRBLow : begin
                 //     rCMDReady          <= 0;
@@ -356,6 +362,7 @@ module NFC_Command_EraseBlock
                 default: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
+                    rTargetID          <= 0;
                     rRowAddress        <= 0;
                     
                     rACG_Command       <= 8'b0000_0000;

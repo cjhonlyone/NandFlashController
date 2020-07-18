@@ -349,6 +349,10 @@ module NFC_Command_Issue_Top
     // assign wRS_ColAddress       = rColAddr2B;
     assign wRS_RowAddress       = rRowAddr3B;
 
+    wire [6:0]  dbg_pageaddr   = rRowAddr3B[6:0];
+    wire [11:0] dbg_blockaddr  = rRowAddr3B[18:7];
+    wire        dbg_plane_addr = rRowAddr3B[7];
+    
     always @ (posedge iSystemClock, posedge iReset) begin
         if (iReset) begin
             rTargetWay1B[7:0]   <= 0;
