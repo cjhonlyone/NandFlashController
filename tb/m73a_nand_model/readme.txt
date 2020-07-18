@@ -1,3 +1,8 @@
+Confidential:
+-------------
+This file and all files delivered herewith are Micron Confidential Information.
+
+
 Disclaimer of Warranty:
 -----------------------
 This software code and all associated documentation, comments
@@ -71,7 +76,7 @@ model.  The following are examples of defining the width.
     NC-Verilog  ncverilog +v2k +define+x8 nand_die_model.v
     VCS         vcs +v2k +define+x8 nand_die_model.v
 
-Defining the Classification:
+Defining the Classification (Multidie Configurations):
 -------------------------
 The verilog compiler directive "`define" may be used to choose between 
 multiple part classifications supported by the nand model.  The classification is 

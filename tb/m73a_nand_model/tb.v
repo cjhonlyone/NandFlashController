@@ -1,4 +1,7 @@
 ////////////////////////////////////////////////
+// [Confidential]
+// This file and all files delivered herewith are Micron Confidential Information.
+//
 //[Disclaimer]    
 //This software code and all associated documentation, comments
 //or other information (collectively "Software") is provided 
@@ -23,7 +26,7 @@
 //of liability for consequential or incidental damages, the above
 //limitation may not apply to you.
 //
-//Copyright 2006-2008 Micron Technology, Inc. All rights reserved.
+//Copyright 2006-2012 Micron Technology, Inc. All rights reserved.
 ////////////////////////////////////////////////
 `timescale 1ns / 1ps
 
@@ -105,12 +108,18 @@ end
     reg  sync_mode;
     wire sync_mode0;
     wire sync_mode1;
+    wire sync_mode2;
+    wire sync_mode3;
+    reg  sync_enh_mode;
     wire any_device_active = ~Ce_n || ~Ce2_n || ~Ce3_n || ~Ce4_n;
     reg rd_verify;
     reg enable_rd_verify;
     reg rd_verify_sync;
     reg [1:0] device;
     reg [DQ_BITS -1 : 0] rd_dq;
+`ifdef IO_LATCH
+    reg [DQ_BITS -1 : 0] IO_latch;
+`endif
     reg [7:0] lastCmd;
     reg [2:0] lastState;
     reg Clk_int = 0;
@@ -152,6 +161,7 @@ end
     reg        clock_disable; 
     reg [14:0] crc16;
     reg        por;    
+    reg        tWB_done;    
     assign                    Clk  = We_n;
 
     initial begin
@@ -181,6 +191,7 @@ end
         Dqs = 1'bz;
         clock_disable = 1;
         por           = 0;
+        tWB_done      = 1;
     end
 
 
@@ -358,6 +369,10 @@ end
     end
     always @(IO) begin
         tm_io = $realtime;
+`ifdef IO_LATCH
+	if (IO !== 8'hxx && IO !== 8'hzz)
+	    IO_latch = IO;
+`endif
     end
     always @(IO2) begin
         tm_io2 = $realtime;
@@ -595,6 +610,10 @@ end
 			wait_posedge_clk;
 			#(tCALH_sync_min+1); // to avoid tCALS violation
 			Re_n <= 1'b0;
+			wait_posedge_clk;
+			#(tWRCK_sync_min);
+			wait_posedge_clk;
+			#(tCALH_sync_min+1); // to avoid tCALS violation
 			Cle  <= 1'b1;
 			Ale  <= 1'b1; 
 			wait (IO[6] === 1);
@@ -606,8 +625,9 @@ end
 			if ((lastCmd == 8'h30) || (lastCmd == 8'h31) || (lastCmd == 8'h3F) || (lastCmd == 8'h35) || (lastCmd == 8'hE0)
 				|| (lastCmd == 8'hEC) || (lastCmd == 8'hED) || (lastCmd == 8'h90) || (lastCmd == 8'hEE))
 			     latch_command(8'h0);
-			end else
-			wait (Rb_any_n === 1);
+			end else begin
+			    wait (Rb_any_n === 1);
+			end
 		     `else
 			wait (Rb_any_n === 1);
 		     `endif
@@ -627,8 +647,9 @@ end
 			if ((lastCmd == 8'h30) || (lastCmd == 8'h31) || (lastCmd == 8'h3F) || (lastCmd == 8'h35) || (lastCmd == 8'hE0)
 				|| (lastCmd == 8'hEC) || (lastCmd == 8'hED) || (lastCmd == 8'h90) || (lastCmd == 8'hEE))
 			     latch_command(8'h0);
-			end else
-			wait (Rb_any_n === 1);
+			end else begin
+			    wait (Rb_any_n === 1);
+			end
 		    `else
 			wait (Rb_any_n === 1);
 		    `endif
@@ -649,6 +670,10 @@ end
 			wait_posedge_clk;
 			#(tCALH_sync_min+1); // to avoid tCALS violation
 			Re_n <= 1'b0;
+			wait_posedge_clk;
+			#(tWRCK_sync_min);
+			wait_posedge_clk;
+			#(tCALH_sync_min+1); // to avoid tCALS violation
 			Cle  <= 1'b1;
 			Ale  <= 1'b1;
 			wait (IO[6] === 1);
@@ -1029,6 +1054,7 @@ endtask
                 //      since we are referencing time variables triggered off the clk edge
             //now make sure we don't violate tCAD before switch back to data mode
             while (($realtime - tm_dqs_neg) < tWPST_sync_min) #tCK_sync_min;
+            while (($realtime - tm_ren_pos) < tRHW_sync_min) #tCK_sync_min;
             while (( tm_clk_pos + tCK_sync -1) < (tm_cad_r + tCAD_sync_min)) begin
             //wait for Clk edge that won't violate tCAD
                 wait_posedge_clk;
@@ -1038,11 +1064,22 @@ endtask
                 wait_posedge_clk; //to avoid setup violation
                 #1;
             end
+	    while (tWB_done == 1'b0) begin
+                wait_posedge_clk; //to avoid tWB violation
+                #1;
+	    end
             //Setup command and data
             Cle <= #(tCK_sync - tCALS_sync_min - ($realtime - tm_clk_pos)) 1'b1;
             Io[7:0] <= #(tCK_sync - tCAS_sync_min - ($realtime - tm_clk_pos)) data_in;
             //wait for clock edge
             wait_posedge_clk;
+	    if (data_in == 8'hFF || data_in == 8'hFC || data_in == 8'hD0 || data_in == 8'hD1 ||
+		data_in == 8'h30 || data_in == 8'h32 || data_in == 8'h31 || data_in == 8'h3F ||
+		data_in == 8'h10 || data_in == 8'h11 || data_in == 8'h15 || data_in == 8'h35
+	    ) begin
+		tWB_done = 1'b0;
+		tWB_done <= #(tWB_sync_max) 1'b1;
+	    end
             //hold command and data for required time
             if ((Io[7:0] !== 8'h70) && (Io[7:0] !== 8'h78)) lastCmd = Io;
             Io  <= #tCAH_sync_min {DQ_BITS{1'bz}};
@@ -1075,6 +1112,7 @@ endtask
             `else
             wait (IO !== {DQ_BITS{1'bx}});
             `endif
+	    wait (tWB_done == 1'b1);
             Cle = 1'b1;
             Io = data_in;
 
@@ -1134,6 +1172,13 @@ endtask
             //wait for all setup times to be met
             wait (we_setup && ale_setup && cle_setup && ce_setup && io_setup && trhw_setup);
             We_n = 1;
+	    if (data_in == 8'hFF || data_in == 8'hFC || data_in == 8'hD0 || data_in == 8'hD1 ||
+		data_in == 8'h30 || data_in == 8'h32 || data_in == 8'h31 || data_in == 8'h3F ||
+		data_in == 8'h10 || data_in == 8'h11 || data_in == 8'h15 || data_in == 8'h35
+	    ) begin
+		tWB_done = 1'b0;
+		tWB_done <= #(tWB_max) 1'b1;
+	    end
         
             if (cache_mode) begin
                 cle_hold <= #tCLH_cache_min 1'b1;
@@ -1206,7 +1251,7 @@ endtask
         end
     end
     endtask
-    
+
     //pulse we to latch write data
 
     task latch_data_async;
@@ -1274,6 +1319,7 @@ endtask
 
     task go_idle;
     begin
+      if (sync_mode) begin
         if ($realtime == (tm_clk_pos + tCK_sync)) #1;
         //Can use this task to make sure devices in sync mode end up back in idle state
         if (($realtime - tm_clk_pos) < tCALH_sync_min) #(tCALH_sync_min - ($realtime - tm_clk_pos));
@@ -1282,7 +1328,7 @@ endtask
         if ($realtime < (tm_clk_pos + tDQSS_sync_min + tDQSH_sync_max + tDH_sync_min)) begin
             #((tm_clk_pos + tDQSS_sync_min + tDQSH_sync_max + tDH_sync_min) - $realtime);
         end
-        
+      end
     end
     endtask
     
@@ -1334,6 +1380,10 @@ endtask
         input [7:0] p3;
         input [7:0] p4;
     begin
+`ifdef SE_HACK
+    	if (feature_address == 8'h01 && p1[5:4] == 2'b01)
+	    p1[5:4] = 2'b10; // make all sync conv tests run in sync enh mode
+`endif
         if (sync_mode) begin
             if ($realtime + tCS_sync_min < tm_clk_pos + tCK_sync) wait_posedge_clk;
         end
@@ -1353,14 +1403,16 @@ endtask
         end
         latch_command (8'hEF);
         latch_address (feature_address);
-        #tADL_min;
         if (sync_mode) begin
+	    #tADL_sync_min;
+	    wait_posedge_clk;
             latch_data_sync (p1,p1);
             latch_data_sync (p2,p2);
             latch_data_sync (p3,p3);
             latch_data_sync (p4,p4);
             go_idle;
         end else begin
+	    #tADL_min;
             latch_data_async (p1);
             latch_data_async (p2);
             latch_data_async (p3);
@@ -1371,7 +1423,7 @@ endtask
             //we need to update the timing mode parameters
 
             // if we already in sync mode, only need to wait for Ce_n to go low
-            if(p1[4]) begin
+            if(p1[5:4] == 2'b01) begin // do not use sync_mode here b/c it is not set until after tFEAT
                 Ce_n  <= #tCAD_sync_min 1;
                 Ce2_n <= #tCAD_sync_min 1;
             end
@@ -1381,18 +1433,22 @@ endtask
 
             switch_timing_mode(p1);
 
-            if(p1[4])   enable_clock;
+            if(p1[5:4] == 2'b01)   enable_clock;
             tCK_sync = (tCK_sync_min + tCK_sync_max) / 2;
 
-            if (sync_mode) begin
+            if (p1[5:4] == 2'b01) begin // do not use sync_mode here b/c it is assgined to DUT internal signal => race condition
                 update_clock_parameters;
                 #(tCK_sync*4);
                 wait_posedge_clk;
                 #tCH_sync_min;
             end
             activate_device(device);
-            if (sync_mode) begin
-                wait_posedge_clk;
+            if (p1[5:4] == 2'b00) begin // for Async mode, recalculate tRC and tWC values
+		set_read_cycle(tRP_min, (tRC_min-tRP_min));
+		set_write_cycle(tWP_min, (tWC_min-tWP_min));
+            end
+            if (p1[5:4] == 2'b01) begin
+                wait_posedge_clk; // already waited tCH_sync_min in previous block
             end else begin
                 #tCS_min;
             end
@@ -1596,7 +1652,7 @@ endtask
         input tp;
         input idm;
         input otp;
-        input copyback2;
+        input copyback2_softread; // this bit can represent 2 commands because commands are mutually exclusive
 
         reg   [DQ_BITS - 1 : 0] col_addr_1;
         reg   [DQ_BITS - 1 : 0] col_addr_2;
@@ -1636,7 +1692,7 @@ endtask
             if (idm) begin
                 latch_command (8'h35);
             end else begin
-                if (copyback2) begin
+                if (copyback2_softread && !FEATURE_SET2[6]) begin // copyback2
                     latch_command (8'h3A);
                 end else begin
                     latch_command (8'h30);
@@ -1829,6 +1885,92 @@ endtask
     end
     endtask
 
+    // JEDEC Program Page (81h -> 10h)
+    // this task does same thing as program_page task above, but uses 81h instead of 80h
+    task jedec_program_page;
+        input [BLCK_BITS + LUN_BITS - 1 : 0] blck_addr;
+        input [PAGE_BITS - 1 : 0] page_addr;
+        input [COL_BITS  - 1 : 0] col_addr;
+        input [DQ_BITS - 1 : 0] data;
+        input [COL_BITS  - 1 : 0] size;
+        input             [1 : 0] pattern;
+        input tp;
+        input idm;
+        input otp;
+        input cache;
+        input copyback2;
+        input finalCmd;
+
+        reg   [DQ_BITS - 1 : 0] col_addr_1;
+        reg   [DQ_BITS - 1 : 0] col_addr_2;
+        reg   [DQ_BITS - 1 : 0] row_addr_1;
+        reg   [DQ_BITS - 1 : 0] row_addr_2;
+        reg   [DQ_BITS - 1 : 0] row_addr_3;
+        reg   [23          :00] tsk_row_addr;
+        reg   [COL_BITS  - 1 : 0] i;
+    begin
+
+        if (otp && (tp || idm || cache)) $display("%m at time %t: ERROR: Illegal task option.  Can't write OTP page with cache, twoplane, or internal data move commands", $realtime);
+
+        
+        // Decode Address
+        col_addr_1 [7 : 0] = col_addr [7 : 0];
+        col_addr_2 [7 : 0] = {{(16 - COL_BITS){1'b0}}, col_addr [(COL_BITS -1) : 8]};
+        tsk_row_addr = fn_row_addr(blck_addr, page_addr, 1'b1);
+        row_addr_1 = tsk_row_addr[07:00];
+        row_addr_2 = tsk_row_addr[15:08];
+        row_addr_3 = tsk_row_addr[23:16];
+
+        // Decode Command
+        if (otp) begin
+            latch_command (8'hA0);
+        end else begin
+            if (idm) begin
+                latch_command (8'h85);
+            end else begin
+                if (copyback2) begin
+                    latch_command (8'h8C);
+                end else begin
+                    latch_command (8'h81); // changed to drive 81h
+                end
+            end
+        end
+        latch_address (col_addr_1);
+        latch_address (col_addr_2);
+        latch_address (row_addr_1);
+        if (otp) begin
+            latch_address (8'h00);
+            latch_address (8'h00);
+        end else begin
+            latch_address (row_addr_2);
+            latch_address (row_addr_3);
+        end
+
+        #tADL_min;
+                
+        if (~idm && (size != 0)) begin
+        //only input data if not an internal data move
+        //random data writes are in a separate task
+            write_data(data, size, pattern);
+        end
+
+        // Done Program
+        if (finalCmd) begin
+            if (tp) begin
+                latch_command (8'h11);
+            end else begin
+                if (cache) begin
+                    latch_command (8'h15);
+                end else begin
+                    //if (~idm[0]) begin
+                        latch_command (8'h10);
+                    //end
+                end
+            end
+        end
+    end
+    endtask
+
 // write data pattern, addresses already input
     task write_data;
         input [DQ_BITS - 1 : 0] data;
@@ -1946,7 +2088,7 @@ endtask
     real  delay;
     begin
         #delay; 
-        wait_ready();
+        wait_ready;
     end
     endtask
 
@@ -2059,6 +2201,24 @@ endtask
     end
     endtask
 
+    //reads static JEDEC ID regs
+    task read_jedec_id;
+    begin
+        latch_command (8'h90);
+        latch_address (8'h40);
+        #tWHR_min;
+	serial_read(8'h4A, 2'h0, 1);
+	serial_read(8'h45, 2'h0, 1);
+	serial_read(8'h44, 2'h0, 1);
+	serial_read(8'h45, 2'h0, 1);
+	serial_read(8'h43, 2'h0, 1);
+	if (sync_mode)
+	    serial_read(8'h05, 2'h0, 1);
+	else
+	    serial_read(8'h01, 2'h0, 1);	
+    end
+    endtask
+
     //command address sequence required to access ONFI parameter data page
     //can't really use serial_read here cuz won't know all expected data
     task read_parameter_page;
@@ -2066,6 +2226,13 @@ endtask
         latch_command (8'hEC);
         latch_address (8'h00);
         crc16 =0;
+    end
+    endtask
+
+    task read_jedec_parameter_page;
+    begin
+        latch_command (8'hEC);
+        latch_address (8'h40);
     end
     endtask
 
@@ -2318,7 +2485,7 @@ endtask
     `endif
 
     `ifdef BUS2
-    always @(DQS2) begin : data_verify_sync
+    always @(DQS2) begin : data_verify_sync_and_sync_enh
         integer i;
         #(tDQSQ_sync_max + 1);
         if (rd_verify_sync ) begin
@@ -2337,7 +2504,7 @@ endtask
         end
     end
     `else
-    always @(DQS) begin : data_verify_sync
+    always @(DQS) begin : data_verify_sync_and_sync_enh
         integer i;
         #(tDQSQ_sync_max + 1);
         if (rd_verify_sync ) begin

@@ -301,15 +301,16 @@ module NFC_Atom_Command_Generator_to_Physical_Mux
     end
 
     always @ (*) begin
-        if          (iCI_ACG_Command[6]) begin rACG_PHY_ChipEnable <= iACA_ChipEnable;
-        end else if (iCI_ACG_Command[5]) begin rACG_PHY_ChipEnable <= iDOA_ChipEnable;
+        // if          (iCI_ACG_Command[6]) begin rACG_PHY_ChipEnable <= iACA_ChipEnable;
+        // end else if (iCI_ACG_Command[5]) begin rACG_PHY_ChipEnable <= iDOA_ChipEnable;
         // end else if (iCI_ACG_Command[4]) begin rACG_PHY_ChipEnable <= iDIA_ChipEnable;
-        end else if (iCI_ACG_Command[3]) begin rACG_PHY_ChipEnable <= iACS_ChipEnable;
-        end else if (iCI_ACG_Command[2]) begin rACG_PHY_ChipEnable <= iDOS_ChipEnable;
-        end else if (iCI_ACG_Command[1]) begin rACG_PHY_ChipEnable <= iDIS_ChipEnable;
+        // end else if (iCI_ACG_Command[3]) begin rACG_PHY_ChipEnable <= iACS_ChipEnable;
+        // end else if (iCI_ACG_Command[2]) begin rACG_PHY_ChipEnable <= iDOS_ChipEnable;
+        // end else if (iCI_ACG_Command[1]) begin rACG_PHY_ChipEnable <= iDIS_ChipEnable;
         // end else if (iCI_ACG_Command[0]) begin rACG_PHY_ChipEnable <= iDLE_ChipEnable;
-        end else                         begin rACG_PHY_ChipEnable <= iDLE_ChipEnable;
-        end
+        // end else                         begin 
+        rACG_PHY_ChipEnable <= iDLE_ChipEnable;
+        // end
     end
 
     always @ (*) begin

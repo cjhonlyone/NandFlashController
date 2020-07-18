@@ -15,7 +15,7 @@ NFC_Command_FILES = $(wildcard ../rtl/NFC_Command*.v)
 tb_NFC_Top_FILES = ../tb/tb_NandFlashController_Top.v
 NFC_Top_FILES = ../rtl/NandFlashController_Top.v
 
-nand_model_FILES = $(wildcard ../tb/nandmodel/*.vh) $(wildcard ../tb/nandmodel/*.v)
+nand_model_FILES = $(wildcard ../tb/m73a_nand_model/*.vh) $(wildcard ../tb/m73a_nand_model/*.v)
 
 
 prj: $(tb_NFC_Physical_FILES) $(NFC_Physical_FILES) $(NFC_Command_FILES)

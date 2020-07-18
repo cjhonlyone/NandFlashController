@@ -24,14 +24,14 @@
 *                Copyright 2006 Micron Technology, Inc. All rights reserved.
 *
 ****************************************************************************************/
-// package defines are C5, H1, H2, H3, WP.  Default is C5, WP
+// package defines are C5, WP, H1, H2, H3, J1, J2, J3 (H* is default)
 
 //**************************************
 //Asynchronous I/F timing parameters
 //**************************************
 // This devices supports different async timing modes (0 through MAX_ASYNC_TIM_MODE)
-parameter MAX_ASYNC_TIM_MODE = 4;
-`define NAND_SYNC
+parameter MAX_ASYNC_TIM_MODE = 5;
+//`define NAND_SYNC
 `define SHORT_RESET
 //setup and hold times
 //Command, Data, and Address Input
@@ -95,28 +95,28 @@ real  tREA_cache_max; // RE# access time
 real  tCHZ_cache_max; // CE# HIGH to output High-Z
 
 //PROGRAM/ERASE Characteristics
-parameter  tBERS_min            =      700000; // BLOCK ERASE operation time
-parameter  tBERS_max            =     3000000; // BLOCK ERASE operation time
-parameter  tCBSY_min            =        3000; // Busy time for PROGRAM CACHE operation
-parameter  tCBSY_max            =      500000; // Busy time for PROGRAM CACHE operation
+parameter  tBERS_min            =     1500000; // BLOCK ERASE operation time
+parameter  tBERS_max            =     7000000; // BLOCK ERASE operation time
+parameter  tCBSY_min            =       12000; // Busy time for PROGRAM CACHE operation
+parameter  tCBSY_max            =      560000; // Busy time for PROGRAM CACHE operation
 parameter  tDBSY_min            =         500; // Busy time for TWO-PLANE PROGRAM PAGE operation
 parameter  tDBSY_max            =        1000; // Busy time for TWO-PLANE PROGRAM PAGE operation
 parameter  tFEAT                =        1000; // Busy time for SET FEATURES and GET FEATURES operations
 parameter  tITC_max             =        1000; // Busy time for sync interface switch
 parameter  tLBSY_min            =        2000; // Busy time for PROGRAM/ERASE on locked block
 parameter  tLBSY_max            =        3000; // Busy time for PROGRAM/ERASE on locked block
-parameter  tOBSY_max            =       30000; // Busy time for OTP DATA PROGRAM if OTP is protected
-parameter  tPROG_typ            =      200000; // Busy time for PAGE PROGRAM operation
-parameter  tPROG_max            =      500000; // Busy time for PAGE PROGRAM operation
+parameter  tOBSY_max            =       40000; // Busy time for OTP DATA PROGRAM if OTP is protected
+parameter  tPROG_typ            =      350000; // Busy time for PAGE PROGRAM operation
+parameter  tPROG_max            =      560000; // Busy time for PAGE PROGRAM operation
 integer    tLPROG_cache_typ                  ;
 parameter  NPP                  =           4; // Number of partial page programs
-parameter  tDCBSYR1_max         =        3000; // Cache busy in page read cache mode (first 31h) (tRCBSY)
-parameter  tR_max               =       25000; // Data transfer from Flash array to data register
+parameter  tDCBSYR1_max         =        9000; // Cache busy in page read cache mode (first 31h) (tRCBSY)
+parameter  tR_max               =       35000; // Data transfer from Flash array to data register
 parameter  tR_mp_max            =      tR_max; // Data transfer from Flash array to data register (multi-plane) // ???
 parameter  tRST_read            =        5000; // RESET time issued during READ
 parameter  tRST_prog            =       10000; // RESET time issued during PROGRAM
 parameter  tRST_erase           =      500000; // RESET time issued during ERASE
-parameter  tRST_powerup         =       10000; // RESET time issued after power-up
+parameter  tRST_powerup         =     1000000; // RESET time issued after power-up
 parameter  tRST_ready           =        5000; // RESET time issued during idle
 `ifdef SHORT_RESET
 parameter  tVCC_delay           =         100; // VCC valid to R/B# low valid
@@ -140,14 +140,14 @@ parameter  tWHRIO_min           =           0; // Programmable I/O WE# high to R
 parameter  tWPIO_min            =           0; // Programmable I/O WE# pulse width
 
 //EDO cycle time upper bound
-parameter  tEDO_RC              =          20;
+parameter  tEDO_RC              =          30;
 `define EDO
 
 //**************************************
 //Source Synchronous I/F timing parameters
 //**************************************
 // This devices supports different sync timing modes (0 through MAX_SYNC_TIM_MODE)
-parameter MAX_SYNC_TIM_MODE = 4;
+parameter MAX_SYNC_TIM_MODE = 5;
 
 // some timing parameters share the same names as an async param, thus the
 //  need to add the sync identifier in the sync timing parameter name
@@ -203,18 +203,18 @@ real tACmaxQHminsync;
 real tACmaxDQSQmaxDVWminsync; 
 
 task switch_timing_mode;
-    input [7:0] new_mode;
+    input [4:0] new_mode;
     begin
-        case (new_mode[7:4])
+        case (new_mode[4])
             4'h0 : begin // async
-                if (new_mode[3:0] <= MAX_ASYNC_TIM_MODE); else begin
+                if (new_mode[3:0] > MAX_ASYNC_TIM_MODE) begin
                     $display("%0t  :  ERROR: Illegal timing mode %d.  Max legal async timing mode = %d", $realtime, new_mode[3:0], MAX_ASYNC_TIM_MODE);
                     disable switch_timing_mode;
                 end
-            end
+	    end	
             4'h1 : begin // sync
-	            if (new_mode[3:0] <= MAX_SYNC_TIM_MODE); else begin
-	                $display("%0t  :  ERROR: Illegal timing mode %d.  Max legal sync timing mode = %d", $realtime, new_mode[3:0], MAX_SYNC_TIM_MODE);
+	        if (new_mode[3:0] > MAX_SYNC_TIM_MODE) begin
+	            $display("%0t  :  ERROR: Illegal timing mode %d.  Max legal sync timing mode = %d", $realtime, new_mode[3:0], MAX_SYNC_TIM_MODE);
                     disable switch_timing_mode;
                 end
             end
@@ -376,6 +376,37 @@ task switch_timing_mode;
 	            tWHR_min            =          60;
 	            tWP_min             =          12;
             end
+            8'h05 : begin // async mode 5
+                tADL_min            =     70;
+		    tALH_min            =      5;
+		    tALS_min            =     10;
+		    tAR_min             =     10;
+		    tCEA_max            =     25;
+		    tCH_min             =      5;
+		    tCHZ_max            =     30;
+		    tCLH_min            =      5;
+		    tCLR_min            =     10;
+		    tCLS_min            =     10;
+		    tCOH_min            =     15;
+		    tCS_min             =     15;
+		    tDH_min             =      5;
+		    tDS_min             =      7;
+		    tIR_min             =      0;
+		    tRC_min             =     20;
+		    tREA_max            =     16;
+		    tREH_min            =      7;
+		    tRHOH_min           =     15;
+		    tRHW_min            =    100;
+		    tRHZ_max            =    100;
+		    tRLOH_min           =      5;
+		    tRP_min             =     10;
+		    tRR_min             =     20;
+		    tWB_max             =    100;
+		    tWC_min             =     20;
+		    tWH_min             =      7;
+		    tWHR_min            =     60;
+		    tWP_min             =     10;
+            end
             8'h10 : begin // sync mode 0
                 tADL_sync_min       =    100;
 	            tCALH_sync_min      =     10;
@@ -406,7 +437,7 @@ task switch_timing_mode;
 	            tDQSQ_sync_max      =    2.5;
 	            tDS_sync_min        =    3.0;
 	            tQHS_sync_max       =    3.0;
-                tWHR_sync_min       =     60;
+                tWHR_sync_min       =     80;
             end
             8'h12 : begin // sync mode 2
                 tADL_sync_min       =     70;
@@ -422,7 +453,7 @@ task switch_timing_mode;
 	            tDQSQ_sync_max      =    1.7;
 	            tDS_sync_min        =    2.0;
 	            tQHS_sync_max       =    2.0;
-                tWHR_sync_min       =     60;
+                tWHR_sync_min       =     80;
             end
             8'h13 : begin // sync mode 3
                 tADL_sync_min       =     70;
@@ -438,7 +469,7 @@ task switch_timing_mode;
 	            tDQSQ_sync_max      =    1.3;
 	            tDS_sync_min        =    1.5;
 	            tQHS_sync_max       =    1.5;
-                tWHR_sync_min       =     60;
+                tWHR_sync_min       =     80;
             end
             8'h14 : begin // sync mode 4
                 tADL_sync_min       =     70;
@@ -451,10 +482,26 @@ task switch_timing_mode;
 	            tCK_sync_max        =     15;
 	            tCS_sync_min        =     15;
 	            tDH_sync_min        =    1.1;
-	            tDQSQ_sync_max      =    1.1;
+	            tDQSQ_sync_max      =    1.0;
 	            tDS_sync_min        =    1.1;
 	            tQHS_sync_max       =    1.2;
-                tWHR_sync_min       =     60;
+                tWHR_sync_min       =     80;
+            end
+            8'h15 : begin // sync mode 5
+                tADL_sync_min       =     70;
+	            tCALH_sync_min      =      2;
+	            tCALS_sync_min      =      2;
+	            tCAH_sync_min       =      2;
+	            tCAS_sync_min       =      2;
+	            tCH_sync_min        =      2;
+	            tCK_sync_min        =     10;
+	            tCK_sync_max        =     12;
+	            tCS_sync_min        =     15;
+	            tDH_sync_min        =    0.8;
+	            tDQSQ_sync_max      =   0.85;
+	            tDS_sync_min        =    0.8;
+	            tQHS_sync_max       =      1;
+                tWHR_sync_min       =     80;
             end
             default : begin
 	            $display("%0t  :  ERROR: Illegal timing mode %h.", $realtime, new_mode);
@@ -494,7 +541,7 @@ task switch_timing_mode;
 	    tCKL_sync_min       =      0.43 * tCK_sync_min;
 	    tCKL_sync_max       =      0.57 * tCK_sync_min;
 	    tDQSCK_sync_max     =     20;
-	    tDQSD_sync_min      =     20;
+	    tDQSD_sync_min      =     18;
 	    tDQSHZ_sync_min     =     20;
 	    tDQSH_sync_min      =      0.4 * tCK_sync_min;
 	    tDQSH_sync_max      =      0.6 * tCK_sync_min;
@@ -512,7 +559,10 @@ task switch_timing_mode;
 	    tWPST_sync_min      =      1.5 * tCK_sync_min;
         tWRCK_sync_min      =     20;
         tWW_sync_min        =    100;
-        tCKWR_sync_min      = ((tDQSCK_sync_max + tCK_sync_min) / tCK_sync_min) + 1; // ??? modulo
+	// by assigning quotient to integer type, quotient is automatically rounded to nearest integer
+        tCKWR_sync_min      = ((tDQSCK_sync_max + tCK_sync_min) / tCK_sync_min);
+        if (tCKWR_sync_min < ((tDQSCK_sync_max + tCK_sync_min) / tCK_sync_min))
+		tCKWR_sync_min = tCKWR_sync_min + 1; // if tCKWR_sync_min was rounded down, then add 1 to it
         if(tCKL_sync_min < tCKH_sync_min)
             tHP_sync_min    =   tCKL_sync_min;
         else
@@ -527,6 +577,7 @@ task switch_timing_mode;
 endtask
 
 initial begin
+    tCK_sync_min = 100; // initial dummy value to prevent Infinity results from division operation errors during switch_timing_mode(8'h00)
     switch_timing_mode(8'h00);
     switch_timing_mode(8'h10);
 end
@@ -543,12 +594,12 @@ parameter BPC_MAX           = 3'b001;
 parameter BPC               = 3'b001;
 parameter NUM_OTP_ROW       =   30;  // Number of OTP pages
 parameter OTP_ADDR_MAX      =   NUM_OTP_ROW+2;
-parameter OTP_NPP           =    8;  // Number of Partial Programs in OTP
+parameter OTP_NPP           =    4;  // Number of Partial Programs in OTP
 parameter NUM_BOOT_BLOCKS   =    0;
 parameter BOOT_BLOCK_BITS   =    1;
-parameter COL_BITS          =   13;  //2^13 = 8192 , num columns = 4320
-parameter COL_CNT_BITS      =   13;  // NUM_COL rounded up
-parameter NUM_COL           = 4320; 
+parameter COL_BITS          =   14;  //2^14 = 16384 , num columns = 8640
+parameter COL_CNT_BITS      =   14;  // NUM_COL rounded up
+parameter NUM_COL           = 8640;  //8192 + 448 spare bytes
 parameter DQ_BITS           =    8;  //only x8 supported
 `define x8
 
@@ -561,7 +612,7 @@ parameter DQ_BITS           =    8;  //only x8 supported
 `else `ifdef CLASSU
     parameter ROW_BITS          =   20;
     parameter LUN_BITS          =    1;
-`else // CLASSB, E, F, M
+`else // CLASS B, E, F, M
     parameter ROW_BITS          =   19;
     parameter LUN_BITS          =    0;
 `endif `endif `endif 
@@ -569,7 +620,7 @@ parameter DQ_BITS           =    8;  //only x8 supported
 parameter BLCK_BITS         =   12;
 parameter NUM_BLCK          = (1 << BLCK_BITS) -1;  // block limit 
 parameter NUM_PLANES        =    2;
-parameter PAGE_BITS         =    7;  // 2^8=256
+parameter PAGE_BITS         =    7;  // 2^7=128
 parameter NUM_PAGE          = 1<<PAGE_BITS;
 parameter PAGE_SIZE         =  NUM_COL*BPC_MAX*DQ_BITS;
 
@@ -583,30 +634,29 @@ parameter PAGE_SIZE         =  NUM_COL*BPC_MAX*DQ_BITS;
 parameter NUM_ID_BYTES      =      8;
 parameter READ_ID_BYTE0     =  8'h2C; // Micron Manufacturer ID
 `ifdef CLASSU 
-parameter READ_ID_BYTE1     =  8'h68;
+parameter READ_ID_BYTE1     =  8'h88;
 parameter READ_ID_BYTE2     =  8'h01;
-parameter READ_ID_BYTE3     =  8'hA6;
+parameter READ_ID_BYTE3     =  8'hA7;
 `else `ifdef CLASSK
-parameter READ_ID_BYTE1     =  8'h68;
+parameter READ_ID_BYTE1     =  8'h88;
 parameter READ_ID_BYTE2     =  8'h01;
-parameter READ_ID_BYTE3     =  8'hA6;
+parameter READ_ID_BYTE3     =  8'hA7;
 `else `ifdef CLASSJ
-parameter READ_ID_BYTE1     =  8'h68;
+parameter READ_ID_BYTE1     =  8'h88;
 parameter READ_ID_BYTE2     =  8'h01;
-parameter READ_ID_BYTE3     =  8'hA6;
-`else
-parameter READ_ID_BYTE1     =  8'h48;
+parameter READ_ID_BYTE3     =  8'hA7;
+`else // CLASS B, E, F, M
+parameter READ_ID_BYTE1     =  8'h68;
 parameter READ_ID_BYTE2     =  8'h00;
-parameter READ_ID_BYTE3     =  8'h26;
+parameter READ_ID_BYTE3     =  8'h27;
 `endif `endif `endif
-parameter READ_ID_BYTE4     =  8'h89;
+parameter READ_ID_BYTE4     =  8'hA9;
 parameter READ_ID_BYTE5     =  8'h00;
 parameter READ_ID_BYTE6     =  8'h00;
 parameter READ_ID_BYTE7     =  8'h00;
 `define IDBYTESGT5 // used to tell model that there are more than 5 ID bytes
 
-
-parameter FEATURE_SET = 16'b1100011001101011;
+parameter FEATURE_SET = 16'b1100011001001011;
 //     MP Read using Cache--||||||||||||||||--basic NAND commands
 //          Multi-Plane cmd--||||||||||||||-new commands (page rd cache commands)
 //           boot block lock--||||||||||||--read ID2
@@ -616,11 +666,11 @@ parameter FEATURE_SET = 16'b1100011001101011;
 //                      features--||||--ONFI 
 //       drive strength(non-ONFI)--||--block lock
 
-parameter FEATURE_SET2 = 16'b0000000000000000;
+parameter FEATURE_SET2 = 16'b0000000000001010;
 //                   unused--||||||||||||||||--ECC timing
-//                    unused--||||||||||||||--unused
-//                     unused--||||||||||||--MP Read output option
-//                      unused--||||||||||--unused
+//                    unused--||||||||||||||--Reset LUN command
+//                     unused--||||||||||||--MP Read output
+//                      unused--||||||||||--Program Clear
 //                       unused--||||||||--unused
 //                        unused--||||||--unused
 //                         unused--||||--unused
@@ -650,42 +700,41 @@ task setup_params_array;
     onfi_params_array[2] = 8'h46; // 'F'
     onfi_params_array[3] = 8'h49; // 'I'
     // ONFI revision number
-    onfi_params_array[4] = 8'h0E; // ONFI 2.1 compliant
+    onfi_params_array[4] = 8'h1E; // 2.2 compliant
     onfi_params_array[5] = 8'h00;
     // Features supported
-    `ifdef CLASSJ
-            onfi_params_array[6] = 8'h5A;
-    `else `ifdef CLASSK
-        `ifdef NAND_SYNC
+    `ifdef NAND_SYNC
+	`ifdef CLASSK
             onfi_params_array[6] = 8'h7A;
-        `else 
-            onfi_params_array[6] = 8'h5A;
-        `endif
-    `else `ifdef CLASSU
-        `ifdef NAND_SYNC
+	`else `ifdef CLASSU
             onfi_params_array[6] = 8'h7A;
-        `else 
-            onfi_params_array[6] = 8'h5A;
-        `endif
-    `else
-        `ifdef NAND_SYNC
+	`else // CLASS B, E, M
             onfi_params_array[6] = 8'h78;
-        `else 
+	`endif `endif
+    `else
+	`ifdef CLASSJ
+            onfi_params_array[6] = 8'h5A;
+	`else `ifdef CLASSK
+            onfi_params_array[6] = 8'h5A;
+	`else `ifdef CLASSU
+            onfi_params_array[6] = 8'h5A;
+	`else // CLASS B, F, M
             onfi_params_array[6] = 8'h58;
-        `endif
-    `endif `endif `endif
-    
-    onfi_params_array[7] = 8'h00;
+	`endif `endif `endif
+    `endif    
+    onfi_params_array[7] = 8'h01;
     // optional command supported
     onfi_params_array[8] = 8'hFF;
-    onfi_params_array[9] = 8'h01;
+    onfi_params_array[9] = 8'h03;
     // Reserved
     onfi_params_array[10] = 8'h00;
     onfi_params_array[11] = 8'h00;
+    // Reserved
     onfi_params_array[12] = 8'h00;
     onfi_params_array[13] = 8'h00;
     // number of parameter pages
     onfi_params_array[14] = 8'h03;
+    // Reserved
     for (k=15; k<=31 ; k=k+1) begin
         onfi_params_array[k] = 8'h00;
     end
@@ -703,144 +752,183 @@ task setup_params_array;
     onfi_params_array[42] = 8'h20;
     onfi_params_array[43] = 8'h20;    
     // Device model
-    onfi_params_array[44] = 8'h4D; //M
-    onfi_params_array[45] = 8'h54; //T
-    onfi_params_array[46] = 8'h32; //2
-    onfi_params_array[47] = 8'h39; //9
-    onfi_params_array[48] = 8'h46; //F
+    onfi_params_array[44] = 8'h4D; //M 
+    onfi_params_array[45] = 8'h54; //T 
+    onfi_params_array[46] = 8'h32; //2 
+    onfi_params_array[47] = 8'h39; //9 
+    onfi_params_array[48] = 8'h46; //F 
 
-    `ifdef CLASSU
-	onfi_params_array[49] = 8'h31; //1
-	onfi_params_array[50] = 8'h32; //2
-	onfi_params_array[51] = 8'h38; //8
-	onfi_params_array[52] = 8'h47; //G
-	onfi_params_array[53] = 8'h30; //0
-	onfi_params_array[54] = 8'h38; //8
-	onfi_params_array[55] = 8'h41; //A
-	onfi_params_array[56] = 8'h55; //U
-	`ifdef H3
-	onfi_params_array[57] = 8'h43; //C
-	onfi_params_array[58] = 8'h42; //B
-	onfi_params_array[59] = 8'h42; //B
-	onfi_params_array[60] = 8'h48; //H
-	onfi_params_array[61] = 8'h33; //3
-     	`else
-	onfi_params_array[57] = 8'h41; //A
-	onfi_params_array[58] = 8'h42; //B
-	onfi_params_array[59] = 8'h41; //A
-	onfi_params_array[60] = 8'h43; //C
-	onfi_params_array[61] = 8'h35; //5
-	`endif
-    `else `ifdef CLASSM
-	onfi_params_array[49] = 8'h36; //6
-	onfi_params_array[50] = 8'h34; //4    	
-        onfi_params_array[51] = 8'h47; //G
-        onfi_params_array[52] = 8'h30; //0
-        onfi_params_array[53] = 8'h38; //8
-        onfi_params_array[54] = 8'h41; //A
-        onfi_params_array[55] = 8'h4D; //M
-	`ifdef H2
-        onfi_params_array[56] = 8'h43; //C
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h42; //B
-        onfi_params_array[59] = 8'h48; //H
-        onfi_params_array[60] = 8'h32; //2
-	`else
-        onfi_params_array[56] = 8'h41; //A
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h41; //A
-        onfi_params_array[59] = 8'h43; //C
-        onfi_params_array[60] = 8'h35; //5
-	`endif
-        onfi_params_array[61] = 8'h20;
-    `else `ifdef CLASSK
-        onfi_params_array[49] = 8'h36; //6
-        onfi_params_array[50] = 8'h34; //4	    
-        onfi_params_array[51] = 8'h47; //G
-        onfi_params_array[52] = 8'h30; //0
-        onfi_params_array[53] = 8'h38; //8
-        onfi_params_array[54] = 8'h41; //A
-        onfi_params_array[55] = 8'h4B; //K
-	`ifdef H2
-        onfi_params_array[56] = 8'h43; //C
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h42; //B
-        onfi_params_array[59] = 8'h48; //H
-        onfi_params_array[60] = 8'h32; //2
-	`else
-        onfi_params_array[56] = 8'h41; //A
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h41; //A
-        onfi_params_array[59] = 8'h43; //C
-        onfi_params_array[60] = 8'h35; //5
-	`endif
-        onfi_params_array[61] = 8'h20;
-    `else `ifdef CLASSJ
-        onfi_params_array[49] = 8'h36; //6
-        onfi_params_array[50] = 8'h34; //4	    
-        onfi_params_array[51] = 8'h47; //G
-        onfi_params_array[52] = 8'h30; //0
-        onfi_params_array[53] = 8'h38; //8
-        onfi_params_array[54] = 8'h41; //A
-        onfi_params_array[55] = 8'h4A; //J
-        onfi_params_array[56] = 8'h41; //A
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h41; //A
-        onfi_params_array[59] = 8'h57; //W
-        onfi_params_array[60] = 8'h50; //P
-        onfi_params_array[61] = 8'h20;
-    `else `ifdef CLASSF
-	onfi_params_array[49] = 8'h33; //3
-	onfi_params_array[50] = 8'h32; //2
-        onfi_params_array[51] = 8'h47; //G
-        onfi_params_array[52] = 8'h30; //0
-        onfi_params_array[53] = 8'h38; //8
-        onfi_params_array[54] = 8'h41; //A
-        onfi_params_array[55] = 8'h46; //F
-        onfi_params_array[56] = 8'h41; //A
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h41; //A
-        onfi_params_array[59] = 8'h57; //W
-        onfi_params_array[60] = 8'h50; //P
-        onfi_params_array[61] = 8'h20;
-    `else `ifdef CLASSE
-	onfi_params_array[49] = 8'h33; //3
-	onfi_params_array[50] = 8'h32; //2
-        onfi_params_array[51] = 8'h47; //G
-        onfi_params_array[52] = 8'h30; //0
-        onfi_params_array[53] = 8'h38; //8
-        onfi_params_array[54] = 8'h41; //A
-        onfi_params_array[55] = 8'h45; //E
-        onfi_params_array[56] = 8'h43; //C
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h42; //B
-        onfi_params_array[59] = 8'h48; //H
-        onfi_params_array[60] = 8'h31; //1
-        onfi_params_array[61] = 8'h20;
-    `else // CLASSB
-	onfi_params_array[49] = 8'h31; //1
-	onfi_params_array[50] = 8'h36; //6
-        onfi_params_array[51] = 8'h47; //G
-        onfi_params_array[52] = 8'h30; //0
-        onfi_params_array[53] = 8'h38; //8
-        onfi_params_array[54] = 8'h41; //A
-	onfi_params_array[55] = 8'h42; //B
-    	`ifdef H1
-        onfi_params_array[56] = 8'h43; //C
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h42; //B
-        onfi_params_array[59] = 8'h48; //H
-        onfi_params_array[60] = 8'h31; //1
-	`else
-        onfi_params_array[56] = 8'h41; //A
-        onfi_params_array[57] = 8'h42; //B
-        onfi_params_array[58] = 8'h41; //A
-        onfi_params_array[59] = 8'h57; //W
-        onfi_params_array[60] = 8'h50; //P
-	`endif
-        onfi_params_array[61] = 8'h20;
-    `endif `endif `endif `endif `endif `endif
-
+    `ifdef NAND_SYNC
+        `ifdef CLASSE
+            onfi_params_array[49] = 8'h36; //6
+            onfi_params_array[50] = 8'h34; //4
+            onfi_params_array[51] = 8'h47; //G
+            onfi_params_array[52] = 8'h30; //0
+            onfi_params_array[53] = 8'h38; //8
+            onfi_params_array[54] = 8'h41; //A
+            onfi_params_array[55] = 8'h45; //E
+            onfi_params_array[56] = 8'h43; //C
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h42; //B
+            `ifdef J1
+            onfi_params_array[59] = 8'h4A; //J
+            `else // H1
+            onfi_params_array[59] = 8'h48; //H
+            `endif
+            onfi_params_array[60] = 8'h31; //1
+            onfi_params_array[61] = 8'h20;
+        `else `ifdef CLASSK
+            onfi_params_array[49] = 8'h31; //1
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h38; //8
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h4B; //K
+            onfi_params_array[57] = 8'h43; //C
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h42; //B
+            onfi_params_array[60] = 8'h48; //H
+            onfi_params_array[61] = 8'h32; //2
+        `else `ifdef CLASSM
+            onfi_params_array[49] = 8'h31; //1
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h38; //8
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h4D; //M
+            onfi_params_array[57] = 8'h43; //C
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h42; //B
+            `ifdef J2
+            onfi_params_array[60] = 8'h4A; //J
+            `else // H2
+            onfi_params_array[60] = 8'h48; //H
+            `endif
+            onfi_params_array[61] = 8'h32; //2
+        `else `ifdef CLASSU
+            onfi_params_array[49] = 8'h32; //2
+            onfi_params_array[50] = 8'h35; //5
+            onfi_params_array[51] = 8'h36; //6
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h55; //U
+            onfi_params_array[57] = 8'h43; //C
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h42; //B
+            `ifdef J3
+            onfi_params_array[60] = 8'h4A; //J
+            `else // H3
+            onfi_params_array[60] = 8'h48; //H
+            `endif
+            onfi_params_array[61] = 8'h33; //3
+        `else  // CLASSB
+            onfi_params_array[49] = 8'h33; //3
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h47; //G
+            onfi_params_array[52] = 8'h30; //0
+            onfi_params_array[53] = 8'h38; //8
+            onfi_params_array[54] = 8'h41; //A
+            onfi_params_array[55] = 8'h42; //B
+            onfi_params_array[56] = 8'h43; //C
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h42; //B
+            onfi_params_array[59] = 8'h48; //H
+            onfi_params_array[60] = 8'h31; //1
+            onfi_params_array[61] = 8'h20;
+        `endif `endif `endif `endif
+    `else
+	`ifdef CLASSF
+            onfi_params_array[49] = 8'h36; //6
+            onfi_params_array[50] = 8'h34; //4
+            onfi_params_array[51] = 8'h47; //G
+            onfi_params_array[52] = 8'h30; //0
+            onfi_params_array[53] = 8'h38; //8
+            onfi_params_array[54] = 8'h41; //A
+            onfi_params_array[55] = 8'h46; //F
+            onfi_params_array[56] = 8'h41; //A
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h57; //W
+            onfi_params_array[60] = 8'h50; //P
+            onfi_params_array[61] = 8'h20;
+        `else `ifdef CLASSJ
+            onfi_params_array[49] = 8'h31; //1
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h38; //8
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h4A; //J
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h41; //A
+            onfi_params_array[60] = 8'h57; //W
+            onfi_params_array[61] = 8'h50; //P
+	`else `ifdef CLASSK
+            onfi_params_array[49] = 8'h31; //1
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h38; //8
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h4B; //K
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h41; //A
+            onfi_params_array[60] = 8'h43; //C
+            onfi_params_array[61] = 8'h35; //5
+	`else `ifdef CLASSM
+            onfi_params_array[49] = 8'h31; //1
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h38; //8
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h4D; //M
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h41; //A
+            onfi_params_array[60] = 8'h43; //C
+            onfi_params_array[61] = 8'h35; //5
+	`else `ifdef CLASSU
+            onfi_params_array[49] = 8'h32; //2
+            onfi_params_array[50] = 8'h35; //5
+            onfi_params_array[51] = 8'h36; //6
+            onfi_params_array[52] = 8'h47; //G
+            onfi_params_array[53] = 8'h30; //0
+            onfi_params_array[54] = 8'h38; //8
+            onfi_params_array[55] = 8'h41; //A
+            onfi_params_array[56] = 8'h55; //U
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h41; //A
+            onfi_params_array[60] = 8'h43; //C
+            onfi_params_array[61] = 8'h35; //5
+	`else  // CLASSB
+            onfi_params_array[49] = 8'h33; //3
+            onfi_params_array[50] = 8'h32; //2
+            onfi_params_array[51] = 8'h47; //G
+            onfi_params_array[52] = 8'h30; //0
+            onfi_params_array[53] = 8'h38; //8
+            onfi_params_array[54] = 8'h41; //A
+            onfi_params_array[55] = 8'h42; //B
+            onfi_params_array[56] = 8'h41; //A
+            onfi_params_array[57] = 8'h41; //A
+            onfi_params_array[58] = 8'h41; //A
+            onfi_params_array[59] = 8'h57; //W
+            onfi_params_array[60] = 8'h50; //P
+            onfi_params_array[61] = 8'h20;
+        `endif `endif `endif `endif `endif
+    `endif
     onfi_params_array[62] = 8'h20;
     onfi_params_array[63] = 8'h20;
 
@@ -855,19 +943,19 @@ task setup_params_array;
     end
     // Number of data bytes per page
     onfi_params_array[80] = 8'h00;
-    onfi_params_array[81] = 8'h10;
+    onfi_params_array[81] = 8'h20;
     onfi_params_array[82] = 8'h00;
     onfi_params_array[83] = 8'h00;
     // Number of spare bytes per page        
-    onfi_params_array[84] = 8'hE0;
-    onfi_params_array[85] = 8'h00;
-    // Number of data bytes per partial page
+    onfi_params_array[84] = 8'hC0;
+    onfi_params_array[85] = 8'h01;
+    // Number of data bytes per partial page (obsolete in ONFI 2.2)
     onfi_params_array[86] = 8'h00;    
-    onfi_params_array[87] = 8'h02;    
+    onfi_params_array[87] = 8'h00;    
     onfi_params_array[88] = 8'h00;    
     onfi_params_array[89] = 8'h00;    
-    // Number of spare bytes per partial page
-    onfi_params_array[90] = 8'h1C;
+    // Number of spare bytes per partial page (obsolete in ONFI 2.2)
+    onfi_params_array[90] = 8'h00;
     onfi_params_array[91] = 8'h00;
     // Number of pages per block
     onfi_params_array[92] = 8'h80;
@@ -886,7 +974,7 @@ task setup_params_array;
         onfi_params_array[100] = 8'h02;
     `else`ifdef CLASSU
         onfi_params_array[100] = 8'h02;
-    `else
+    `else // CLASS B, E, F, M
         onfi_params_array[100] = 8'h01;
     `endif `endif `endif
     // Number of address cycles
@@ -897,8 +985,8 @@ task setup_params_array;
     onfi_params_array[103] = 8'h50;
     onfi_params_array[104] = 8'h00;
     // Block endurance
-    onfi_params_array[105] = 8'h01;
-    onfi_params_array[106] = 8'h05;
+    onfi_params_array[105] = 8'h06;
+    onfi_params_array[106] = 8'h04;
     // Guaranteed valid blocks at beginning of target
     onfi_params_array[107] = 8'h01;
     // Block endurance for guaranteed valid blocks
@@ -909,7 +997,7 @@ task setup_params_array;
     // Partial programming attributes
     onfi_params_array[111] = 8'h00;
     // Number of ECC bits
-    onfi_params_array[112] = 8'h04;
+    onfi_params_array[112] = 8'h08;
     // Number of interleaved address bits
     onfi_params_array[113] = 8'h01;
     // Interleaved operation attributes
@@ -919,148 +1007,215 @@ task setup_params_array;
         onfi_params_array[k] = 8'h00;
     end
     // IO pin capacitance
-    `ifdef CLASSU
-    	`ifdef H3
-        onfi_params_array[128] = 8'h09;
-	`else
-        onfi_params_array[128] = 8'h0A;
-	`endif
-    `else`ifdef CLASSM
-    	`ifdef H2
-        onfi_params_array[128] = 8'h05;
-	`else
-        onfi_params_array[128] = 8'h07;
-	`endif
-    `else`ifdef CLASSK
-    	`ifdef H2
-        onfi_params_array[128] = 8'h09;
-	`else
-        onfi_params_array[128] = 8'h0E;
-	`endif
-    `else `ifdef CLASSJ
-        onfi_params_array[128] = 8'h09;
-    `else // CLASS B, E, F	
-        onfi_params_array[128] = 8'h05;
-    `endif `endif `endif `endif
-    
+    `ifdef NAND_SYNC
+	`ifdef CLASSE
+	    `ifdef J1
+	    onfi_params_array[128] = 8'h06;
+	    `else // H1
+	    onfi_params_array[128] = 8'h05;
+	    `endif
+	`else `ifdef CLASSK
+	    onfi_params_array[128] = 8'h0A;
+	`else `ifdef CLASSM
+	    `ifdef J2
+	    onfi_params_array[128] = 8'h05;
+	    `else // H2
+	    onfi_params_array[128] = 8'h05;
+	    `endif
+	`else `ifdef CLASSU
+	    `ifdef J3
+	    onfi_params_array[128] = 8'h08;
+	    `else // H3
+	    onfi_params_array[128] = 8'h09;
+	    `endif
+	`else // CLASS B
+	    onfi_params_array[128] = 8'h05;
+	`endif `endif `endif `endif
+    `else
+	`ifdef CLASSF
+	    onfi_params_array[128] = 8'h05;
+	`else `ifdef CLASSJ
+	    onfi_params_array[128] = 8'h09;
+	`else `ifdef CLASSK
+	    onfi_params_array[128] = 8'h0A;
+	`else `ifdef CLASSM
+	    onfi_params_array[128] = 8'h05;
+	`else `ifdef CLASSU
+	    onfi_params_array[128] = 8'h08;
+	`else // CLASS B, 
+	    onfi_params_array[128] = 8'h06;
+	`endif `endif `endif `endif `endif
+    `endif
     // Timing mode support
-    onfi_params_array[129] = 8'h1F;    
+    onfi_params_array[129] = 8'h3F;    
     onfi_params_array[130] = 8'h00;
-    // Program cache timing mode support
-    onfi_params_array[131] = 8'h1F;    
+    // Program cache timing mode support (obsolete in ONFI 2.2)
+    onfi_params_array[131] = 8'h00;    
     onfi_params_array[132] = 8'h00;
     // tPROG max page program time
-    onfi_params_array[133] = 8'hF4;
-    onfi_params_array[134] = 8'h01;
+    onfi_params_array[133] = 8'h30;
+    onfi_params_array[134] = 8'h02;
     // tBERS max block erase time
-    onfi_params_array[135] = 8'hB8;
-    onfi_params_array[136] = 8'h0B;
+    onfi_params_array[135] = 8'h58;
+    onfi_params_array[136] = 8'h1B;
     // tR max page read time        
-    onfi_params_array[137] = 8'h19;
+    onfi_params_array[137] = 8'h23;
     onfi_params_array[138] = 8'h00;
     // tCCS min change column setup time (same as tWHR)
     onfi_params_array[139] = 8'hC8;
     onfi_params_array[140] = 8'h00;
     // Source synchronous timing mode support
     `ifdef NAND_SYNC
-    onfi_params_array[141] = 8'h1F;
+	onfi_params_array[141] = 8'h3F;
     `else
-    onfi_params_array[141] = 8'h00;
+	onfi_params_array[141] = 8'h00;
     `endif
     onfi_params_array[142] = 8'h00;
     // Source synchronous features
     `ifdef NAND_SYNC
-    onfi_params_array[143] = 8'h02;
+	onfi_params_array[143] = 8'h02;
     `else
-    onfi_params_array[143] = 8'h00;
+	onfi_params_array[143] = 8'h00;
     `endif
-    
     // CLK input pin capacitance, typical
     `ifdef NAND_SYNC
-        `ifdef CLASSU
-            onfi_params_array[144] = 8'h35;
-        `else `ifdef CLASSM
-            onfi_params_array[144] = 8'h1F;
-        `else `ifdef CLASSK
-            onfi_params_array[144] = 8'h3E;
-        `else // CLASS B,E
-            onfi_params_array[144] = 8'h24;
-       `endif `endif `endif
+	`ifdef CLASSE
+	    `ifdef J1
+	    onfi_params_array[144] = 8'h2D;
+	    `else // H1
+	    onfi_params_array[144] = 8'h28;
+	    `endif
+	`else `ifdef CLASSK
+	    onfi_params_array[144] = 8'h3E;
+	`else `ifdef CLASSM
+	    `ifdef J2
+	    onfi_params_array[144] = 8'h23;
+	    `else // H2
+	    onfi_params_array[144] = 8'h1F;
+	    `endif
+	`else `ifdef CLASSU
+	    `ifdef J3
+	    onfi_params_array[144] = 8'h3C;
+	    `else // H3
+	    onfi_params_array[144] = 8'h35;
+	    `endif
+	`else // CLASS B
+	    onfi_params_array[144] = 8'h28;
+	`endif `endif `endif `endif
     `else
         onfi_params_array[144] = 8'h00;
     `endif
     onfi_params_array[145] = 8'h00;
     // I/O pin capacitance, typical
     `ifdef NAND_SYNC
-        `ifdef CLASSU
-            onfi_params_array[146] = 8'h49;
-        `else `ifdef CLASSM
-            onfi_params_array[146] = 8'h28;
-        `else `ifdef CLASSK
-            onfi_params_array[146] = 8'h50;
-        `else // CLASS B,E
-            onfi_params_array[146] = 8'h2D;
-       `endif `endif `endif
+	`ifdef CLASSE
+	    `ifdef J1
+	    onfi_params_array[146] = 8'h31;
+	    `else // H1
+	    onfi_params_array[146] = 8'h2D;
+	    `endif
+	`else `ifdef CLASSK
+	    onfi_params_array[146] = 8'h50;
+	`else `ifdef CLASSM
+	    `ifdef J2
+	    onfi_params_array[146] = 8'h28;
+	    `else // H2
+	    onfi_params_array[146] = 8'h28;
+	    `endif
+	`else `ifdef CLASSU
+	    `ifdef J3
+	    onfi_params_array[146] = 8'h46;
+	    `else // H3
+	    onfi_params_array[146] = 8'h49;
+	    `endif
+	`else // CLASS B
+	    onfi_params_array[146] = 8'h2D;
+	`endif `endif `endif `endif
     `else
         onfi_params_array[146] = 8'h00;
     `endif
     onfi_params_array[147] = 8'h00;
     // Input pin capacitance, typical
     `ifdef NAND_SYNC
-        `ifdef CLASSU
-            onfi_params_array[148] = 8'h35;
-        `else `ifdef CLASSM
-            onfi_params_array[148] = 8'h22;
-        `else `ifdef CLASSK
-            onfi_params_array[148] = 8'h44;
-        `else // CLASS B,E
-            onfi_params_array[148] = 8'h28;
-       `endif `endif `endif
+	`ifdef CLASSE
+	    `ifdef J1
+	    onfi_params_array[148] = 8'h2C;
+	    `else // H1
+	    onfi_params_array[148] = 8'h28;
+	    `endif
+	`else `ifdef CLASSK
+	    onfi_params_array[148] = 8'h44;
+	`else `ifdef CLASSM
+	    `ifdef J2
+	    onfi_params_array[148] = 8'h22;
+	    `else // H2
+	    onfi_params_array[148] = 8'h22;
+	    `endif
+	`else `ifdef CLASSU
+	    `ifdef J3
+	    onfi_params_array[148] = 8'h3B;
+	    `else // H3
+	    onfi_params_array[148] = 8'h35;
+	    `endif
+	`else // CLASS B
+	    onfi_params_array[148] = 8'h28;
+	`endif `endif `endif `endif
     `else
         onfi_params_array[148] = 8'h00;
     `endif
     onfi_params_array[149] = 8'h00;
-    
-    // Input capacitance, maximum
-    `ifdef CLASSU
-	`ifdef H3
-        onfi_params_array[150] = 8'h07;
-     	`else
-        onfi_params_array[150] = 8'h0A;
-	`endif
-    `else `ifdef CLASSM
-	`ifdef H2
-        onfi_params_array[150] = 8'h04;
-	`else
-        onfi_params_array[150] = 8'h05;
-	`endif
-    `else `ifdef CLASSK
-	`ifdef H2
-        onfi_params_array[150] = 8'h08;
-	`else
-        onfi_params_array[150] = 8'h0A;
-	`endif
-    `else `ifdef CLASSJ
-        onfi_params_array[150] = 8'h09;
-    `else `ifdef CLASSF
-        onfi_params_array[150] = 8'h07;
-    `else `ifdef CLASSE
-        onfi_params_array[150] = 8'h05;
-    `else // CLASSB
-    	`ifdef H1
-        onfi_params_array[150] = 8'h05;
-	`else
-        onfi_params_array[150] = 8'h0A;
-	`endif
-    `endif `endif `endif `endif `endif `endif
-
+    // Input capacitance, maximum    
+    `ifdef NAND_SYNC
+	`ifdef CLASSE
+	    `ifdef J1
+	    onfi_params_array[150] = 8'h06;
+	    `else // H1
+	    onfi_params_array[150] = 8'h05;
+	    `endif
+	`else `ifdef CLASSK
+	    onfi_params_array[150] = 8'h08;
+	`else `ifdef CLASSM
+	    `ifdef J2
+	    onfi_params_array[150] = 8'h05;
+	    `else // H2
+	    onfi_params_array[150] = 8'h04;
+	    `endif
+	`else `ifdef CLASSU
+	    `ifdef J3
+	    onfi_params_array[150] = 8'h07;
+	    `else // H3
+	    onfi_params_array[150] = 8'h07;
+	    `endif
+	`else // CLASS B
+	    onfi_params_array[150] = 8'h05;
+	`endif `endif `endif `endif
+    `else
+	`ifdef CLASSF
+	    onfi_params_array[150] = 8'h07;
+	`else `ifdef CLASSJ
+	    onfi_params_array[150] = 8'h09;
+	`else `ifdef CLASSK
+	    onfi_params_array[150] = 8'h0A;
+	`else `ifdef CLASSM
+	    onfi_params_array[150] = 8'h05;
+	`else `ifdef CLASSU
+	    onfi_params_array[150] = 8'h07;
+	`else // CLASS B
+	    onfi_params_array[150] = 8'h0A;
+	`endif `endif `endif `endif `endif
+    `endif
     // Driver strength support
-    onfi_params_array[151] = 8'h07; 
-    // multiplane read time          
-    onfi_params_array[152] = 8'h19;            
-    onfi_params_array[153] = 8'h00;            
-    //reserved
-    for (k=154; k<=163; k=k+1) begin
+    onfi_params_array[151] = 8'h07;            
+ 
+    // tR max multiplane page read time 
+    onfi_params_array[152] = 8'h23;
+    onfi_params_array[153] = 8'h00;
+    // tADL time 
+    onfi_params_array[154] = 8'h6E;
+    onfi_params_array[155] = 8'h00;
+
+   //reserved
+    for (k=156; k<=163; k=k+1) begin
         onfi_params_array[k] = 8'h00;
     end
     // Vendor-specific revision number    
@@ -1097,50 +1252,70 @@ task setup_params_array;
     for (k=180; k<=252; k=k+1) begin
         onfi_params_array[k] = 8'h00;
     end
+    // Parameter page revision
+    `ifdef J1
     onfi_params_array[253] = 8'h02;
+    `else `ifdef J2
+    onfi_params_array[253] = 8'h02;
+    `else `ifdef J3
+    onfi_params_array[253] = 8'h02;
+    `else
+    onfi_params_array[253] = 8'h04;
+    `endif `endif `endif
     // Integrity CRC
-    `ifdef CLASSU
-	`ifdef H3
-	onfi_params_array[254] = 8'hB9;
-	onfi_params_array[255] = 8'hC1;
-     	`else
-	onfi_params_array[254] = 8'hFC;
-	onfi_params_array[255] = 8'hE3;
-	`endif
-    `else `ifdef CLASSM
-	`ifdef H2
-	onfi_params_array[254] = 8'h67;
-	onfi_params_array[255] = 8'hF1;
-	`else
-	onfi_params_array[254] = 8'h7B;
-	onfi_params_array[255] = 8'h94;
-	`endif
-    `else `ifdef CLASSK
-	`ifdef H2
-	onfi_params_array[254] = 8'h6D;
-	onfi_params_array[255] = 8'hC8;
-	`else
-	onfi_params_array[254] = 8'h72;
-	onfi_params_array[255] = 8'h79;
-	`endif
-    `else `ifdef CLASSJ
-	onfi_params_array[254] = 8'hA5;
-	onfi_params_array[255] = 8'hD6;
-    `else `ifdef CLASSF
-	onfi_params_array[254] = 8'hE9;
-	onfi_params_array[255] = 8'hAC;
-    `else `ifdef CLASSE
-	onfi_params_array[254] = 8'h01;
-	onfi_params_array[255] = 8'h70;
-    `else // CLASSB
-    	`ifdef H1
-	onfi_params_array[254] = 8'h8B;
-	onfi_params_array[255] = 8'hAE;
-	`else
-	onfi_params_array[254] = 8'hE6;
-	onfi_params_array[255] = 8'hA9;
-	`endif
-    `endif `endif `endif `endif `endif `endif
+    `ifdef NAND_SYNC
+        `ifdef CLASSU
+            `ifdef J3
+            onfi_params_array[254] = 8'hA7;
+            onfi_params_array[255] = 8'h80;
+            `else // H3
+            onfi_params_array[254] = 8'h7E;
+            onfi_params_array[255] = 8'h89;
+            `endif
+        `else `ifdef CLASSM
+            `ifdef J2
+            onfi_params_array[254] = 8'h65;
+            onfi_params_array[255] = 8'hEA;
+            `else // H2
+            onfi_params_array[254] = 8'h3D;
+            onfi_params_array[255] = 8'hFC;
+            `endif
+        `else `ifdef CLASSK
+            onfi_params_array[254] = 8'h93;
+            onfi_params_array[255] = 8'hBB;
+        `else `ifdef CLASSE
+            `ifdef J1
+            onfi_params_array[254] = 8'h99;
+            onfi_params_array[255] = 8'h5A;
+            `else // H1
+            onfi_params_array[254] = 8'h16;
+            onfi_params_array[255] = 8'h4E;
+            `endif
+        `else // CLASSB
+            onfi_params_array[254] = 8'h92;
+            onfi_params_array[255] = 8'h8A;
+        `endif `endif `endif `endif
+    `else
+        `ifdef CLASSU
+            onfi_params_array[254] = 8'hF0;
+            onfi_params_array[255] = 8'h5D;
+        `else `ifdef CLASSM
+            onfi_params_array[254] = 8'h27;
+            onfi_params_array[255] = 8'h00;
+        `else `ifdef CLASSK
+            onfi_params_array[254] = 8'h89;
+            onfi_params_array[255] = 8'h05;
+        `else `ifdef CLASSJ
+            onfi_params_array[254] = 8'hC8;
+            onfi_params_array[255] = 8'hDF;
+        `else `ifdef CLASSF
+            onfi_params_array[254] = 8'h1D;
+            onfi_params_array[255] = 8'h32;
+        `else // CLASSB
+            onfi_params_array[254] = 8'h1F;
+            onfi_params_array[255] = 8'hA6;
+        `endif `endif `endif `endif `endif
+    `endif
 
     onfi_params_array_unpacked =0;
     for (k=0; k<=255; k=k+1) begin
@@ -1164,39 +1339,57 @@ endtask
     `define NUM_DIE2
     parameter NUM_DIE   =   2;
     parameter NUM_CE    =   2;
+    parameter async_only_n = 1'b1;
 `else `ifdef CLASSF 
     `define NUM_DIE2
     parameter NUM_DIE   =   2;
     parameter NUM_CE    =   2;
+    parameter async_only_n = 1'b0;
 `else `ifdef CLASSJ 
     `define NUM_DIE4
     parameter NUM_DIE   =   4;
     parameter NUM_CE    =   2;
     `define DIES4
+    parameter async_only_n = 1'b0;
 `else `ifdef CLASSK 
     `define NUM_DIE4
     parameter NUM_DIE   =   4;
     parameter NUM_CE    =   2;
     `define DIES4
-`else `ifdef CLASSM 
+    `ifdef NAND_SYNC
+	parameter async_only_n = 1'b1;
+    `else
+	parameter async_only_n = 1'b0;
+    `endif
+`else `ifdef CLASSM
     `define NUM_DIE4
     parameter NUM_DIE   =   4;
     parameter NUM_CE    =   4;
-    `define DIES4
+    `define DIES4;
+    `ifdef NAND_SYNC
+	parameter async_only_n = 1'b1;
+    `else
+	parameter async_only_n = 1'b0;
+    `endif
 `else `ifdef CLASSU 
     `define NUM_DIE8
     parameter NUM_DIE   =   8;
     parameter NUM_CE    =   4;
+    `ifdef NAND_SYNC
+	parameter async_only_n = 1'b1;
+    `else
+	parameter async_only_n = 1'b0;
+    `endif
 `else // CLASSB
     parameter NUM_DIE   =   1;
     parameter NUM_CE    =   1;
+    `ifdef NAND_SYNC
+	parameter async_only_n = 1'b1;
+    `else
+	parameter async_only_n = 1'b0;
+    `endif
 `endif `endif `endif `endif `endif `endif
 
-`ifdef NAND_SYNC
-    parameter async_only_n = 1'b1;
-`else
-    parameter async_only_n = 1'b0;
-`endif
 
 `define SYNC2ASYNCRESET
 

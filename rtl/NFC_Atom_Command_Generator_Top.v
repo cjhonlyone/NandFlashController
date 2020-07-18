@@ -379,6 +379,8 @@ module NFC_Atom_Command_Generator_Top
     NFC_Atom_Command_Idle #(
             .NumberOfWays(NumberOfWays)
         ) inst_NFC_Atom_Command_Idle (
+            .iTargetWay          (iCI_ACG_TargetWay),
+
             .oDQSOutEnable       (wDLE_DQSOutEnable),
             .oDQOutEnable        (wDLE_DQOutEnable),
             .oDQStrobe           (wDLE_DQStrobe),

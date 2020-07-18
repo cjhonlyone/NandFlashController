@@ -75,8 +75,11 @@ module NFC_Atom_Command_Sync
     reg  [3:0]                    rACS_DataCounter        ;
     reg  [3:0]                    rACS_TimeCounter        ;
 
+    reg                           rHalt                   ;
 
-    wire                          wTimerDone = (rACS_TimeCounter == 4'd2) ? 1 : 0 ;
+
+    wire                          wTimerDone = (rACS_TimeCounter == 4'd2) ? 1 : 0 ; // this is for tCAD
+    wire                          wTimerD1   = (rACS_TimeCounter == 4'd1) ? 1 : 0 ; // this is for tCAD
     wire                          wACSDone   = (rACS_DataCounter == rNumOfData) ? 1 : 0 ;
 
     // FSM Parameters/Wires/Regs
@@ -84,7 +87,7 @@ module NFC_Atom_Command_Sync
     localparam ACS_RESET = 9'b0_0000_0001;
     localparam ACS_READY = 9'b0_0000_0010; // Ready
     localparam ACS_LATCH = 9'b0_0000_0100; // Command/Address capture: first
-    localparam ACS_DQSHZ = 9'b0_0000_1000; // tDQSHZ
+    localparam ACS_DQSHZ = 9'b0_0000_1000; // tCAD
     localparam ACS_OST00 = 9'b0_0001_0000; // output data
     localparam ACS_OST01 = 9'b0_0010_0000; // output data
     localparam ACS_OST02 = 9'b0_0100_0000; // output data
@@ -118,22 +121,22 @@ module NFC_Atom_Command_Sync
                 rACS_nxt_state <= ACS_DQSHZ;
             end
             ACS_DQSHZ: begin
-                rACS_nxt_state <= (wTimerDone)? ACS_OST00:ACS_DQSHZ;
+                rACS_nxt_state <= ACS_OST00 ; //(wTimerDone)? ACS_OST00:ACS_DQSHZ;
             end
             ACS_OST00: begin
-                rACS_nxt_state <= (rLastStep) ? ACS_READY : ACS_OST01; // 100ns
+                rACS_nxt_state <= (rLastStep) ? ACS_READY : (wTimerDone ? ACS_OST01 : ACS_OST00); // 100ns
             end
             ACS_OST01: begin
-                rACS_nxt_state <= (rLastStep) ? ACS_READY : ACS_OST02;
+                rACS_nxt_state <= (rLastStep) ? ACS_READY : (wTimerDone ? ACS_OST02 : ACS_OST01);
             end
             ACS_OST02: begin
-                rACS_nxt_state <= (rLastStep) ? ACS_READY : ACS_OST03;
+                rACS_nxt_state <= (rLastStep) ? ACS_READY : (wTimerDone ? ACS_OST03 : ACS_OST02);
             end
             ACS_OST03: begin
-                rACS_nxt_state <= (rLastStep) ? ACS_READY : ACS_OST04;
+                rACS_nxt_state <= (rLastStep) ? ACS_READY : (wTimerDone ? ACS_OST04 : ACS_OST03);
             end
             ACS_OST04: begin
-                rACS_nxt_state <= (rLastStep) ? ACS_READY : ACS_READY;
+                rACS_nxt_state <= (rLastStep) ? ACS_READY : (wTimerDone ? ACS_READY : ACS_OST04);
             end
             default:
                 rACS_nxt_state <= ACS_READY;
@@ -164,6 +167,7 @@ module NFC_Atom_Command_Sync
 
             rACS_DataCounter    <= 4'd0;
             rACS_TimeCounter    <= 4'd0;
+            rHalt               <= 0;
         end else begin
             case (rACS_nxt_state)
                 ACS_RESET: begin
@@ -188,6 +192,7 @@ module NFC_Atom_Command_Sync
 
                     rACS_DataCounter    <= 4'd0;
                     rACS_TimeCounter    <= 4'd0;
+                    rHalt               <= 0;
                 end
                 ACS_READY: begin
                     rReady              <= 1'b1;
@@ -211,6 +216,7 @@ module NFC_Atom_Command_Sync
 
                     rACS_DataCounter    <= 4'd0;
                     rACS_TimeCounter    <= 4'd0;
+                    rHalt               <= 0;
                 end
                 ACS_LATCH: begin
                     rReady              <= 1'b0;
@@ -234,6 +240,7 @@ module NFC_Atom_Command_Sync
 
                     rACS_DataCounter    <= 4'd0;
                     rACS_TimeCounter    <= 4'd0;
+                    rHalt               <= 0;
                 end
                 ACS_DQSHZ: begin
                     rReady              <= 1'b0;
@@ -256,11 +263,12 @@ module NFC_Atom_Command_Sync
                     rCommandLatchEnable <= 4'b0000;
 
                     rACS_DataCounter    <= 4'd0;
-                    rACS_TimeCounter    <= rACS_TimeCounter + 1;
+                    rACS_TimeCounter    <= 0;
+                    rHalt               <= 0;
                 end
                 ACS_OST00: begin
                     rReady              <= 1'b0;
-                    rLastStep           <= wACSDone;
+                    rLastStep           <= wTimerD1 ? wACSDone : 0;
 
                     rTargetWay          <= rTargetWay;
                     rNumOfData          <= rNumOfData;
@@ -275,15 +283,16 @@ module NFC_Atom_Command_Sync
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
-                    rAddressLatchEnable <= (rCASelect) ? 4'b0000 : 4'b0011;
-                    rCommandLatchEnable <= (rCASelect) ? 4'b0011 : 4'b0000;
+                    rAddressLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0000 : 4'b0011) : 4'b0000 ;
+                    rCommandLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0011 : 4'b0000) : 4'b0000 ;
 
-                    rACS_DataCounter    <= rACS_DataCounter + 1;
-                    rACS_TimeCounter    <= 4'd0;
+                    rACS_DataCounter    <= (wTimerDone) ? rACS_DataCounter + 1 : rACS_DataCounter;
+                    rACS_TimeCounter    <= (wTimerDone) ? 0 : rACS_TimeCounter + 1;
+                    rHalt               <= ~rHalt;
                 end
                 ACS_OST01: begin
                     rReady              <= 1'b0;
-                    rLastStep           <= wACSDone;
+                    rLastStep           <= wTimerD1 ? wACSDone : 0;
 
                     rTargetWay          <= rTargetWay;
                     rNumOfData          <= rNumOfData;
@@ -298,15 +307,16 @@ module NFC_Atom_Command_Sync
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
-                    rAddressLatchEnable <= (rCASelect) ? 4'b0000 : 4'b0011;
-                    rCommandLatchEnable <= (rCASelect) ? 4'b0011 : 4'b0000;
+                    rAddressLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0000 : 4'b0011) : 4'b0000 ;
+                    rCommandLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0011 : 4'b0000) : 4'b0000 ;
 
-                    rACS_DataCounter    <= rACS_DataCounter + 1;
-                    rACS_TimeCounter    <= 4'd0;
+                    rACS_DataCounter    <= (wTimerDone) ? rACS_DataCounter + 1 : rACS_DataCounter;
+                    rACS_TimeCounter    <= (wTimerDone) ? 0 : rACS_TimeCounter + 1;
+                    rHalt               <= ~rHalt;
                 end
                 ACS_OST02: begin
                     rReady              <= 1'b0;
-                    rLastStep           <= wACSDone;
+                    rLastStep           <= wTimerD1 ? wACSDone : 0;
 
                     rTargetWay          <= rTargetWay;
                     rNumOfData          <= rNumOfData;
@@ -321,15 +331,16 @@ module NFC_Atom_Command_Sync
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
-                    rAddressLatchEnable <= (rCASelect) ? 4'b0000 : 4'b0011;
-                    rCommandLatchEnable <= (rCASelect) ? 4'b0011 : 4'b0000;
+                    rAddressLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0000 : 4'b0011) : 4'b0000 ;
+                    rCommandLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0011 : 4'b0000) : 4'b0000 ;
 
-                    rACS_DataCounter    <= rACS_DataCounter + 1;
-                    rACS_TimeCounter    <= 4'd0;
+                    rACS_DataCounter    <= (wTimerDone) ? rACS_DataCounter + 1 : rACS_DataCounter;
+                    rACS_TimeCounter    <= (wTimerDone) ? 0 : rACS_TimeCounter + 1;
+                    rHalt               <= ~rHalt;
                 end
                 ACS_OST03: begin
                     rReady              <= 1'b0;
-                    rLastStep           <= wACSDone;
+                    rLastStep           <= wTimerD1 ? wACSDone : 0;
 
                     rTargetWay          <= rTargetWay;
                     rNumOfData          <= rNumOfData;
@@ -344,15 +355,16 @@ module NFC_Atom_Command_Sync
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
-                    rAddressLatchEnable <= (rCASelect) ? 4'b0000 : 4'b0011;
-                    rCommandLatchEnable <= (rCASelect) ? 4'b0011 : 4'b0000;
+                    rAddressLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0000 : 4'b0011) : 4'b0000 ;
+                    rCommandLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0011 : 4'b0000) : 4'b0000 ;
 
-                    rACS_DataCounter    <= rACS_DataCounter + 1;
-                    rACS_TimeCounter    <= 4'd0;
+                    rACS_DataCounter    <= (wTimerDone) ? rACS_DataCounter + 1 : rACS_DataCounter;
+                    rACS_TimeCounter    <= (wTimerDone) ? 0 : rACS_TimeCounter + 1;
+                    rHalt               <= ~rHalt;
                 end
                 ACS_OST04: begin
                     rReady              <= 1'b0;
-                    rLastStep           <= wACSDone;
+                    rLastStep           <= wTimerD1 ? wACSDone : 0;
 
                     rTargetWay          <= rTargetWay;
                     rNumOfData          <= rNumOfData;
@@ -367,11 +379,12 @@ module NFC_Atom_Command_Sync
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
-                    rAddressLatchEnable <= (rCASelect) ? 4'b0000 : 4'b0011;
-                    rCommandLatchEnable <= (rCASelect) ? 4'b0011 : 4'b0000;
+                    rAddressLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0000 : 4'b0011) : 4'b0000 ;
+                    rCommandLatchEnable <= (rACS_TimeCounter == 0) ? ((rCASelect) ? 4'b0011 : 4'b0000) : 4'b0000 ;
 
-                    rACS_DataCounter    <= rACS_DataCounter + 1;
-                    rACS_TimeCounter    <= 4'd0;
+                    rACS_DataCounter    <= (wTimerDone) ? rACS_DataCounter + 1 : rACS_DataCounter;
+                    rACS_TimeCounter    <= (wTimerDone) ? 0 : rACS_TimeCounter + 1;
+                    rHalt               <= ~rHalt;
                 end
                 default: begin
                     rReady              <= 1'b0;
@@ -394,6 +407,7 @@ module NFC_Atom_Command_Sync
 
                     rACS_DataCounter    <= 4'd0;
                     rACS_TimeCounter    <= 4'd0;
+                    rHalt               <= 4'd0;
                 end
             endcase
         end
