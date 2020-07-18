@@ -83,7 +83,7 @@ module NFC_Atom_Dataoutput_Sync
     reg  [7:0]                    rDQStrobe_m2            ;
     reg  [31:0]                   rDQ_m2                  ;
 
-    wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd5) ? 1 : 0 ;
+    wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd1) ? 1 : 0 ; // this is for tCAD
     wire                          wTimerDone = (rDOS_TimeCounter == 4'd1) ? 1 : 0 ;
     wire                          wTimerHalf = (rDOS_TimeCounter <= 4'd4) ? 1 : 0 ;
     wire                          wDOSDone   = (rDOS_DataCounter == rNumOfData) ? 1 : 0 ;
