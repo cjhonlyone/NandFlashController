@@ -338,7 +338,7 @@ module NFC_Atom_Dataoutput_Sync
                     rDQOutEnable        <= 1;
 
                     rDQStrobe           <= 8'h03;
-                    rDQ                 <= {16'h00, iWriteData[7:0], iWriteData[15:8]};
+                    rDQ                 <= {16'h00, iWriteData[15:0]};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
