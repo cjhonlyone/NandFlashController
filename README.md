@@ -1,10 +1,75 @@
-### Nand Flash Controller
+# Nand Flash Controller
 
 - ONFI 2.1
 - Code idea from Cosmos-plus-OpenSSD
 - DDR mode
 
-### Command
+### NFC Interface
+
+#### Configure Interface
+
+``` verilog
+    input   [5:0]                  iOpcode                 ;
+    input   [4:0]                  iTargetID               ;
+    input   [31:0]                 iAddress                ;
+    input   [15:0]                 iLength                 ;
+    input                          iCMDValid               ;
+    output                         oCMDReady               ;
+```
+
+#### Data Output  Interface
+
+```verilog
+    input   [15:0]                 iWriteData              ;
+    input                          iWriteLast              ;
+    input                          iWriteValid             ;
+    input   [1:0]                  iWriteKeep              ;
+    output                         oWriteReady             ;
+```
+
+#### Data Input  Interface
+
+```verilog
+    output  [15:0]                 oReadData               ;
+    output                         oReadLast               ;
+    output                         oReadValid              ;
+    output  [1:0]                  oReadKeep               ;
+    input                          iReadReady              ;
+```
+
+#### Status Interface
+
+```
+    output  [NumberOfWays - 1:0]   oReadyBusy              ;
+    
+    output  [23:0]                 oStatus                 ;
+    output                         oStatusValid            ;
+```
+
+#### Nand Flash Physics Interface
+
+```verilog
+    inout                          IO_NAND_DQS             ;
+    inout                  [7:0]   IO_NAND_DQ              ;
+    output  [NumberOfWays - 1:0]   O_NAND_CE               ;
+    output                         O_NAND_WE               ;
+    output                         O_NAND_RE               ;
+    output                         O_NAND_ALE              ;
+    output                         O_NAND_CLE              ;
+    input   [NumberOfWays - 1:0]   I_NAND_RB               ;
+    output                         O_NAND_WP               ;
+```
+### Modules and Files 
+
+| Module/Files                   | Description                                                           |
+| ------------------------ | --------------------------------------------------------------------- |
+| `NandFlashController_Top_AXI`               | AXI and AXIS Interface Top Module                   |
+| `NandFlashController_Top`               | Raw Interface Top Module                      |
+| `NFC_Command_*`           | Command Decode   |
+| `NFC_Atom_*`   | Atom Command (Command/Address/DataIn/DataOut) |
+| `NFC_Phy*`            | Pinpad |
+
+### How to Use
 
 #### Select Way
 
