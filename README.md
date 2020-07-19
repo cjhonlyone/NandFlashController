@@ -2,6 +2,7 @@
 
 - ONFI 2.1
 - Code idea from Cosmos-plus-OpenSSD
+- DDR mode
 
 ### Command
 
