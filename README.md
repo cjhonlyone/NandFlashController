@@ -39,7 +39,7 @@
 
 #### Status Interface
 
-```
+```verilog
     output  [NumberOfWays - 1:0]   oReadyBusy              ;
     
     output  [23:0]                 oStatus                 ;
