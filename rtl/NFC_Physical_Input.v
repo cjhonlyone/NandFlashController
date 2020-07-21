@@ -9,6 +9,7 @@ module NFC_Physical_Input
 (
     iSystemClock    ,
     iDelayRefClock  ,
+    iOutputDrivingClock ,
     iModuleReset    ,
     iBufferReset    ,
     iPI_Buff_RE     ,
@@ -32,6 +33,7 @@ module NFC_Physical_Input
 );
     input           iSystemClock        ;
     input           iDelayRefClock      ;
+    input           iOutputDrivingClock     ;
     input           iModuleReset        ;
     input           iBufferReset        ;
     input           iPI_Buff_RE         ;
@@ -190,7 +192,7 @@ module NFC_Physical_Input
     reg            rDQSFromNAND_m1;
     reg            rDQSFromNAND_m2;
     
-    always @ (posedge iDelayRefClock, posedge iBufferReset) begin
+    always @ (posedge iOutputDrivingClock) begin
         if (iBufferReset) begin
             rDQAtRising <= 0;
             rDQAtRising_m1 <= 0;
@@ -339,7 +341,7 @@ module NFC_Physical_Input
         .RST(iBufferReset), // 1-bit input: Asynchronous Reset
         .RSTREG(1'b0), // 1-bit input: Output register set/reset
         // Write Control Signals: 1-bit (each) input: Write clock and enable input signals
-        .WRCLK(iDelayRefClock), // 1-bit input: Write clock
+        .WRCLK(iOutputDrivingClock), // 1-bit input: Write clock
         .WREN(rDQSFromNAND_m2), // 1-bit input: Write enable
         // Write Data: 32-bit (each) input: Write input data
         .DI({16'd0, rDQAtFalling,rDQAtRising_m1}), // 32-bit input: Data input

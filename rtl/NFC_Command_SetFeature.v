@@ -169,7 +169,7 @@ module NFC_Command_SetFeature
 
 
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rST_cur_state <= rST_RESET;
         end else begin
@@ -210,7 +210,7 @@ module NFC_Command_SetFeature
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
@@ -326,12 +326,12 @@ module NFC_Command_SetFeature
         end
     end
 
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
         rWay_ReadyBusy <= | rACG_ReadyBusy;
     end
 
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rACG_WriteData  <= 0;
             rACG_WriteLast  <= 0;

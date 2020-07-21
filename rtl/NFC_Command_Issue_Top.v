@@ -543,7 +543,7 @@ module NFC_Command_Issue_Top
             .TargetID(TargetID)
         ) inst_NFC_Command_GetFeature (
             .iSystemClock       (iSystemClock),
-            .iReset             (wReset),
+            .iReset             (iReset),
 
             .iOpcode            (wGTF_Opcode),
             .iCMDValid          (wGTF_CMDValid),

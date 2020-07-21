@@ -92,7 +92,7 @@ module NFC_Atom_Datainput_Async
     // FSM: Atom_Command_Sync
     
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rDIA_cur_state <= DIA_RESET;
         end else begin
@@ -136,7 +136,7 @@ module NFC_Atom_Datainput_Async
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rReady              <= 1'b0;
             rLastStep           <= 1'b0;

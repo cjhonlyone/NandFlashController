@@ -376,7 +376,7 @@ module NFC_Command_EraseBlock
         end
     end
 
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
         rWay_ReadyBusy <= | rACG_ReadyBusy;
     end

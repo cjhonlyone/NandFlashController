@@ -133,8 +133,8 @@ module NFC_Command_ProgramPage
     reg                           rACG_CASelect      ;      
     reg   [39:0]                  rACG_CAData        ;   
 
-    reg   [NumberOfWays - 1:0]    rACG_ReadyBusy     ;
-    reg                           rWay_ReadyBusy     ;
+//    reg   [NumberOfWays - 1:0]    rACG_ReadyBusy     ;
+//    reg                           rWay_ReadyBusy     ;
 
     // reg                           rWriteReady          ;
 
@@ -181,7 +181,7 @@ module NFC_Command_ProgramPage
     assign wDOSDone  = iACG_LastStep[2];
 
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rST_cur_state <= rST_RESET;
         end else begin
@@ -225,7 +225,7 @@ module NFC_Command_ProgramPage
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
@@ -390,10 +390,10 @@ module NFC_Command_ProgramPage
         end
     end
 
-    always @ (posedge iSystemClock, posedge iReset) begin
-        rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
-        rWay_ReadyBusy <= | rACG_ReadyBusy;
-    end
+//    always @ (posedge iSystemClock) begin
+//        rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
+//        rWay_ReadyBusy <= | rACG_ReadyBusy;
+//    end
 
     assign oStart             = wStart             ;
     assign oLastStep          = rLastStep          ;

@@ -159,7 +159,7 @@ module NFC_Physical_Top
     (
         .iSystemClock       (iSystemClock               ),
         .iDelayRefClock     (iDelayRefClock             ),
-        
+        .iOutputDrivingClock(iOutputDrivingClock             ),
         .iModuleReset       (iACG_PHY_PinIn_Reset                  ),
         .iBufferReset       (iACG_PHY_PinIn_BUFF_Reset             ),
         

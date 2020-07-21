@@ -121,7 +121,7 @@ module NFC_Atom_Dataoutput_Sync
     // FSM: Atom_Command_Sync
     
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rDOS_cur_state <= DOS_RESET;
         end else begin
@@ -162,7 +162,7 @@ module NFC_Atom_Dataoutput_Sync
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rReady              <= 1'b0;
             rLastStep           <= 1'b0;

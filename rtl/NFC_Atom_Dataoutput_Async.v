@@ -38,7 +38,7 @@ module NFC_Atom_Dataoutput_Async
     input   [NumberOfWays - 1:0]    iTargetWay              ;
     input   [15:0]                  iNumOfData              ;
 
-    input   [31:0]                  iWriteData              ;
+    input   [15:0]                  iWriteData              ;
     input                           iWriteLast              ;
     input                           iWriteValid             ;
     output                          oWriteReady             ;
@@ -116,7 +116,7 @@ module NFC_Atom_Dataoutput_Async
     // FSM: Atom_Command_Sync
     
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rDOA_cur_state <= DOA_RESET;
         end else begin
@@ -160,7 +160,7 @@ module NFC_Atom_Dataoutput_Async
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rReady              <= 1'b0;
             rLastStep           <= 1'b0;
