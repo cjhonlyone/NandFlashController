@@ -157,7 +157,7 @@ module NFC_Command_Reset
     assign wACSDone  = iACG_LastStep[3];
 
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rST_cur_state <= rST_RESET;
         end else begin
@@ -195,7 +195,7 @@ module NFC_Command_Reset
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
@@ -303,7 +303,7 @@ module NFC_Command_Reset
         end
     end
 
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
         rWay_ReadyBusy <= | rACG_ReadyBusy;
     end

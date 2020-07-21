@@ -131,7 +131,7 @@ localparam tWPST_timer = 3;
     // FSM: Atom_Command_Sync
     
     // update current state to next state
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rDIS_cur_state <= DIS_RESET;
         end else begin
@@ -169,7 +169,7 @@ localparam tWPST_timer = 3;
     end
 
     // state behaviour
-    always @ (posedge iSystemClock, posedge iReset) begin
+    always @ (posedge iSystemClock) begin
         if (iReset) begin
             rReady              <= 1'b0;
             rLastStep           <= 1'b0;
@@ -377,22 +377,22 @@ localparam tWPST_timer = 3;
     end
 
 	// Parameters
-	parameter DEPTH = 4320;
-	parameter DATA_WIDTH = 16;
-	parameter KEEP_ENABLE = (DATA_WIDTH>8);
-	parameter KEEP_WIDTH = (DATA_WIDTH/8);
-	parameter LAST_ENABLE = 1;
-	parameter ID_ENABLE = 1;
-	parameter ID_WIDTH = 8;
-	parameter DEST_ENABLE = 1;
-	parameter DEST_WIDTH = 8;
-	parameter USER_ENABLE = 1;
-	parameter USER_WIDTH = 1;
-	parameter FRAME_FIFO = 0;
-	parameter USER_BAD_FRAME_VALUE = 1'b1;
-	parameter USER_BAD_FRAME_MASK = 1'b1;
-	parameter DROP_BAD_FRAME = 0;
-	parameter DROP_WHEN_FULL = 0;
+	localparam DEPTH = 4320;
+    localparam DATA_WIDTH = 16;
+    localparam KEEP_ENABLE = (DATA_WIDTH>8);
+    localparam KEEP_WIDTH = (DATA_WIDTH/8);
+    localparam LAST_ENABLE = 1;
+    localparam ID_ENABLE = 1;
+    localparam ID_WIDTH = 8;
+    localparam DEST_ENABLE = 1;
+    localparam DEST_WIDTH = 8;
+    localparam USER_ENABLE = 1;
+    localparam USER_WIDTH = 1;
+    localparam FRAME_FIFO = 0;
+    localparam USER_BAD_FRAME_VALUE = 1'b1;
+    localparam USER_BAD_FRAME_MASK = 1'b1;
+    localparam DROP_BAD_FRAME = 0;
+    localparam DROP_WHEN_FULL = 0;
 
 
     axis_fifo #(
