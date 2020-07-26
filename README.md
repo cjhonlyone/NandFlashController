@@ -4,7 +4,17 @@
 - Code idea from Cosmos-plus-OpenSSD
 - DDR mode
 
-### NFC Interface
+# Table of Contents
+
+- [NFC RAW Interface](#NFC-RAW-Interface)
+- [AXI Interface](#AXI-Interface)
+- [Modules and Files ](#Modules-and-Files)
+- [How to Use](#How-to-Use)
+- [Building IP and simulation](#Building-IP-and-simulation)
+
+### NFC RAW Interface
+
+------
 
 #### Configure Interface
 
@@ -59,7 +69,96 @@
     input   [NumberOfWays - 1:0]   I_NAND_RB               ;
     output                         O_NAND_WP               ;
 ```
+
+### AXI Interface
+
+------
+
+#### AXI-lite for Configuration
+
+```verilog
+    /*
+    * AXI-lite slave interface
+    */
+    input  wire [ADDR_WIDTH-1:0]      s_axil_awaddr      ,
+    input  wire [2:0]                 s_axil_awprot      ,
+    input  wire                       s_axil_awvalid     ,
+    output wire                       s_axil_awready     ,
+    input  wire [DATA_WIDTH-1:0]      s_axil_wdata       ,
+    input  wire [STRB_WIDTH-1:0]      s_axil_wstrb       ,
+    input  wire                       s_axil_wvalid      ,
+    output wire                       s_axil_wready      ,
+    output wire [1:0]                 s_axil_bresp       ,
+    output wire                       s_axil_bvalid      ,
+    input  wire                       s_axil_bready      ,
+    input  wire [ADDR_WIDTH-1:0]      s_axil_araddr      ,
+    input  wire [2:0]                 s_axil_arprot      ,
+    input  wire                       s_axil_arvalid     ,
+    output wire                       s_axil_arready     ,
+    output wire [DATA_WIDTH-1:0]      s_axil_rdata       ,
+    output wire [1:0]                 s_axil_rresp       ,
+    output wire                       s_axil_rvalid      ,
+    input  wire                       s_axil_rready      ,
+```
+
+| Configuration Offset | Register Name | Description |
+| :----: |: ---- :| :---- :|
+| 0x00 | rCommand      |{targetID, opcode}|
+| 0x04 | rAddress      |Way/Col/Row/Features |
+| 0x08 | rLength       |Data length, 8 Bytes Alignment|
+| 0x0C | rDMARAddress  |Data Address ,flash read from DDR|
+| 0x10 | rDMAWAddress  |Data Address ,flash write to DDR|
+| 0x14 | rFeature      |Features for Nand|
+| 0x18 | rCommandFail  |Last Command status, last bit high valid|
+| 0x1C | rNFCStatus    |[15:8]Nand Flash Status, [7:0]NFC status|
+| 0x20 | rNandRBStatus |[7:0] Nand R/B Status|
+
+#### AXI for Data Transform
+
+```verilog
+    /*
+    * AXI master interface
+    */
+    output wire [AXI_ID_WIDTH-1:0]    m_axi_awid         ,
+    output wire [AXI_ADDR_WIDTH-1:0]  m_axi_awaddr       ,
+    output wire [7:0]                 m_axi_awlen        ,
+    output wire [2:0]                 m_axi_awsize       ,
+    output wire [1:0]                 m_axi_awburst      ,
+    output wire                       m_axi_awlock       ,
+    output wire [3:0]                 m_axi_awcache      ,
+    output wire [2:0]                 m_axi_awprot       ,
+    output wire                       m_axi_awvalid      ,
+    input  wire                       m_axi_awready      ,
+    output wire [AXI_DATA_WIDTH-1:0]  m_axi_wdata        ,
+    output wire [AXI_STRB_WIDTH-1:0]  m_axi_wstrb        ,
+    output wire                       m_axi_wlast        ,
+    output wire                       m_axi_wvalid       ,
+    input  wire                       m_axi_wready       ,
+    input  wire [AXI_ID_WIDTH-1:0]    m_axi_bid          ,
+    input  wire [1:0]                 m_axi_bresp        ,
+    input  wire                       m_axi_bvalid       ,
+    output wire                       m_axi_bready       ,
+    output wire [AXI_ID_WIDTH-1:0]    m_axi_arid         ,
+    output wire [AXI_ADDR_WIDTH-1:0]  m_axi_araddr       ,
+    output wire [7:0]                 m_axi_arlen        ,
+    output wire [2:0]                 m_axi_arsize       ,
+    output wire [1:0]                 m_axi_arburst      ,
+    output wire                       m_axi_arlock       ,
+    output wire [3:0]                 m_axi_arcache      ,
+    output wire [2:0]                 m_axi_arprot       ,
+    output wire                       m_axi_arvalid      ,
+    input  wire                       m_axi_arready      ,
+    input  wire [AXI_ID_WIDTH-1:0]    m_axi_rid          ,
+    input  wire [AXI_DATA_WIDTH-1:0]  m_axi_rdata        ,
+    input  wire [1:0]                 m_axi_rresp        ,
+    input  wire                       m_axi_rlast        ,
+    input  wire                       m_axi_rvalid       ,
+    output wire                       m_axi_rready       ,
+```
+
 ### Modules and Files 
+
+------
 
 | Module/Files                   | Description                                                           |
 | ------------------------ | --------------------------------------------------------------------- |
@@ -70,6 +169,8 @@
 | `NFC_Phy*`            | Pinpad |
 
 ### How to Use
+
+------
 
 #### Select Way
 
@@ -138,3 +239,12 @@ Get the current Feature.
 - targetID : 5'b00000 Read Status normal(70h)
 - targetID : 5'b00001 Read Status Enhanced(78h)
 
+### Building IP and simulation
+
+------
+
+- need modelsim 10.6d / Vivado Simualtor
+
+```bash
+make prj
+```

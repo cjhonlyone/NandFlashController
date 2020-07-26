@@ -1,6 +1,16 @@
 `timescale 1ps / 1ps
 module tb_NandFlashController_Top_AXI;
 
+`define rCommand 32'd0
+`define rAddress 32'd4
+`define rLength  32'd8
+`define rDMARAddress 32'd12
+`define rDMAWAddress 32'd16
+`define rFeature 32'd20
+
+`define rCommandFail 32'd24
+`define rNFCStatus 32'd28
+`define rNandRBStatus 32'd32
     /*
     * AXI-lite slave interface
     */
@@ -386,8 +396,8 @@ module tb_NandFlashController_Top_AXI;
         input [7:0] way;
         begin
         global_way = way;
-		AXIL32_OUT(32'd4, way);
-		AXIL32_OUT(32'd0, {11'd0, 5'b00000, 10'd0, 6'b100000});
+		AXIL32_OUT(`rAddress, way);
+		AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b100000});
         end
     endtask
 
@@ -395,8 +405,8 @@ module tb_NandFlashController_Top_AXI;
         input [15:0] col;
         begin
         global_col = col;
-		AXIL32_OUT(32'd4, {16'd0,col});
-		AXIL32_OUT(32'd0, {11'd0, 5'b00000, 10'd0, 6'b100010});
+		AXIL32_OUT(`rAddress, {16'd0,col});
+		AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b100010});
         end
     endtask
 
@@ -404,16 +414,16 @@ module tb_NandFlashController_Top_AXI;
         input [23:0] row;
         begin
         global_row = row;
-		AXIL32_OUT(32'd4, {8'd0,row});
-		AXIL32_OUT(32'd0, {11'd0, 5'b00000, 10'd0, 6'b100100});
+		AXIL32_OUT(`rAddress, {8'd0,row});
+		AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b100100});
         end
     endtask
 
     task set_feature;
         input [31:0] feature;
         begin
-		AXIL32_OUT(32'd4, feature);
-		AXIL32_OUT(32'd0, {11'd0, 5'b00000, 10'd0, 6'b101000});
+		AXIL32_OUT(`rAddress, feature);
+		AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b101000});
         end
     endtask
 
@@ -421,15 +431,15 @@ module tb_NandFlashController_Top_AXI;
 
     task reset_ffh;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00101, 10'd0, 6'b000001});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00101, 10'd0, 6'b000001});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -437,15 +447,15 @@ module tb_NandFlashController_Top_AXI;
 
     task setfeature_efh;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00101, 10'd0, 6'b000010});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00101, 10'd0, 6'b000010});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -453,15 +463,15 @@ module tb_NandFlashController_Top_AXI;
 
     task getfeature_eeh;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00101, 10'd0, 6'b000101});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00101, 10'd0, 6'b000101});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -470,17 +480,17 @@ module tb_NandFlashController_Top_AXI;
     task progpage_80h_10h;
     	input [15:0] number;
         begin
-        AXIL32_OUT(32'd8, {16'd0, number});
-        // AXIL32_OUT(32'd12, 0); //DMA addr
-        AXIL32_OUT(32'd0, {11'd0, 5'b00000, 10'd0, 6'b000011});
-        // AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rLength, {16'd0, number});
+        // AXIL32_OUT(`rDMARAddress, 0); //DMA addr
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b000011});
+        // AXIL32_IN(`rNFCStatus, status);
         // @(posedge s_axil_clk);
         // while(status[0] == 0) begin
-	       //  AXIL32_IN(32'd28, status);
+	       //  AXIL32_IN(`rNFCStatus, status);
 	       //  @(posedge s_axil_clk);
 	       //  end
         // while(status[0] == 1) begin
-	       //  AXIL32_IN(32'd28, status);
+	       //  AXIL32_IN(`rNFCStatus, status);
 	       //  @(posedge s_axil_clk);
 	       //  end
         end
@@ -489,17 +499,17 @@ module tb_NandFlashController_Top_AXI;
     task progpage_80h_15h_cache;
     	input [15:0] number;
         begin
-        AXIL32_OUT(32'd8, {16'd0, number});
-        // AXIL32_OUT(32'd12, 0); //DMA addr
-        AXIL32_OUT(32'd0, {11'd0, 5'b00001, 10'd0, 6'b000011});
-        // AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rLength, {16'd0, number});
+        // AXIL32_OUT(`rDMARAddress, 0); //DMA addr
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00001, 10'd0, 6'b000011});
+        // AXIL32_IN(`rNFCStatus, status);
         // @(posedge s_axil_clk);
         // while(status[0] == 0) begin
-	       //  AXIL32_IN(32'd28, status);
+	       //  AXIL32_IN(`rNFCStatus, status);
 	       //  @(posedge s_axil_clk);
 	       //  end
         // while(status[0] == 1) begin
-	       //  AXIL32_IN(32'd28, status);
+	       //  AXIL32_IN(`rNFCStatus, status);
 	       //  @(posedge s_axil_clk);
 	       //  end
         end
@@ -508,17 +518,17 @@ module tb_NandFlashController_Top_AXI;
     task progpage_80h_10h_multplane;
     	input [15:0] number;
         begin
-        AXIL32_OUT(32'd8, {16'd0, number});
-        // AXIL32_OUT(32'd12, 0); //DMA addr
-        AXIL32_OUT(32'd0, {11'd0, 5'b00010, 10'd0, 6'b000011});
-        // AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rLength, {16'd0, number});
+        // AXIL32_OUT(`rDMARAddress, 0); //DMA addr
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00010, 10'd0, 6'b000011});
+        // AXIL32_IN(`rNFCStatus, status);
         // @(posedge s_axil_clk);
         // while(status[0] == 0) begin
-	       //  AXIL32_IN(32'd28, status);
+	       //  AXIL32_IN(`rNFCStatus, status);
 	       //  @(posedge s_axil_clk);
 	       //  end
         // while(status[0] == 1) begin
-	       //  AXIL32_IN(32'd28, status);
+	       //  AXIL32_IN(`rNFCStatus, status);
 	       //  @(posedge s_axil_clk);
 	       //  end
         end
@@ -530,18 +540,18 @@ module tb_NandFlashController_Top_AXI;
     	integer base_adr;
         begin
         base_adr = global_row[7]*6 + global_row[2:0];
-        AXIL32_OUT(32'd8, {16'd0, number});
-        AXIL32_OUT(32'd16, base_adr*4320+12*4320); //DMA addr
-        AXIL32_OUT(32'd0, {11'd0, 5'b00101, 10'd0, 6'b000100});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rLength, {16'd0, number});
+        AXIL32_OUT(`rDMAWAddress, base_adr*4320+12*4320); //DMA addr
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00101, 10'd0, 6'b000100});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
 
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -549,15 +559,15 @@ module tb_NandFlashController_Top_AXI;
 
     task eraseblock_60h_d0h;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00000, 10'd0, 6'b000110});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b000110});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -565,15 +575,15 @@ module tb_NandFlashController_Top_AXI;
 
     task eraseblock_60h_d1h_multiplane;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00010, 10'd0, 6'b000110});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00010, 10'd0, 6'b000110});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -581,15 +591,15 @@ module tb_NandFlashController_Top_AXI;
 
     task readstatus_70h;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00100, 10'd0, 6'b000111});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00100, 10'd0, 6'b000111});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -597,15 +607,15 @@ module tb_NandFlashController_Top_AXI;
 
     task readstatus_78h;
         begin
-        AXIL32_OUT(32'd0, {11'd0, 5'b00101, 10'd0, 6'b000111});
-        AXIL32_IN(32'd28, status);
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00101, 10'd0, 6'b000111});
+        AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         while(status[0] == 1) begin
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
         end
@@ -632,44 +642,44 @@ module tb_NandFlashController_Top_AXI;
             // plane0 page0
             set_rowaddr({{5'd0},{block},page});
             readstatus_70h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
             while (RDY == 0) begin
                 readstatus_70h;
-                AXIL32_IN(32'd28, status);
+                AXIL32_IN(`rNFCStatus, status);
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(32'd12, base_adr*4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*4320);
             progpage_80h_10h_multplane(16'd4320);
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        while(status[0] == 0) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 	        while(status[0] == 1) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 
             // plane1 page0
             set_rowaddr({{5'd0},{rblock},page});
             readstatus_78h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
             while (RDY == 0) begin
                 readstatus_78h;
-                AXIL32_IN(32'd28, status);
+                AXIL32_IN(`rNFCStatus, status);
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(32'd12, base_adr*4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*4320);
             progpage_80h_15h_cache(16'd4320);
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        while(status[0] == 0) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 	        while(status[0] == 1) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 
@@ -677,48 +687,48 @@ module tb_NandFlashController_Top_AXI;
             
             set_rowaddr({{5'd0},{block},{rpage}});
             readstatus_78h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
             while (RDY == 0) begin
                 readstatus_78h;
-                AXIL32_IN(32'd28, status);
+                AXIL32_IN(`rNFCStatus, status);
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(32'd12, base_adr*4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*4320);
             progpage_80h_10h_multplane(16'd4320);
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        while(status[0] == 0) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 	        while(status[0] == 1) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 
             // plane1 page1 cache
             set_rowaddr({{5'd0},{rblock},{rpage}});
             readstatus_78h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
             while (RDY == 0) begin
                 readstatus_78h;
-                AXIL32_IN(32'd28, status);
+                AXIL32_IN(`rNFCStatus, status);
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(32'd12, base_adr*4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*4320);
             if (finished)
                 progpage_80h_10h(16'd4320);
             else
                 progpage_80h_15h_cache(16'd4320);
 
-	        AXIL32_IN(32'd28, status);
+	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        while(status[0] == 0) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
 	        while(status[0] == 1) begin
-		        AXIL32_IN(32'd28, status);
+		        AXIL32_IN(`rNFCStatus, status);
 		        @(posedge s_axil_clk);
 		        end
         end
@@ -762,7 +772,7 @@ module tb_NandFlashController_Top_AXI;
 
         while (ARDY == 0) begin
             readstatus_70h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
@@ -811,18 +821,18 @@ module tb_NandFlashController_Top_AXI;
         eraseblock_60h_d1h_multiplane;
         set_rowaddr({{5'd0},{11'd1},{7'd0}});
         readstatus_78h;
-        AXIL32_IN(32'd28, status);
+        AXIL32_IN(`rNFCStatus, status);
         while (ARDY == 0) begin
             readstatus_78h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
         end
 
         eraseblock_60h_d0h;
         readstatus_78h;
-        AXIL32_IN(32'd28, status);
+        AXIL32_IN(`rNFCStatus, status);
         while (ARDY == 0) begin
             readstatus_78h;
-            AXIL32_IN(32'd28, status);
+            AXIL32_IN(`rNFCStatus, status);
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
