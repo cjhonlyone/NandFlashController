@@ -3,6 +3,7 @@
 - ONFI 2.1
 - Code idea from Cosmos-plus-OpenSSD
 - DDR mode
+- DMA Transfer
 
 # Table of Contents
 
@@ -102,16 +103,16 @@
 ```
 
 | Configuration Offset | Register Name | Description |
-| :----: |: ---- :| :---- :|
-| 0x00 | rCommand      |{targetID, opcode}|
-| 0x04 | rAddress      |Way/Col/Row/Features |
-| 0x08 | rLength       |Data length, 8 Bytes Alignment|
-| 0x0C | rDMARAddress  |Data Address ,flash read from DDR|
-| 0x10 | rDMAWAddress  |Data Address ,flash write to DDR|
-| 0x14 | rFeature      |Features for Nand|
-| 0x18 | rCommandFail  |Last Command status, last bit high valid|
-| 0x1C | rNFCStatus    |[15:8]Nand Flash Status, [7:0]NFC status|
-| 0x20 | rNandRBStatus |[7:0] Nand R/B Status|
+| :----: | ---- | ---- |
+| 0x00 | rCommand      | {targetID, opcode} |
+| 0x04 | rAddress      | Way/Col/Row/Features |
+| 0x08 | rLength       | Data length, 8 Bytes Alignment |
+| 0x0C | rDMARAddress  | Data Address ,flash read from DDR |
+| 0x10 | rDMAWAddress  | Data Address ,flash write to DDR |
+| 0x14 | rFeature      | Features for Nand |
+| 0x18 | rCommandFail  | Last Command status, last bit high valid |
+| 0x1C | rNFCStatus    | [15:8]Nand Flash Status, [7:0]NFC status |
+| 0x20 | rNandRBStatus | [7:0] Nand R/B Status |
 
 #### AXI for Data Transform
 
