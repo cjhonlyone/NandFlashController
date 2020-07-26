@@ -25,6 +25,8 @@ module NFC_Command_ReadPage
     oStart                   ,
     oLastStep                ,
 
+    oTransValid               ,
+
     // iWriteData               ,  
     // iWriteLast               ,  
     // iWriteValid              ,  
@@ -79,6 +81,7 @@ module NFC_Command_ReadPage
     output                          oStart               ;
     output                          oLastStep            ;
 
+    output                          oTransValid           ;
     // input   [15:0]                  iWriteData           ;
     // input                           iWriteLast           ;
     // input                           iWriteValid          ;
@@ -123,7 +126,7 @@ module NFC_Command_ReadPage
     // reg  [NumberOfWays - 1:0]     rReadyBusy     
     reg   [15:0]                  rColAddress          ;
     reg   [23:0]                  rRowAddress          ;
-    
+    reg                           rTransValid           ;
     reg   [7:0]                   rACG_Command       ;      
     reg   [2:0]                   rACG_CommandOption ;      
     reg   [NumberOfWays - 1:0]    rACG_TargetWay     ;      
@@ -230,9 +233,10 @@ module NFC_Command_ReadPage
         if (iReset) begin
             rCMDReady          <= 1;
             rLastStep          <= 0;
-			rLength            <= 16'd0;
+            rLength            <= 16'd0;
             rColAddress        <= 0;
             rRowAddress        <= 0;
+            rTransValid         <= 0;
 
             rACG_Command       <= 8'b0000_0000;
             rACG_CommandOption <= 3'b000;
@@ -245,9 +249,10 @@ module NFC_Command_ReadPage
                 rST_RESET: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
-					rLength            <= 16'd0;
+                    rLength            <= 16'd0;
                     rColAddress        <= 0;
                     rRowAddress        <= 0;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -259,9 +264,10 @@ module NFC_Command_ReadPage
                 rST_READY: begin
                     rCMDReady          <= 1;
                     rLastStep          <= 0;
-					rLength            <= 16'd0;
+                    rLength            <= 16'd0;
                     rColAddress        <= 0;
                     rRowAddress        <= 0;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -276,6 +282,7 @@ module NFC_Command_ReadPage
                     rLength            <= iLength  ;
                     rColAddress        <= iColAddress;
                     rRowAddress        <= iRowAddress;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -287,9 +294,10 @@ module NFC_Command_ReadPage
                 rST_CMDIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rLength            <= rLength  ;
+                    rLength            <= rLength  ;
                     rColAddress        <= rColAddress;
                     rRowAddress        <= rRowAddress;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -301,9 +309,10 @@ module NFC_Command_ReadPage
                 rST_ADDRIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rLength            <= rLength ;
+                    rLength            <= rLength ;
                     rColAddress        <= rColAddress;
                     rRowAddress        <= rRowAddress;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -315,9 +324,10 @@ module NFC_Command_ReadPage
                 rST_CMD2Issue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= 0;
-					rLength            <= rLength ;
+                    rLength            <= rLength ;
                     rColAddress        <= rColAddress;
                     rRowAddress        <= rRowAddress;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_1000;
                     rACG_CommandOption <= 3'b000;
@@ -332,6 +342,7 @@ module NFC_Command_ReadPage
                     rLength            <= rLength ;
                     rColAddress        <= rColAddress;
                     rRowAddress        <= rRowAddress;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -346,6 +357,7 @@ module NFC_Command_ReadPage
                     rLength            <= rLength ;
                     rColAddress        <= rColAddress;
                     rRowAddress        <= rRowAddress;
+                    rTransValid         <= rWay_ReadyBusy;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -357,9 +369,10 @@ module NFC_Command_ReadPage
                 rST_DATAIssue: begin
                     rCMDReady          <= 0;
                     rLastStep          <= wDISDone ? 1 : 0;
-					rLength            <= rLength ;
+                    rLength            <= rLength ;
                     rColAddress        <= rColAddress;
                     rRowAddress        <= rRowAddress;
+                    rTransValid         <= rST_cur_state[8];
 
                     rACG_Command       <= wDISDone ? 8'b0000_0000 : 8'b0000_0010;
                     rACG_CommandOption <= 3'b000;
@@ -376,6 +389,7 @@ module NFC_Command_ReadPage
                     rLength            <= 0;
                     rColAddress        <= 0;
                     rRowAddress        <= 0;
+                    rTransValid         <= 0;
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
@@ -396,6 +410,7 @@ module NFC_Command_ReadPage
     assign oStart             = wStart             ;
     assign oLastStep          = rLastStep          ;
 
+    assign oTransValid         = rTransValid         ;
     assign oCMDReady          = rCMDReady          ;
     assign oACG_Command       = rACG_Command       ;
     assign oACG_CommandOption = rACG_CommandOption ;
