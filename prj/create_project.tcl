@@ -23,22 +23,33 @@ add_files -fileset sources_1 ../rtl/NFC_Command_ReadStatus.v
 add_files -fileset sources_1 ../rtl/NFC_Command_Reset.v
 add_files -fileset sources_1 ../rtl/NFC_Command_SetFeature.v
 add_files -fileset sources_1 ../rtl/NandFlashController_Top.v
+add_files -fileset sources_1 ../rtl/NandFlashController_Top_AXI.v
+add_files -fileset sources_1 ../rtl/NandFlashController_Interface_adapter.v
+add_files -fileset sources_1 ../rtl/NandFlashController_AXIL_Reg.v
 add_files -fileset sim_1 ../tb/tb_NFC_Atom_Command_Generator_Top.v
 add_files -fileset sim_1 ../tb/tb_NFC_Physical_Top.v
 add_files -fileset sim_1 ../tb/tb_NFC_Command_Issue_Top.v
 add_files -fileset sim_1 ../tb/tb_NandFlashController_Top.v
-add_files -fileset sim_1 ../tb/nandmodel/nand_defines.vh
-add_files -fileset sim_1 ../tb/nandmodel/nand_parameters.vh
-add_files -fileset sim_1 ../tb/nandmodel/subtest.vh
-add_files -fileset sim_1 ../tb/nandmodel/nand_die_model.v
-add_files -fileset sim_1 ../tb/nandmodel/nand_model.v
-add_files -fileset sim_1 ../tb/nandmodel/tb.v
+add_files -fileset sim_1 ../tb/tb_NandFlashController_Top_AXI.v
+add_files -fileset sim_1 ../tb/m73a_nand_model/nand_defines.vh
+add_files -fileset sim_1 ../tb/m73a_nand_model/nand_parameters.vh
+add_files -fileset sim_1 ../tb/m73a_nand_model/subtest.vh
+add_files -fileset sim_1 ../tb/m73a_nand_model/nand_die_model.v
+add_files -fileset sim_1 ../tb/m73a_nand_model/nand_model.v
+add_files -fileset sim_1 ../tb/m73a_nand_model/tb.v
 add_files -fileset sources_1 ../lib/axis/rtl/axis_fifo.v
-set_property top NandFlashController_Top [get_filesets sources_1]
-set_property top tb_NandFlashController_Top [get_filesets sim_1]
+add_files -fileset sources_1 ../lib/verilog-axi/rtl/axi_dma.v
+add_files -fileset sources_1 ../lib/verilog-axi/rtl/axi_dma_rd.v
+add_files -fileset sources_1 ../lib/verilog-axi/rtl/axi_dma_wr.v
+add_files -fileset sources_1 ../lib/verilog-axi/rtl/axi_ram.v
+add_files -fileset sources_1 ../lib/axis/rtl/axis_async_fifo.v
+add_files -fileset sources_1 ../lib/axis/rtl/axis_async_fifo_adapter.v
+add_files -fileset sources_1 ../lib/axis/rtl/axis_adapter.v
+add_files -fileset sources_1 ../lib/axis/rtl/axis_fifo.v
+set_property top NandFlashController_Top_AXI [get_filesets sources_1]
+set_property top tb_NandFlashController_Top_AXI [get_filesets sim_1]
 update_compile_order -fileset sources_1
 update_compile_order -fileset sim_1
 set_property target_simulator ModelSim [current_project]
 set_property -name {modelsim.simulate.log_all_signals} -value {true} -objects [get_filesets sim_1]
 set_property -name {modelsim.simulate.runtime} -value {10us} -objects [get_filesets sim_1]
-exit

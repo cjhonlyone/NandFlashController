@@ -22,6 +22,8 @@ module NFC_Command_SetFeature
     
     oStart            ,
     oLastStep         ,
+
+    iFeature          ,
     
     // iWriteData     ,  
     // iWriteLast     ,  
@@ -74,7 +76,7 @@ module NFC_Command_SetFeature
     input   [NumberOfWays - 1:0]    iWaySelect           ;
     output                          oStart               ;
     output                          oLastStep            ;
-
+    input   [31:0]                  iFeature             ;
     // input   [31:0]                  iWriteData           ;
     // input                           iWriteLast           ;
     // input                           iWriteValid          ;
@@ -336,24 +338,24 @@ module NFC_Command_SetFeature
             rACG_WriteData  <= 0;
             rACG_WriteLast  <= 0;
             rACG_WriteValid <= 1;
-            rfeatures          <= 32'h14_00_00_00;
+            // rfeatures          <= 32'h14_00_00_00;
         end else begin
         	rACG_WriteValid <= 1;
         	case ({iACG_WriteReady,rACG_WriteLast})
         	2'b00: begin
-	            rACG_WriteData  <= rfeatures[31:16];
+	            rACG_WriteData  <= iFeature[31:16];
 	            rACG_WriteLast  <= 0;
         	end
         	2'b01: begin
-	            rACG_WriteData  <= rfeatures[15:0];
+	            rACG_WriteData  <= iFeature[15:0];
 	            rACG_WriteLast  <= 1;
         	end
         	2'b10: begin
-	            rACG_WriteData  <= rfeatures[15:0];
+	            rACG_WriteData  <= iFeature[15:0];
 	            rACG_WriteLast  <= 1;
         	end
         	2'b11: begin
-	            rACG_WriteData  <= rfeatures[31:16];
+	            rACG_WriteData  <= iFeature[31:16];
 	            rACG_WriteLast  <= 0;
         	end
         	endcase

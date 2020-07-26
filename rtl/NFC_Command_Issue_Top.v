@@ -23,11 +23,15 @@ module NFC_Command_Issue_Top
     iTop_CI_WriteKeep        ,  
     oCI_Top_WriteReady       ,  
 
+    oCI_Top_WriteTransValid   ,
+
     oCI_Top_ReadData         ,  
     oCI_Top_ReadLast         ,  
     oCI_Top_ReadValid        ,  
     oCI_Top_ReadKeep         ,  
     iTop_CI_ReadReady        , 
+
+    oCI_Top_ReadTransValid   ,
 
     oCI_Top_ReadyBusy        ,  
 
@@ -75,11 +79,15 @@ module NFC_Command_Issue_Top
     input   [1:0]                   iTop_CI_WriteKeep     ;
     output                          oCI_Top_WriteReady    ;
     
+    output                          oCI_Top_WriteTransValid;
+
     output  [15:0]                  oCI_Top_ReadData      ;
     output                          oCI_Top_ReadLast      ;
     output                          oCI_Top_ReadValid     ;
     output  [1:0]                   oCI_Top_ReadKeep      ;
     input                           iTop_CI_ReadReady     ;
+
+    output                          oCI_Top_ReadTransValid;
     
     output  [NumberOfWays - 1:0]    oCI_Top_ReadyBusy     ;
 
@@ -174,7 +182,8 @@ module NFC_Command_Issue_Top
     wire  [23:0]                  wProg_RowAddress        ;
     wire                          wProg_Start             ;
     wire                          wProg_LastStep          ;
-    
+    wire                          wProg_TransValid        ;
+
     wire   [7:0]                  wACG_Prog_Command       ;
     wire   [2:0]                  wACG_Prog_CommandOption ;
     wire   [7:0]                  wACG_Prog_Ready         ;
@@ -195,6 +204,7 @@ module NFC_Command_Issue_Top
     wire  [23:0]                  wRead_RowAddress        ;
     wire                          wRead_Start             ;
     wire                          wRead_LastStep          ;
+    wire                          wRead_TransValid        ;
     
     wire   [7:0]                  wACG_Read_Command       ;
     wire   [2:0]                  wACG_Read_CommandOption ;
@@ -271,7 +281,8 @@ module NFC_Command_Issue_Top
     reg     [7:0]                 rTargetWay1B            ;
     reg     [15:0]                rColAddr2B              ;
     reg     [23:0]                rRowAddr3B              ;
-    
+    reg     [31:0]                rFeature4B              ;
+
     wire   [15:0]                 wFifo_WriteData         ;
     wire                          wFifo_WriteLast         ;
     wire                          wFifo_WriteValid        ;
@@ -344,6 +355,7 @@ module NFC_Command_Issue_Top
     assign wTGC_waySELECT       = (iTop_CI_Opcode[5:0] == 6'b100000) & (iTop_CI_CMDValid);
     assign wTGC_colADDR         = (iTop_CI_Opcode[5:0] == 6'b100010) & (iTop_CI_CMDValid);
     assign wTGC_rowADDR         = (iTop_CI_Opcode[5:0] == 6'b100100) & (iTop_CI_CMDValid);
+    assign wTGC_feature         = (iTop_CI_Opcode[5:0] == 6'b101000) & (iTop_CI_CMDValid);
 
     assign wRead_ColAddress     = rColAddr2B;
     assign wRead_RowAddress     = rRowAddr3B;
@@ -363,26 +375,36 @@ module NFC_Command_Issue_Top
     
     always @ (posedge iSystemClock, posedge iReset) begin
         if (iReset) begin
-            rTargetWay1B[7:0]   <= 0;
-            rColAddr2B[15:0]    <= 0;
-            rRowAddr3B[23:0]    <= 0;
+            rTargetWay1B[7:0] <= 0;
+            rColAddr2B[15:0]  <= 0;
+            rRowAddr3B[23:0]  <= 0;
+            rFeature4B[31:0]  <= 0;
         end else begin
             if (wTGC_waySELECT) begin
-                rTargetWay1B[7:0]   <= iTop_CI_Address[7:0];
-                rColAddr2B[15:0]    <= rColAddr2B[15:0];
-                rRowAddr3B[23:0]    <= rRowAddr3B[23:0];
+                rTargetWay1B[7:0] <= iTop_CI_Address[7:0];
+                rColAddr2B[15:0]  <= rColAddr2B[15:0];
+                rRowAddr3B[23:0]  <= rRowAddr3B[23:0];
+                rFeature4B[31:0]  <= rFeature4B[31:0];
             end else if (wTGC_colADDR) begin
-                rTargetWay1B[7:0]   <= rTargetWay1B[7:0];
-                rColAddr2B[15:0]    <= iTop_CI_Address[15:0];
-                rRowAddr3B[23:0]    <= rRowAddr3B[23:0];
+                rTargetWay1B[7:0] <= rTargetWay1B[7:0];
+                rColAddr2B[15:0]  <= iTop_CI_Address[15:0];
+                rRowAddr3B[23:0]  <= rRowAddr3B[23:0];
+                rFeature4B[31:0]  <= rFeature4B[31:0];
             end else if (wTGC_rowADDR) begin
-                rTargetWay1B[7:0]   <= rTargetWay1B[7:0];
-                rColAddr2B[15:0]    <= rColAddr2B[15:0];
-                rRowAddr3B[23:0]    <= iTop_CI_Address[23:0];
+                rTargetWay1B[7:0] <= rTargetWay1B[7:0];
+                rColAddr2B[15:0]  <= rColAddr2B[15:0];
+                rRowAddr3B[23:0]  <= iTop_CI_Address[23:0];
+                rFeature4B[31:0]  <= rFeature4B[31:0];
+            end else if (wTGC_feature) begin
+                rTargetWay1B[7:0] <= rTargetWay1B[7:0];
+                rColAddr2B[15:0]  <= rColAddr2B[15:0];
+                rRowAddr3B[23:0]  <= rRowAddr3B[23:0];
+                rFeature4B[31:0]  <= iTop_CI_Address[31:0];
             end else begin
-                rTargetWay1B[7:0]   <= rTargetWay1B[7:0];
-                rColAddr2B[15:0]    <= rColAddr2B[15:0];
-                rRowAddr3B[23:0]    <= rRowAddr3B[23:0];
+                rTargetWay1B[7:0] <= rTargetWay1B[7:0];
+                rColAddr2B[15:0]  <= rColAddr2B[15:0];
+                rRowAddr3B[23:0]  <= rRowAddr3B[23:0];
+                rFeature4B[31:0]  <= rFeature4B[31:0];
             end
         end
     end
@@ -457,6 +479,7 @@ module NFC_Command_Issue_Top
             .iWaySelect         (wSTF_WaySelect),
             .oStart             (wSTF_Start),
             .oLastStep          (wSTF_LastStep),
+            .iFeature           (rFeature4B),
 
             .oACG_Command       (wACG_STF_Command),
             .oACG_CommandOption (wACG_STF_CommandOption),
@@ -493,7 +516,8 @@ module NFC_Command_Issue_Top
             .iRowAddress        (wProg_RowAddress),
             .oStart             (wProg_Start),
             .oLastStep          (wProg_LastStep),
-
+            .oTransValid        (wProg_TransValid),
+            
             .oACG_Command       (wACG_Prog_Command),
             .oACG_CommandOption (wACG_Prog_CommandOption),
             .iACG_Ready         (wACG_Prog_Ready),
@@ -524,6 +548,8 @@ module NFC_Command_Issue_Top
             .iRowAddress        (wRead_RowAddress),
             .oStart             (wRead_Start),
             .oLastStep          (wRead_LastStep),
+
+            .oTransValid        (wRead_TransValid),
 
             .oACG_Command       (wACG_Read_Command),
             .oACG_CommandOption (wACG_Read_CommandOption),
@@ -817,4 +843,7 @@ module NFC_Command_Issue_Top
 
     assign oCI_Top_Status      = wRS_Status     ; 
     assign oCI_Top_StatusValid = wRS_StatusValid; 
+
+    assign oCI_Top_ReadTransValid  = wRead_TransValid;
+    assign oCI_Top_WriteTransValid = wProg_TransValid;
 endmodule

@@ -80,7 +80,8 @@ module tb_NandFlashController_Top;
     wire                          oReadLast            ;
     wire                          oReadValid           ;
     wire   [1:0]                  oReadKeep            ;
-    reg                           iReadReady           ;
+    wire                          iReadReady           ;
+    wire                          oReadTransValid      ;
 
     wire  [NumberOfWays - 1:0]    oReadyBusy           ;
 
@@ -127,6 +128,7 @@ module tb_NandFlashController_Top;
             .oReadValid          (oReadValid),
             .oReadKeep           (oReadKeep),
             .iReadReady          (iReadReady),
+            .oReadTransValid     (oReadTransValid),
 
             .oReadyBusy          (oReadyBusy),
 
@@ -173,6 +175,272 @@ module tb_NandFlashController_Top;
         //.Wp2_n()
         );  
 
+    // Parameters
+    parameter AXI_DATA_WIDTH    = 16;
+    parameter AXI_ADDR_WIDTH    = 16;
+    parameter AXI_STRB_WIDTH    = (AXI_DATA_WIDTH/8);
+    parameter AXI_ID_WIDTH      = 8;
+    parameter AXI_MAX_BURST_LEN = 256;
+    parameter AXIS_DATA_WIDTH   = AXI_DATA_WIDTH;
+    parameter AXIS_KEEP_ENABLE  = (AXIS_DATA_WIDTH>8);
+    parameter AXIS_KEEP_WIDTH   = (AXIS_DATA_WIDTH/8);
+    parameter AXIS_LAST_ENABLE  = 1;
+    parameter AXIS_ID_ENABLE    = 1;
+    parameter AXIS_ID_WIDTH     = 8;
+    parameter AXIS_DEST_ENABLE  = 0;
+    parameter AXIS_DEST_WIDTH   = 8;
+    parameter AXIS_USER_ENABLE  = 1;
+    parameter AXIS_USER_WIDTH   = 1;
+    parameter LEN_WIDTH         = 20;
+    parameter TAG_WIDTH         = 8;
+    parameter ENABLE_SG         = 0;
+    parameter ENABLE_UNALIGNED  = 0;
+    // Inputs
+    wire                       clk                      = iSystemClock   ;
+    wire                       rst                      = iReset         ;
+    
+    reg [AXI_ADDR_WIDTH-1:0]   s_axis_read_desc_addr    = 0              ;
+    reg [LEN_WIDTH-1:0]        s_axis_read_desc_len     = 4320           ;
+    reg [TAG_WIDTH-1:0]        s_axis_read_desc_tag     = 0              ;
+    reg [AXIS_ID_WIDTH-1:0]    s_axis_read_desc_id      = 0              ;
+    reg [AXIS_DEST_WIDTH-1:0]  s_axis_read_desc_dest    = 0              ;
+    reg [AXIS_USER_WIDTH-1:0]  s_axis_read_desc_user    = 0              ;
+    reg                        s_axis_read_desc_valid   = 0              ;
+    wire                       m_axis_read_data_tready  = 1              ;
+    
+    wire [AXI_ADDR_WIDTH-1:0]  s_axis_write_desc_addr   = 0              ;
+    wire [LEN_WIDTH-1:0]       s_axis_write_desc_len    = 4320           ;
+    wire [TAG_WIDTH-1:0]       s_axis_write_desc_tag    = 0              ;
+    wire                       s_axis_write_desc_valid  = oReadTransValid;
+    
+    
+    wire [AXIS_DATA_WIDTH-1:0] s_axis_write_data_tdata  = oReadData      ;
+    wire [AXIS_KEEP_WIDTH-1:0] s_axis_write_data_tkeep  = oReadKeep      ;
+    wire                       s_axis_write_data_tvalid = oReadValid     ;
+    wire                       s_axis_write_data_tlast  = oReadLast      ;
+    wire [AXIS_ID_WIDTH-1:0]   s_axis_write_data_tid    = 0              ;
+    wire [AXIS_DEST_WIDTH-1:0] s_axis_write_data_tdest  = 0              ;
+    wire [AXIS_USER_WIDTH-1:0] s_axis_write_data_tuser  = 0              ;
+    
+    wire                       m_axi_awready            ;//= 0              ;
+    wire                       m_axi_wready             ;//= 0              ;
+    wire [AXI_ID_WIDTH-1:0]    m_axi_bid                ;//= 0              ;
+    wire [1:0]                 m_axi_bresp              ;//= 0              ;
+    wire                       m_axi_bvalid             ;//= 0              ;
+    wire                       m_axi_arready            ;//= 0              ;
+    wire [AXI_ID_WIDTH-1:0]    m_axi_rid                ;//= 0              ;
+    wire [AXI_DATA_WIDTH-1:0]  m_axi_rdata              ;//= 0              ;
+    wire [1:0]                 m_axi_rresp              ;//= 0              ;
+    wire                       m_axi_rlast              ;//= 0              ;
+    wire                       m_axi_rvalid             ;//= 0              ;
+    
+    wire                       read_enable              = 1              ;
+    wire                       write_enable             = 1              ;
+    wire                       write_abort              = 0              ;
+    
+    // Outputs
+    wire                       s_axis_read_desc_ready                    ;
+    wire [TAG_WIDTH-1:0]       m_axis_read_desc_status_tag               ;
+    wire                       m_axis_read_desc_status_valid             ;
+    wire [AXIS_DATA_WIDTH-1:0] m_axis_read_data_tdata                    ;
+    wire [AXIS_KEEP_WIDTH-1:0] m_axis_read_data_tkeep                    ;
+    wire                       m_axis_read_data_tvalid                   ;
+    wire                       m_axis_read_data_tlast                    ;
+    wire [AXIS_ID_WIDTH-1:0]   m_axis_read_data_tid                      ;
+    wire [AXIS_DEST_WIDTH-1:0] m_axis_read_data_tdest                    ;
+    wire [AXIS_USER_WIDTH-1:0] m_axis_read_data_tuser                    ;
+    wire                       s_axis_write_desc_ready                   ;
+    wire [LEN_WIDTH-1:0]       m_axis_write_desc_status_len              ;
+    wire [TAG_WIDTH-1:0]       m_axis_write_desc_status_tag              ;
+    wire [AXIS_ID_WIDTH-1:0]   m_axis_write_desc_status_id               ;
+    wire [AXIS_DEST_WIDTH-1:0] m_axis_write_desc_status_dest             ;
+    wire [AXIS_USER_WIDTH-1:0] m_axis_write_desc_status_user             ;
+    wire                       m_axis_write_desc_status_valid            ;
+    wire                       s_axis_write_data_tready                  ;
+
+    assign                     iReadReady = s_axis_write_data_tready;
+
+    wire [AXI_ID_WIDTH-1:0]    m_axi_awid                                ;
+    wire [AXI_ADDR_WIDTH-1:0]  m_axi_awaddr                              ;
+    wire [7:0]                 m_axi_awlen                               ;
+    wire [2:0]                 m_axi_awsize                              ;
+    wire [1:0]                 m_axi_awburst                             ;
+    wire                       m_axi_awlock                              ;
+    wire [3:0]                 m_axi_awcache                             ;
+    wire [2:0]                 m_axi_awprot                              ;
+    wire                       m_axi_awvalid                             ;
+    wire [AXI_DATA_WIDTH-1:0]  m_axi_wdata                               ;
+    wire [AXI_STRB_WIDTH-1:0]  m_axi_wstrb                               ;
+    wire                       m_axi_wlast                               ;
+    wire                       m_axi_wvalid                              ;
+    wire                       m_axi_bready                              ;
+    wire [AXI_ID_WIDTH-1:0]    m_axi_arid                                ;
+    wire [AXI_ADDR_WIDTH-1:0]  m_axi_araddr                              ;
+    wire [7:0]                 m_axi_arlen                               ;
+    wire [2:0]                 m_axi_arsize                              ;
+    wire [1:0]                 m_axi_arburst                             ;
+    wire                       m_axi_arlock                              ;
+    wire [3:0]                 m_axi_arcache                             ;
+    wire [2:0]                 m_axi_arprot                              ;
+    wire                       m_axi_arvalid                             ;
+    wire                       m_axi_rready                              ;
+    axi_dma #(
+        .AXI_DATA_WIDTH    (AXI_DATA_WIDTH    ),
+        .AXI_ADDR_WIDTH    (AXI_ADDR_WIDTH    ),
+        .AXI_STRB_WIDTH    (AXI_STRB_WIDTH    ),
+        .AXI_ID_WIDTH      (AXI_ID_WIDTH      ),
+        .AXI_MAX_BURST_LEN (AXI_MAX_BURST_LEN ),
+        .AXIS_DATA_WIDTH   (AXIS_DATA_WIDTH   ),
+        .AXIS_KEEP_ENABLE  (AXIS_KEEP_ENABLE  ),
+        .AXIS_KEEP_WIDTH   (AXIS_KEEP_WIDTH   ),
+        .AXIS_LAST_ENABLE  (AXIS_LAST_ENABLE  ),
+        .AXIS_ID_ENABLE    (AXIS_ID_ENABLE    ),
+        .AXIS_ID_WIDTH     (AXIS_ID_WIDTH     ),
+        .AXIS_DEST_ENABLE  (AXIS_DEST_ENABLE  ),
+        .AXIS_DEST_WIDTH   (AXIS_DEST_WIDTH   ),
+        .AXIS_USER_ENABLE  (AXIS_USER_ENABLE  ),
+        .AXIS_USER_WIDTH   (AXIS_USER_WIDTH   ),
+        .LEN_WIDTH         (LEN_WIDTH         ),
+        .TAG_WIDTH         (TAG_WIDTH         ),
+        .ENABLE_SG         (ENABLE_SG         ),
+        .ENABLE_UNALIGNED  (ENABLE_UNALIGNED  )
+    )
+    axi_dma (
+        .clk                            (clk                            ),
+        .rst                            (rst                            ),
+        .s_axis_read_desc_addr          (s_axis_read_desc_addr          ),
+        .s_axis_read_desc_len           (s_axis_read_desc_len           ),
+        .s_axis_read_desc_tag           (s_axis_read_desc_tag           ),
+        .s_axis_read_desc_id            (s_axis_read_desc_id            ),
+        .s_axis_read_desc_dest          (s_axis_read_desc_dest          ),
+        .s_axis_read_desc_user          (s_axis_read_desc_user          ),
+        .s_axis_read_desc_valid         (s_axis_read_desc_valid         ),
+        .s_axis_read_desc_ready         (s_axis_read_desc_ready         ),
+        .m_axis_read_desc_status_tag    (m_axis_read_desc_status_tag    ),
+        .m_axis_read_desc_status_valid  (m_axis_read_desc_status_valid  ),
+        
+        .m_axis_read_data_tdata         (m_axis_read_data_tdata         ),
+        .m_axis_read_data_tkeep         (m_axis_read_data_tkeep         ),
+        .m_axis_read_data_tvalid        (m_axis_read_data_tvalid        ),
+        .m_axis_read_data_tready        (m_axis_read_data_tready        ),
+        .m_axis_read_data_tlast         (m_axis_read_data_tlast         ),
+        .m_axis_read_data_tid           (m_axis_read_data_tid           ),
+        .m_axis_read_data_tdest         (m_axis_read_data_tdest         ),
+        .m_axis_read_data_tuser         (m_axis_read_data_tuser         ),
+        
+        .s_axis_write_desc_addr         (s_axis_write_desc_addr         ),
+        .s_axis_write_desc_len          (s_axis_write_desc_len          ),
+        .s_axis_write_desc_tag          (s_axis_write_desc_tag          ),
+        .s_axis_write_desc_valid        (s_axis_write_desc_valid        ),
+        .s_axis_write_desc_ready        (s_axis_write_desc_ready        ),
+        .m_axis_write_desc_status_len   (m_axis_write_desc_status_len   ),
+        .m_axis_write_desc_status_tag   (m_axis_write_desc_status_tag   ),
+        .m_axis_write_desc_status_id    (m_axis_write_desc_status_id    ),
+        .m_axis_write_desc_status_dest  (m_axis_write_desc_status_dest  ),
+        .m_axis_write_desc_status_user  (m_axis_write_desc_status_user  ),
+        .m_axis_write_desc_status_valid (m_axis_write_desc_status_valid ),
+        
+        .s_axis_write_data_tdata        (s_axis_write_data_tdata        ),
+        .s_axis_write_data_tkeep        (s_axis_write_data_tkeep        ),
+        .s_axis_write_data_tvalid       (s_axis_write_data_tvalid       ),
+        .s_axis_write_data_tready       (s_axis_write_data_tready       ),
+        .s_axis_write_data_tlast        (s_axis_write_data_tlast        ),
+        .s_axis_write_data_tid          (s_axis_write_data_tid          ),
+        .s_axis_write_data_tdest        (s_axis_write_data_tdest        ),
+        .s_axis_write_data_tuser        (s_axis_write_data_tuser        ),
+
+        .m_axi_awid    (m_axi_awid    ),
+        .m_axi_awaddr  (m_axi_awaddr  ),
+        .m_axi_awlen   (m_axi_awlen   ),
+        .m_axi_awsize  (m_axi_awsize  ),
+        .m_axi_awburst (m_axi_awburst ),
+        .m_axi_awlock  (m_axi_awlock  ),
+        .m_axi_awcache (m_axi_awcache ),
+        .m_axi_awprot  (m_axi_awprot  ),
+        .m_axi_awvalid (m_axi_awvalid ),
+        .m_axi_awready (m_axi_awready ),
+        .m_axi_wdata   (m_axi_wdata   ),
+        .m_axi_wstrb   (m_axi_wstrb   ),
+        .m_axi_wlast   (m_axi_wlast   ),
+        .m_axi_wvalid  (m_axi_wvalid  ),
+        .m_axi_wready  (m_axi_wready  ),
+        .m_axi_bid     (m_axi_bid     ),
+        .m_axi_bresp   (m_axi_bresp   ),
+        .m_axi_bvalid  (m_axi_bvalid  ),
+        .m_axi_bready  (m_axi_bready  ),
+        .m_axi_arid    (m_axi_arid    ),
+        .m_axi_araddr  (m_axi_araddr  ),
+        .m_axi_arlen   (m_axi_arlen   ),
+        .m_axi_arsize  (m_axi_arsize  ),
+        .m_axi_arburst (m_axi_arburst ),
+        .m_axi_arlock  (m_axi_arlock  ),
+        .m_axi_arcache (m_axi_arcache ),
+        .m_axi_arprot  (m_axi_arprot  ),
+        .m_axi_arvalid (m_axi_arvalid ),
+        .m_axi_arready (m_axi_arready ),
+        .m_axi_rid     (m_axi_rid     ),
+        .m_axi_rdata   (m_axi_rdata   ),
+        .m_axi_rresp   (m_axi_rresp   ),
+        .m_axi_rlast   (m_axi_rlast   ),
+        .m_axi_rvalid  (m_axi_rvalid  ),
+        .m_axi_rready  (m_axi_rready  ),
+        .read_enable   (read_enable   ),
+        .write_enable  (write_enable  ),
+        .write_abort   (write_abort   )
+    );
+
+    parameter DATA_WIDTH = 16;
+    parameter ADDR_WIDTH = 16;
+    parameter STRB_WIDTH = (DATA_WIDTH/8);
+    parameter ID_WIDTH = 8;
+    parameter PIPELINE_OUTPUT = 0;
+
+    axi_ram #(
+        .DATA_WIDTH      (DATA_WIDTH      ),
+        .ADDR_WIDTH      (ADDR_WIDTH      ),
+        .STRB_WIDTH      (STRB_WIDTH      ),
+        .ID_WIDTH        (ID_WIDTH        ),
+        .PIPELINE_OUTPUT (PIPELINE_OUTPUT )
+    )
+    axi_ram (
+        .clk           (clk           ),
+        .rst           (rst           ),
+        .s_axi_awid    (m_axi_awid    ),
+        .s_axi_awaddr  (m_axi_awaddr  ),
+        .s_axi_awlen   (m_axi_awlen   ),
+        .s_axi_awsize  (m_axi_awsize  ),
+        .s_axi_awburst (m_axi_awburst ),
+        .s_axi_awlock  (m_axi_awlock  ),
+        .s_axi_awcache (m_axi_awcache ),
+        .s_axi_awprot  (m_axi_awprot  ),
+        .s_axi_awvalid (m_axi_awvalid ),
+        .s_axi_awready (m_axi_awready ),
+        .s_axi_wdata   (m_axi_wdata   ),
+        .s_axi_wstrb   (m_axi_wstrb   ),
+        .s_axi_wlast   (m_axi_wlast   ),
+        .s_axi_wvalid  (m_axi_wvalid  ),
+        .s_axi_wready  (m_axi_wready  ),
+        .s_axi_bid     (m_axi_bid     ),
+        .s_axi_bresp   (m_axi_bresp   ),
+        .s_axi_bvalid  (m_axi_bvalid  ),
+        .s_axi_bready  (m_axi_bready  ),
+        .s_axi_arid    (m_axi_arid    ),
+        .s_axi_araddr  (m_axi_araddr  ),
+        .s_axi_arlen   (m_axi_arlen   ),
+        .s_axi_arsize  (m_axi_arsize  ),
+        .s_axi_arburst (m_axi_arburst ),
+        .s_axi_arlock  (m_axi_arlock  ),
+        .s_axi_arcache (m_axi_arcache ),
+        .s_axi_arprot  (m_axi_arprot  ),
+        .s_axi_arvalid (m_axi_arvalid ),
+        .s_axi_arready (m_axi_arready ),
+        .s_axi_rid     (m_axi_rid     ),
+        .s_axi_rdata   (m_axi_rdata   ),
+        .s_axi_rresp   (m_axi_rresp   ),
+        .s_axi_rlast   (m_axi_rlast   ),
+        .s_axi_rvalid  (m_axi_rvalid  ),
+        .s_axi_rready  (m_axi_rready  )
+    );
 
     reg [7:0]  global_way;
     reg [15:0] global_col;
@@ -211,7 +479,7 @@ module tb_NandFlashController_Top;
                 iWriteData  <= rWriteData ;
                 iWriteLast  <= rWriteLast ;
                 iWriteValid <= rWriteValid;
-                iReadReady  <= 1 ;      
+                // iReadReady  <= 1 ;      
         end
     endtask
 
@@ -251,8 +519,8 @@ module tb_NandFlashController_Top;
         begin
         NFC_signal(6'b000011, 5'b00000, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000011, 5'b00000, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
-        @(posedge iSystemClock);
-        wait(oCMDReady == 0);
+        // @(posedge iSystemClock);
+        // wait(oCMDReady == 0);
         end
     endtask
 
@@ -261,8 +529,8 @@ module tb_NandFlashController_Top;
         begin
         NFC_signal(6'b000011, 5'b00001, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000011, 5'b00001, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
-        @(posedge iSystemClock);
-        wait(oCMDReady == 0);
+        // @(posedge iSystemClock);
+        // wait(oCMDReady == 0);
         end
     endtask
 
@@ -271,36 +539,59 @@ module tb_NandFlashController_Top;
         begin
         NFC_signal(6'b000011, 5'b00010, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000011, 5'b00010, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
-        @(posedge iSystemClock);
-        wait(oCMDReady == 0);
+        // @(posedge iSystemClock);
+        // wait(oCMDReady == 0);
         end
     endtask
-
+        reg [15:0] reg1 = 0;
+        reg [15:0] reg2 = 0;
     task readpage_00h_30h;
         input [15:0] number;
         input check;
         integer m;
         integer base_adr;
+
         begin
         NFC_signal(6'b000100, 5'b00101, 0, 32'h00000000,   number, 1, 16'h0000, 0, 0, 0);
         NFC_signal(6'b000100, 5'b00101, 0, 32'h00000000, 16'h0000, 0, 16'h0000, 0, 0, 0);
+
+
+        wait(m_axis_write_desc_status_valid == 1);
+        @(posedge iSystemClock);
+        s_axis_read_desc_valid <= 1;
+        @(posedge iSystemClock);
+        s_axis_read_desc_valid <= 0;
+        @(posedge iSystemClock);
+
+
+        // wait(m_axis_read_desc_status_valid == 1);
+        // @(posedge iSystemClock);
+
+        
 
         if (check) begin
             m = 0;
             base_adr = global_row[7]*6 + global_row[2:0];
             @(posedge iSystemClock);
-            wait(oReadValid == 1);
-            while (oReadValid & (~ oReadLast)) begin
+            wait((m_axis_read_data_tvalid & m_axis_read_data_tready) == 1);
+            while ((~ m_axis_read_data_tlast)) begin
                 @(posedge iSystemClock);
-                if (memory[base_adr*2160 + m] != oReadData) begin
-                    $display("Error Read data wrong %d %d %04x %04x",base_adr,m,memory[base_adr*2160 + m],oReadData);
-                    $stop;
+                reg1 <= memory[base_adr*2160 + m];
+                reg2 <= m_axis_read_data_tdata;
+
+                if ((m_axis_read_data_tvalid & m_axis_read_data_tready) == 1) begin
+                    m <= m + 1;
+                    if (memory[base_adr*2160 + m] != m_axis_read_data_tdata) begin
+                        $display("Error Read data wrong %d %d %04x %04x",base_adr,m,memory[base_adr*2160 + m],oReadData);
+                        $stop;
+                    end
+                end else begin
+                    m <= m;
                 end
-                m <= m + 1;
             end 
         end else begin
-            @(posedge iSystemClock);
-            wait(oCMDReady == 0);
+            // @(posedge iSystemClock);
+            // wait(oCMDReady == 0);
         end
 
         end
@@ -437,45 +728,55 @@ module tb_NandFlashController_Top;
         begin
             rblock <= block + 1'b1;
             rpage <= page + 1'b1;
+
             // plane0 page0
-            s_axis_input({{5'd0},{block},{page}}, 16'd4320);
             set_rowaddr({{5'd0},{block},page});
             readstatus_70h;
             while (RDY == 0) begin
                 readstatus_70h;
             end
             progpage_80h_10h_multplane(16'd4320);
+            s_axis_input({{5'd0},{block},{page}}, 16'd4320);
+            @(posedge iSystemClock);
+            wait(oCMDReady == 0);
 
             // plane1 page0
-            s_axis_input({{5'd0},{rblock},{page}}, 16'd4320);
             set_rowaddr({{5'd0},{rblock},page});
             readstatus_78h;
             while (RDY == 0) begin
                 readstatus_78h;
             end
             progpage_80h_15h_cache(16'd4320);
+            s_axis_input({{5'd0},{rblock},{page}}, 16'd4320);
+            @(posedge iSystemClock);
+            wait(oCMDReady == 0);
 
             // plane0 page1 cache
-            s_axis_input({{5'd0},{block},{rpage}}, 16'd4320);
+            
             set_rowaddr({{5'd0},{block},{rpage}});
             readstatus_78h;
             while (RDY == 0) begin
                 readstatus_78h;
             end
             progpage_80h_10h_multplane(16'd4320);
+            s_axis_input({{5'd0},{block},{rpage}}, 16'd4320);
+            @(posedge iSystemClock);
+            wait(oCMDReady == 0);
 
             // plane1 page1 cache
-            s_axis_input({{5'd0},{rblock},{rpage}}, 16'd4320);
             set_rowaddr({{5'd0},{rblock},{rpage}});
             readstatus_78h;
             while (RDY == 0) begin
                 readstatus_78h;
             end
+            s_axis_input({{5'd0},{rblock},{rpage}}, 16'd4320);
             if (finished)
                 progpage_80h_10h(16'd4320);
             else
                 progpage_80h_15h_cache(16'd4320);
 
+            @(posedge iSystemClock);
+            wait(oCMDReady == 0);
         end
     endtask
 
@@ -496,7 +797,7 @@ module tb_NandFlashController_Top;
         select_way(8'd1);
         reset_ffh;
         setfeature_efh;
-        getfeature_eeh;
+        // getfeature_eeh;
 
         program_multiplane_cache(11'd0, 7'd0, 0);
         program_multiplane_cache(11'd0, 7'd2, 0);
