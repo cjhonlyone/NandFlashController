@@ -131,104 +131,76 @@ module NFC_Physical_Output
     end
 
     genvar c, d;
-    // ila_0 ila0(
-    // .clk(iSystemClock),
-    // .probe0(iPO_DQStrobe[3:0]),
-    // .probe1(iPO_DQ[15:0])
-    // );
-    OSERDESE2
-    #
-    (
-        .DATA_RATE_OQ   ("DDR"      ),
-        //.DATA_RATE_TQ   ("SDR"      ),
-        .DATA_RATE_TQ   ("BUF"      ),
-        .DATA_WIDTH     (4          ),
-        .INIT_OQ        (1'b0       ),
-        .INIT_TQ        (1'b1       ),
-        .SERDES_MODE    ("MASTER"   ),
-        .SRVAL_OQ       (1'b0       ),
-        .SRVAL_TQ       (1'b1       ),
-        .TRISTATE_WIDTH (1          )
+    ODDR
+    #(
+        .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+        .INIT           (1'b0),
+        .SRTYPE         ("ASYNC")
     )
-    Inst_DQSOSERDES
+    Inst_DQSODDR
     (
-        .OFB        (                       ),
-        .OQ         (oDQSToNAND             ),
-        .SHIFTOUT1  (                       ),
-        .SHIFTOUT2  (                       ),
-        .TBYTEOUT   (                       ),
-        .TFB        (                       ),
-        .TQ         (oDQSOutEnableToPinpad  ), // to pinpad
+        .D1             (iPO_DQStrobe[0]),
+        .D2             (iPO_DQStrobe[1]),
+        .C              (iSystemClock),
+        .CE             (1),
+        .Q              (oDQSToNAND),
+        .R              (iModuleReset),
+        .S              (1'b0)
+    );
 
-        .CLK        (iOutputDrivingClock    ),
-        .CLKDIV     (iSystemClock           ),
-        .D1         (iPO_DQStrobe[0]        ),
-        .D2         (iPO_DQStrobe[1]        ),
-        .D3         (iPO_DQStrobe[2]        ),
-        .D4         (iPO_DQStrobe[3]        ),
-        .D5         (iPO_DQStrobe[4]        ),
-        .D6         (iPO_DQStrobe[5]        ),
-        .D7         (iPO_DQStrobe[6]        ),
-        .D8         (iPO_DQStrobe[7]        ),
-        .OCE        (1'b1                   ),
-        .RST        (iModuleReset           ),
-        .SHIFTIN1   (0                      ),
-        .SHIFTIN2   (0                      ),
-        .T1         (rDQSOut_IOBUF_T        ), // from P.M.
-        .T2         (0                      ),
-        .T3         (0                      ),
-        .T4         (0                      ),
-        .TBYTEIN    (0                      ),
-        .TCE        (1'b1                   )
+    ODDR
+    #(
+        .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+        .INIT           (1'b0),
+        .SRTYPE         ("ASYNC")
+    )
+    Inst_DQSTODDR
+    (
+        .D1             (rDQSOut_IOBUF_T),
+        .D2             (rDQSOut_IOBUF_T),
+        .C              (iSystemClock),
+        .CE             (1),
+        .Q              (oDQSOutEnableToPinpad),
+        .R              (iModuleReset),
+        .S              (1'b0)
     );
 
     generate
     for (c = 0; c < 8; c = c + 1)
     begin : DQOSERDESBits
-        OSERDESE2
-        #
-        (
-            .DATA_RATE_OQ   ("DDR"      ),
-            //.DATA_RATE_TQ   ("SDR"      ),
-            .DATA_RATE_TQ   ("BUF"      ),
-            .DATA_WIDTH     (4          ),
-            .INIT_OQ        (1'b0       ),
-            .INIT_TQ        (1'b1       ),
-            .SERDES_MODE    ("MASTER"   ),
-            .SRVAL_OQ       (1'b0       ),
-            .SRVAL_TQ       (1'b1       ),
-            .TRISTATE_WIDTH (1          )
-        )
-        Inst_DQOSERDES
-        (
-            .OFB        (                   ),
-            .OQ         (oDQToNAND[c]       ),
-            .SHIFTOUT1  (                   ),
-            .SHIFTOUT2  (                   ),
-            .TBYTEOUT   (                   ),
-            .TFB        (                   ),
-            .TQ         (oDQOutEnableToPinpad[c]), // to pinpad
 
-            .CLK        (iOutputDrivingClock),
-            .CLKDIV     (iSystemClock       ),
-            .D1         (iPO_DQ[ 0 + c]     ),
-            .D2         (iPO_DQ[ 8 + c]     ),
-            .D3         (iPO_DQ[16 + c]     ),
-            .D4         (iPO_DQ[24 + c]     ),
-            .D5         (iPO_DQ[16 + c]     ),
-            .D6         (iPO_DQ[16 + c]     ),
-            .D7         (iPO_DQ[24 + c]     ),
-            .D8         (iPO_DQ[24 + c]     ),
-            .OCE        (1'b1               ),
-            .RST        (iModuleReset       ),
-            .SHIFTIN1   (0                  ),
-            .SHIFTIN2   (0                  ),
-            .T1         (rDQOut_IOBUF_T     ), // from P.M.
-            .T2         (0                  ),
-            .T3         (0                  ),
-            .T4         (0                  ),
-            .TBYTEIN    (0                  ),
-            .TCE        (1'b1               )
+        ODDR
+        #(
+            .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+            .INIT           (1'b0),
+            .SRTYPE         ("ASYNC")
+        )
+        Inst_DQODDR
+        (
+            .D1             (iPO_DQ[ 0 + c]),
+            .D2             (iPO_DQ[16 + c]),
+            .C              (iSystemClock),
+            .CE             (1),
+            .Q              (oDQToNAND[c]),
+            .R              (iModuleReset),
+            .S              (1'b0)
+        );
+
+        ODDR
+        #(
+            .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+            .INIT           (1'b0),
+            .SRTYPE         ("ASYNC")
+        )
+        Inst_DQTODDR
+        (
+            .D1             (rDQOut_IOBUF_T),
+            .D2             (rDQOut_IOBUF_T),
+            .C              (iSystemClock),
+            .CE             (1),
+            .Q              (oDQOutEnableToPinpad[c]),
+            .R              (iModuleReset),
+            .S              (1'b0)
         );
     end
     endgenerate
@@ -236,272 +208,92 @@ module NFC_Physical_Output
     generate
     for (d = 0; d < NumberOfWays; d = d + 1)
     begin : CEOSERDESBits
-        OSERDESE2
-        #
-        (
-            .DATA_RATE_OQ   ("DDR"      ),
-            //.DATA_RATE_TQ   ("SDR"      ),
-            .DATA_RATE_TQ   ("BUF"      ),
-            .DATA_WIDTH     (4          ),
-            .INIT_OQ        (1'b1       ),
-            //.INIT_OQ        (1'b0       ),
-            .INIT_TQ        (1'b0       ),
-            .SERDES_MODE    ("MASTER"   ),
-            .SRVAL_OQ       (1'b1       ),
-            //.SRVAL_OQ       (1'b0       ),
-            .SRVAL_TQ       (1'b0       ),
-            .TRISTATE_WIDTH (1          ),
-            
-            
-            .IS_D1_INVERTED (1'b1       ),
-            .IS_D2_INVERTED (1'b1       ),
-            .IS_D3_INVERTED (1'b1       ),
-            .IS_D4_INVERTED (1'b1       ),
-            .IS_D5_INVERTED (1'b1       ),
-            .IS_D6_INVERTED (1'b1       ),
-            .IS_D7_INVERTED (1'b1       ),
-            .IS_D8_INVERTED (1'b1       )
+        ODDR
+        #(
+            .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+            .INIT           (1'b0),
+            .SRTYPE         ("ASYNC")
         )
-        Inst_CEOSERDES
+        Inst_CEODDR
         (
-            .OFB        (                       ),
-            .OQ         (oCEToNAND[d]           ),
-            .SHIFTOUT1  (                       ),
-            .SHIFTOUT2  (                       ),
-            .TBYTEOUT   (                       ),
-            .TFB        (                       ),
-            .TQ         (                       ),
-
-            .CLK        (iOutputDrivingClock    ),
-            .CLKDIV     (iSystemClock           ),
-            .D1         (iPO_ChipEnable[0 + d]  ),
-            .D2         (iPO_ChipEnable[0 + d]  ),
-            .D3         (iPO_ChipEnable[0 + d]  ),
-            .D4         (iPO_ChipEnable[0 + d]  ),
-            .D5         (iPO_ChipEnable[NumberOfWays + d]),
-            .D6         (iPO_ChipEnable[NumberOfWays + d]),
-            .D7         (iPO_ChipEnable[NumberOfWays + d]),
-            .D8         (iPO_ChipEnable[NumberOfWays + d]),
-            .OCE        (1'b1                   ),
-            .RST        (iModuleReset           ),
-            .SHIFTIN1   (0                      ),
-            .SHIFTIN2   (0                      ),
-            .T1         (1'b0                   ),
-            .T2         (0                      ),
-            .T3         (0                      ),
-            .T4         (0                      ),
-            .TBYTEIN    (0                      ),
-            .TCE        (1'b1                   )
+            .D1             (iPO_ChipEnable[0 + d]),
+            .D2             (iPO_ChipEnable[0 + d]),
+            .C              (iSystemClock),
+            .CE             (1),
+            .Q              (oCEToNAND[d]),
+            .R              (iModuleReset),
+            .S              (1'b0)
         );
     end
     endgenerate
-    
-    OSERDESE2
-    #
-    (
-        .DATA_RATE_OQ   ("DDR"      ),
-        //.DATA_RATE_TQ   ("SDR"      ),
-        .DATA_RATE_TQ   ("BUF"      ),
-        .DATA_WIDTH     (4          ),
-        .INIT_OQ        (1'b1       ),
-        //.INIT_OQ        (1'b0       ),
-        .INIT_TQ        (1'b0       ),
-        .SERDES_MODE    ("MASTER"   ),
-        .SRVAL_OQ       (1'b1       ),
-        //.SRVAL_OQ       (1'b0       ),
-        .SRVAL_TQ       (1'b0       ),
-        .TRISTATE_WIDTH (1          )
-        
-        /* // single-ended
-        .IS_D1_INVERTED (1'b1       ),
-        .IS_D2_INVERTED (1'b1       ),
-        .IS_D3_INVERTED (1'b1       ),
-        .IS_D4_INVERTED (1'b1       ),
-        .IS_D5_INVERTED (1'b1       ),
-        .IS_D6_INVERTED (1'b1       ),
-        .IS_D7_INVERTED (1'b1       ),
-        .IS_D8_INVERTED (1'b1       )
-        */
-    )
-    Inst_REOSERDES
-    (
-        .OFB        (                       ),
-        .OQ         (oREToNAND              ),
-        .SHIFTOUT1  (                       ),
-        .SHIFTOUT2  (                       ),
-        .TBYTEOUT   (                       ),
-        .TFB        (                       ),
-        .TQ         (                       ),
 
-        .CLK        (iOutputDrivingClock    ),
-        .CLKDIV     (iSystemClock           ),
-        .D1         (iPO_ReadEnable[0]      ),
-        .D2         (iPO_ReadEnable[0]      ),
-        .D3         (iPO_ReadEnable[1]      ),
-        .D4         (iPO_ReadEnable[1]      ),
-        .D5         (iPO_ReadEnable[2]      ),
-        .D6         (iPO_ReadEnable[2]      ),
-        .D7         (iPO_ReadEnable[3]      ),
-        .D8         (iPO_ReadEnable[3]      ),
-        .OCE        (1'b1                   ),
-        .RST        (iModuleReset           ),
-        .SHIFTIN1   (0                      ),
-        .SHIFTIN2   (0                      ),
-        .T1         (1'b0                   ),
-        .T2         (0                      ),
-        .T3         (0                      ),
-        .T4         (0                      ),
-        .TBYTEIN    (0                      ),
-        .TCE        (1'b1                   )
-    );
-    
-    OSERDESE2
-    #
-    (
-        .DATA_RATE_OQ   ("DDR"      ),
-        //.DATA_RATE_TQ   ("SDR"      ),
-        .DATA_RATE_TQ   ("BUF"      ),
-        .DATA_WIDTH     (4          ),
-        .INIT_OQ        (1'b1       ),
-        //.INIT_OQ        (1'b0       ),
-        .INIT_TQ        (1'b0       ),
-        .SERDES_MODE    ("MASTER"   ),
-        .SRVAL_OQ       (1'b1       ),
-        //.SRVAL_OQ       (1'b0       ),
-        .SRVAL_TQ       (1'b0       ),
-        .TRISTATE_WIDTH (1          ),
-        
-        .IS_D1_INVERTED (1'b1       ),
-        .IS_D2_INVERTED (1'b1       ),
-        .IS_D3_INVERTED (1'b1       ),
-        .IS_D4_INVERTED (1'b1       ),
-        .IS_D5_INVERTED (1'b1       ),
-        .IS_D6_INVERTED (1'b1       ),
-        .IS_D7_INVERTED (1'b1       ),
-        .IS_D8_INVERTED (1'b1       )
+    ODDR
+    #(
+        .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+        .INIT           (1'b0),
+        .SRTYPE         ("ASYNC")
     )
-    Inst_WEOSERDES
+    Inst_REODDR
     (
-        .OFB        (                       ),
-        .OQ         (oWEToNAND              ),
-        .SHIFTOUT1  (                       ),
-        .SHIFTOUT2  (                       ),
-        .TBYTEOUT   (                       ),
-        .TFB        (                       ),
-        .TQ         (                       ),
-
-        .CLK        (iOutputDrivingClock    ),
-        .CLKDIV     (iSystemClock           ),
-        .D1         (iPO_WriteEnable[0]     ),
-        .D2         (iPO_WriteEnable[0]     ),
-        .D3         (iPO_WriteEnable[1]     ),
-        .D4         (iPO_WriteEnable[1]     ),
-        .D5         (iPO_WriteEnable[2]     ),
-        .D6         (iPO_WriteEnable[2]     ),
-        .D7         (iPO_WriteEnable[3]     ),
-        .D8         (iPO_WriteEnable[3]     ),
-        .OCE        (1'b1                   ),
-        .RST        (iModuleReset           ),
-        .SHIFTIN1   (0                      ),
-        .SHIFTIN2   (0                      ),
-        .T1         (1'b0                   ),
-        .T2         (0                      ),
-        .T3         (0                      ),
-        .T4         (0                      ),
-        .TBYTEIN    (0                      ),
-        .TCE        (1'b1                   )
-    );
-    
-    OSERDESE2
-    #
-    (
-        .DATA_RATE_OQ   ("DDR"      ),
-        //.DATA_RATE_TQ   ("SDR"      ),
-        .DATA_RATE_TQ   ("BUF"      ),
-        .DATA_WIDTH     (4          ),
-        .INIT_OQ        (1'b0       ),
-        .INIT_TQ        (1'b0       ),
-        .SERDES_MODE    ("MASTER"   ),
-        .SRVAL_OQ       (1'b0       ),
-        .SRVAL_TQ       (1'b0       ),
-        .TRISTATE_WIDTH (1          )
-    )
-    Inst_ALEOSERDES
-    (
-        .OFB        (                       ),
-        .OQ         (oALEToNAND             ),
-        .SHIFTOUT1  (                       ),
-        .SHIFTOUT2  (                       ),
-        .TBYTEOUT   (                       ),
-        .TFB        (                       ),
-        .TQ         (                       ),
-
-        .CLK        (iOutputDrivingClock    ),
-        .CLKDIV     (iSystemClock           ),
-        .D1         (iPO_AddressLatchEnable[0]),
-        .D2         (iPO_AddressLatchEnable[0]),
-        .D3         (iPO_AddressLatchEnable[1]),
-        .D4         (iPO_AddressLatchEnable[1]),
-        .D5         (iPO_AddressLatchEnable[2]),
-        .D6         (iPO_AddressLatchEnable[2]),
-        .D7         (iPO_AddressLatchEnable[3]),
-        .D8         (iPO_AddressLatchEnable[3]),
-        .OCE        (1'b1                   ),
-        .RST        (iModuleReset           ),
-        .SHIFTIN1   (0                      ),
-        .SHIFTIN2   (0                      ),
-        .T1         (1'b0                   ),
-        .T2         (0                      ),
-        .T3         (0                      ),
-        .T4         (0                      ),
-        .TBYTEIN    (0                      ),
-        .TCE        (1'b1                   )
+        .D1             (iPO_ReadEnable[0]),
+        .D2             (iPO_ReadEnable[1]),
+        .C              (iSystemClock),
+        .CE             (1),
+        .Q              (oREToNAND),
+        .R              (iModuleReset),
+        .S              (1'b0)
     );
 
-    OSERDESE2
-    #
-    (
-        .DATA_RATE_OQ   ("DDR"      ),
-        //.DATA_RATE_TQ   ("SDR"      ),
-        .DATA_RATE_TQ   ("BUF"      ),
-        .DATA_WIDTH     (4          ),
-        .INIT_OQ        (1'b0       ),
-        .INIT_TQ        (1'b0       ),
-        .SERDES_MODE    ("MASTER"   ),
-        .SRVAL_OQ       (1'b0       ),
-        .SRVAL_TQ       (1'b0       ),
-        .TRISTATE_WIDTH (1          )
+    ODDR
+    #(
+        .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+        .INIT           (1'b0),
+        .SRTYPE         ("ASYNC")
     )
-    Inst_CLEOSERDES
+    Inst_WEODDR
     (
-        .OFB        (                       ),
-        .OQ         (oCLEToNAND             ),
-        .SHIFTOUT1  (                       ),
-        .SHIFTOUT2  (                       ),
-        .TBYTEOUT   (                       ),
-        .TFB        (                       ),
-        .TQ         (                       ),
-
-        .CLK        (iOutputDrivingClock    ),
-        .CLKDIV     (iSystemClock           ),
-        .D1         (iPO_CommandLatchEnable[0]),
-        .D2         (iPO_CommandLatchEnable[0]),
-        .D3         (iPO_CommandLatchEnable[1]),
-        .D4         (iPO_CommandLatchEnable[1]),
-        .D5         (iPO_CommandLatchEnable[2]),
-        .D6         (iPO_CommandLatchEnable[2]),
-        .D7         (iPO_CommandLatchEnable[3]),
-        .D8         (iPO_CommandLatchEnable[3]),
-        .OCE        (1'b1                   ),
-        .RST        (iModuleReset           ),
-        .SHIFTIN1   (0                      ),
-        .SHIFTIN2   (0                      ),
-        .T1         (1'b0                   ),
-        .T2         (0                      ),
-        .T3         (0                      ),
-        .T4         (0                      ),
-        .TBYTEIN    (0                      ),
-        .TCE        (1'b1                   )
+        .D1             (iPO_WriteEnable[0]),
+        .D2             (iPO_WriteEnable[1]),
+        .C              (iSystemClock),
+        .CE             (1),
+        .Q              (oWEToNAND),
+        .R              (iModuleReset),
+        .S              (1'b0)
     );
+
+    ODDR
+    #(
+        .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+        .INIT           (1'b0),
+        .SRTYPE         ("ASYNC")
+    )
+    Inst_ALEODDR
+    (
+        .D1             (iPO_AddressLatchEnable[0]),
+        .D2             (iPO_AddressLatchEnable[1]),
+        .C              (iSystemClock),
+        .CE             (1),
+        .Q              (oALEToNAND),
+        .R              (iModuleReset),
+        .S              (1'b0)
+    );
+
+    ODDR
+    #(
+        .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
+        .INIT           (1'b0),
+        .SRTYPE         ("ASYNC")
+    )
+    Inst_CLEODDR
+    (
+        .D1             (iPO_CommandLatchEnable[0]),
+        .D2             (iPO_CommandLatchEnable[1]),
+        .C              (iSystemClock),
+        .CE             (1),
+        .Q              (oCLEToNAND),
+        .R              (iModuleReset),
+        .S              (1'b0)
+    );
+
 
 endmodule
