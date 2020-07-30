@@ -79,11 +79,11 @@ module NFC_Atom_Dataoutput_Sync
 
  
     reg  [7:0]                    rDQStrobe_m1            ;
-    reg  [31:0]                   rDQ_m1                  ;
+    reg  [63:0]                   rDQ_m1                  ;
     reg  [7:0]                    rDQStrobe_m2            ;
-    reg  [31:0]                   rDQ_m2                  ;
+    reg  [63:0]                   rDQ_m2                  ;
 
-    wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd1) ? 1 : 0 ; // this is for tCAD
+    wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd2) ? 1 : 0 ; // this is for tCAD
     wire                          wTimerDone = (rDOS_TimeCounter == 4'd1) ? 1 : 0 ;
     wire                          wTimerHalf = (rDOS_TimeCounter <= 4'd4) ? 1 : 0 ;
     wire                          wDOSDone   = (rDOS_DataCounter == rNumOfData) ? 1 : 0 ;
@@ -337,8 +337,8 @@ module NFC_Atom_Dataoutput_Sync
                     rDQSOutEnable       <= 1;    
                     rDQOutEnable        <= 1;
 
-                    rDQStrobe           <= 8'h03;
-                    rDQ                 <= {16'h00, iWriteData[15:0]};
+                    rDQStrobe           <= 8'b0000_1100;
+                    rDQ                 <= {{2{iWriteData[15:8]}}, {2{iWriteData[7:0]}}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= 4'b0001;
@@ -398,7 +398,8 @@ module NFC_Atom_Dataoutput_Sync
         end
     end
 
-	always @(posedge iSystemClock , posedge iReset) begin
+
+	always @(posedge iSystemClock) begin
 		if (iReset) begin
 			// reset
 			rDQStrobe_m1 <= 8'h00;
@@ -407,10 +408,10 @@ module NFC_Atom_Dataoutput_Sync
 			rDQ_m2 <= 32'd0;
 		end
 		else begin
-			rDQStrobe_m1 <= {rDQStrobe[3:0], rDQStrobe[1:0], rDQStrobe_m1[7:6]};
-			rDQStrobe_m2 <= rDQStrobe_m2;
-			rDQ_m1 <= {rDQ[15:0], rDQ[7:0], rDQ_m1[31:24]};
-			rDQ_m2 <= rDQ_m2;
+			rDQStrobe_m1 <= rDQStrobe;
+			rDQStrobe_m2 <= rDQStrobe_m1;
+			rDQ_m1 <= {rDQ[31:0], rDQ[23:0], rDQ_m1[63:56]};
+			rDQ_m2 <= rDQ_m1;
 		end
 	end
 
@@ -422,7 +423,7 @@ module NFC_Atom_Dataoutput_Sync
     assign oDQSOutEnable       = rDQSOutEnable           ;   
     assign oDQOutEnable        = rDQOutEnable            ;   
     assign oDQStrobe           = rDQStrobe_m1            ;   
-    assign oDQ                 = rDQ_m1                  ;   
+    assign oDQ                 = rDQ_m1[31:0]                  ;   
     assign oChipEnable         = rChipEnable             ;   
     assign oReadEnable         = rReadEnable             ;   
     assign oWriteEnable        = rWriteEnable            ;   

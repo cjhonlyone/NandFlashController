@@ -54,6 +54,9 @@ module NFC_Physical_Input
     output  [ 1:0]  oPI_Buff_Keep       ;
     output          oPI_Buff_Last       ;
     
+    reg           r0_PI_Buff_WE         ;
+    reg           r1_PI_Buff_WE         ;
+    reg           r2_PI_Buff_WE         ;
     // Input Capture Clock -> delayed DQS signal with IDELAYE2
     // IDELAYE2, REFCLK: SDR 200MHz
     //           Tap resolution: 1/(32*2*200MHz) = 78.125 ps
@@ -81,7 +84,7 @@ module NFC_Physical_Input
     Inst_DQSIDELAYCTRL
     (
         .REFCLK (iDelayRefClock     ),
-        .RST    (iModuleReset       ),
+        .RST    (0       ),
         .RDY    (oPI_DelayReady     )
     );
     
@@ -107,7 +110,7 @@ module NFC_Physical_Input
         .INC            (0                  ),
         .LD             (iPI_DelayTapLoad   ),
         .LDPIPEEN       (0                  ),
-        .REGRST         (iModuleReset       )
+        .REGRST         (0       )
     );
 
     generate
@@ -193,14 +196,14 @@ module NFC_Physical_Input
     reg            rDQSFromNAND_m2;
     
     always @ (posedge iOutputDrivingClock) begin
-        if (iBufferReset) begin
-            rDQAtRising <= 0;
-            rDQAtRising_m1 <= 0;
-            rDQAtFalling <= 0;
-            rDQSFromNAND <= 0;
-            rDQSFromNAND_m1 <= 0;
-            rDQSFromNAND_m2 <= 0;
-        end else begin
+        // if (iBufferReset) begin
+        //     rDQAtRising <= 0;
+        //     rDQAtRising_m1 <= 0;
+        //     rDQAtFalling <= 0;
+        //     rDQSFromNAND <= 0;
+        //     rDQSFromNAND_m1 <= 0;
+        //     rDQSFromNAND_m2 <= 0;
+        // end else begin
             rDQAtRising <= wDQAtRising;
             rDQAtRising_m1 <= rDQAtRising;
             
@@ -209,7 +212,11 @@ module NFC_Physical_Input
             rDQSFromNAND <= wDelayedDQSClock;
             rDQSFromNAND_m1 <= rDQSFromNAND & iPI_Buff_WE;
             rDQSFromNAND_m2 <= rDQSFromNAND_m1;
-        end
+
+            // r0_PI_Buff_WE <= iPI_Buff_WE;
+            // r1_PI_Buff_WE <= r0_PI_Buff_WE;
+            // r2_PI_Buff_WE <= r1_PI_Buff_WE;
+        // end
     end
     
     wire    [7:0]   wDQ0  ;
@@ -308,6 +315,16 @@ module NFC_Physical_Input
             rPI_Buff_Last <= 0;
         end
     end
+    // ila_0 ila0(
+    // .clk(iOutputDrivingClock),
+    // .probe0(oPI_Buff_Valid),
+    // .probe1(rDQSFromNAND_m2),
+    // .probe2(rPI_Buff_Data),
+    // .probe3(iPI_Buff_Ready),
+    // .probe4({wDQ1,wDQ0}),
+    // .probe5({rDQAtFalling, rDQAtRising_m1})
+    // );
+    // Input
 
 	FIFO36E1 #(
         .ALMOST_EMPTY_OFFSET(13'h0080), // Sets the almost empty threshold
@@ -348,14 +365,31 @@ module NFC_Physical_Input
         .DIP(4'b0) // 4-bit input: Parity input
         );
 
+    // reg          r_buffer0_PI_Buff_Valid      ;
+    // reg  [15:0]  r_buffer0_PI_Buff_Data       ;
+    // reg  [ 1:0]  r_buffer0_PI_Buff_Keep       ;
+    // reg          r_buffer0_PI_Buff_Last       ;
+    // reg          r_buffer1_PI_Buff_Valid      ;
+    // reg  [15:0]  r_buffer1_PI_Buff_Data       ;
+    // reg  [ 1:0]  r_buffer1_PI_Buff_Keep       ;
+    // reg          r_buffer1_PI_Buff_Last       ;
+    // always @(posedge iSystemClock) begin
+    //     r_buffer0_PI_Buff_Valid <= rPI_Buff_Valid_m4;
+    //     r_buffer0_PI_Buff_Data  <= rPI_Buff_Data    ;
+    //     r_buffer0_PI_Buff_Keep  <= rPI_Buff_Keep    ;
+    //     r_buffer0_PI_Buff_Last  <= rPI_Buff_Last    ;
 
-
-
+    //     r_buffer1_PI_Buff_Valid <= r_buffer0_PI_Buff_Valid;
+    //     r_buffer1_PI_Buff_Data  <= r_buffer0_PI_Buff_Data ;
+    //     r_buffer1_PI_Buff_Keep  <= r_buffer0_PI_Buff_Keep ;
+    //     r_buffer1_PI_Buff_Last  <= r_buffer0_PI_Buff_Last ;
+    // end
 
     assign oPI_Buff_Valid = rPI_Buff_Valid_m4;
-    assign oPI_Buff_Data  = rPI_Buff_Data ;
-    assign oPI_Buff_Keep  = rPI_Buff_Keep ;
-    assign oPI_Buff_Last  = rPI_Buff_Last ;
+    assign oPI_Buff_Data  = rPI_Buff_Data    ;
+    assign oPI_Buff_Keep  = rPI_Buff_Keep    ;
+    assign oPI_Buff_Last  = rPI_Buff_Last    ;
+
 
 
 

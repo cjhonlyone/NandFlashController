@@ -65,6 +65,7 @@ module NandFlashController_AXIL_Reg #
     input  wire                   s_axil_rready ,
 
     output wire                   oAxilValid  ,
+    output wire [5:0]             oDelayTapLoad,
 
     output wire [31:0]            oCommand    ,
     output wire                   oCommandValid,
@@ -79,6 +80,7 @@ module NandFlashController_AXIL_Reg #
     input  wire [31:0]            iNandRBStatus
 );
     reg                   rAxilValid  = 0;
+    reg [5:0]             rDelayTapLoad =0 ;
     reg [31:0]            rCommand       ;
     reg                   rCommandValid  ;
     reg [31:0]            rAddress       ;
@@ -188,6 +190,8 @@ always @(posedge clk) begin
             rDMAWAddress <= s_axil_wdata;
         end else if (s_axil_awaddr_valid[7:0] == 8'd5) begin
             rFeature <= s_axil_wdata;
+        end else if (s_axil_awaddr_valid[7:0] == 8'd9) begin
+            rDelayTapLoad <= s_axil_wdata[5:0];
         end
         rAxilValid <= 1;
     end else begin
@@ -254,6 +258,7 @@ always @(posedge clk) begin
 end
     
     assign oAxilValid    = rAxilValid   ;
+    assign oDelayTapLoad = rDelayTapLoad;
     assign oCommand      = rCommand     ;
     assign oCommandValid = rCommandValid;
     assign oAddress      = rAddress     ;

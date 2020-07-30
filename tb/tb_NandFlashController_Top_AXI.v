@@ -14,9 +14,9 @@ module tb_NandFlashController_Top_AXI;
     /*
     * AXI-lite slave interface
     */
-	parameter ADDR_WIDTH           = 32              ;
-	parameter DATA_WIDTH           = 32              ;
-	parameter STRB_WIDTH           = DATA_WIDTH/8    ;
+	parameter AXIL_ADDR_WIDTH           = 32              ;
+	parameter AXIL_DATA_WIDTH           = 32              ;
+	parameter AXIL_STRB_WIDTH           = AXIL_DATA_WIDTH/8    ;
 	/*
 	* AXI master interface
 	*/
@@ -97,14 +97,14 @@ module tb_NandFlashController_Top_AXI;
         end
     end
 
-    reg  [ADDR_WIDTH-1:0]      s_axil_awaddr                             ;
+    reg  [AXIL_ADDR_WIDTH-1:0]      s_axil_awaddr                             ;
     reg  [2:0]                 s_axil_awprot                             ;
     reg                        s_axil_awvalid                            ;
-    reg  [DATA_WIDTH-1:0]      s_axil_wdata                              ;
-    reg  [STRB_WIDTH-1:0]      s_axil_wstrb                              ;
+    reg  [AXIL_DATA_WIDTH-1:0]      s_axil_wdata                              ;
+    reg  [AXIL_STRB_WIDTH-1:0]      s_axil_wstrb                              ;
     reg                        s_axil_wvalid                             ;
     reg                        s_axil_bready                             ;
-    reg  [ADDR_WIDTH-1:0]      s_axil_araddr                             ;
+    reg  [AXIL_ADDR_WIDTH-1:0]      s_axil_araddr                             ;
     reg  [2:0]                 s_axil_arprot                             ;
     reg                        s_axil_arvalid                            ;
     reg                        s_axil_rready                             ;
@@ -114,7 +114,7 @@ module tb_NandFlashController_Top_AXI;
     wire [1:0]                 s_axil_bresp                              ;
     wire                       s_axil_bvalid                             ;
     wire                       s_axil_arready                            ;
-    wire [DATA_WIDTH-1:0]      s_axil_rdata                              ;
+    wire [AXIL_DATA_WIDTH-1:0]      s_axil_rdata                              ;
     wire [1:0]                 s_axil_rresp                              ;
     wire                       s_axil_rvalid                             ;
 
@@ -165,9 +165,9 @@ module tb_NandFlashController_Top_AXI;
     wire   [NumberOfWays - 1:0]   I_NAND_RB                   ;
     wire                          O_NAND_WP                   ;
 	NandFlashController_Top_AXI #(
-			.ADDR_WIDTH           (ADDR_WIDTH           ),
-			.DATA_WIDTH           (DATA_WIDTH           ),
-			.STRB_WIDTH           (STRB_WIDTH           ),
+			.AXIL_ADDR_WIDTH           (AXIL_ADDR_WIDTH           ),
+			.AXIL_DATA_WIDTH           (AXIL_DATA_WIDTH           ),
+			.AXIL_STRB_WIDTH           (AXIL_STRB_WIDTH           ),
 			.AXI_ID_WIDTH         (AXI_ID_WIDTH         ),
 			.AXI_ADDR_WIDTH       (AXI_ADDR_WIDTH       ),
 			.AXI_DATA_WIDTH       (AXI_DATA_WIDTH       ),
@@ -292,7 +292,7 @@ module tb_NandFlashController_Top_AXI;
     )
     axi_ram (
         .clk           (m_axi_clk     ),
-        .rst           (m_axi_rst     ),
+        .rst           (~m_axi_rst     ),
         .s_axi_awid    (m_axi_awid    ),
         .s_axi_awaddr  (m_axi_awaddr  ),
         .s_axi_awlen   (m_axi_awlen   ),
@@ -331,11 +331,11 @@ module tb_NandFlashController_Top_AXI;
     );
 
     task AXIL32_WriteChannel;
-		input  [ADDR_WIDTH-1:0]      r_axil_awaddr ;
+		input  [AXIL_ADDR_WIDTH-1:0]      r_axil_awaddr ;
 		input  [2:0]                 r_axil_awprot ;
 		input                        r_axil_awvalid;
-		input  [DATA_WIDTH-1:0]      r_axil_wdata  ;
-		input  [STRB_WIDTH-1:0]      r_axil_wstrb  ;
+		input  [AXIL_DATA_WIDTH-1:0]      r_axil_wdata  ;
+		input  [AXIL_STRB_WIDTH-1:0]      r_axil_wstrb  ;
 		input                        r_axil_wvalid ;
 		input                        r_axil_bready ;
     	begin
@@ -351,7 +351,7 @@ module tb_NandFlashController_Top_AXI;
     endtask
 
     task AXIL32_ReadChannel;
-	    input  [ADDR_WIDTH-1:0]      r_axil_araddr ;
+	    input  [AXIL_ADDR_WIDTH-1:0]      r_axil_araddr ;
 	    input  [2:0]                 r_axil_arprot ;
 	    input                        r_axil_arvalid;
 	    input                        r_axil_rready ;
@@ -745,7 +745,7 @@ module tb_NandFlashController_Top_AXI;
         // $dumpfile("./tb_NFC_Physical_Top.vcd");
         // $dumpvars(0, tb_NFC_Physical_Top);
 		iReset     <= 1;
-		s_axil_rst <= 1;
+		s_axil_rst <= 0;
 		AXIL32_ReadChannel(0,0,0,0);
 		AXIL32_WriteChannel(   0, 3'd0, 0, 0, 4'hf, 0, 0);
 
@@ -759,7 +759,7 @@ module tb_NandFlashController_Top_AXI;
 
 		# 1000000
 		iReset     <= 0;
-		s_axil_rst <= 0;
+		s_axil_rst <= 1;
 
         select_way(8'd1);
         reset_ffh;

@@ -52,7 +52,7 @@ module NFC_Pinpad
     output                          O_NAND_CLE      ;
     input   [NumberOfWays - 1:0]    I_NAND_RB       ;
     output                          O_NAND_WP       ; 
-    
+
     genvar  c, d, e;
 
     IOBUF
@@ -82,28 +82,28 @@ module NFC_Pinpad
         );
     end
     endgenerate
-    /*
-    // CE Pad
-    assign O_NAND_CE = iCEToNAND;
     
-    // WE Pad
-    assign O_NAND_WE = iWEToNAND;
+    // // CE Pad
+    // assign O_NAND_CE = iCEToNAND;
     
-    // RE Pad
-    //assign O_NAND_RE = iREToNAND;
+    // // WE Pad
+    // assign O_NAND_WE = iWEToNAND;
     
-    // ALE Pad
-    assign O_NAND_ALE = iALEToNAND;
+    // // RE Pad
+    // assign O_NAND_RE = iREToNAND;
     
-    // CLE Pad
-    assign O_NAND_CLE = iCLEToNAND;
+    // // ALE Pad
+    // assign O_NAND_ALE = iALEToNAND;
     
-    // RB Pad
-    assign oRBFromNAND = I_NAND_RB;
+    // // CLE Pad
+    // assign O_NAND_CLE = iCLEToNAND;
     
-    // WP Pad
-    assign O_NAND_WP = iWPToNAND;
-    */
+    // // RB Pad
+    // assign oRBFromNAND = I_NAND_RB;
+    
+    // // WP Pad
+    // assign O_NAND_WP = iWPToNAND;
+
     // CE Pad
     generate
     for (d = 0; d < NumberOfWays; d = d + 1)
