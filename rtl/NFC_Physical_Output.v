@@ -55,8 +55,62 @@ module NFC_Physical_Output
     output                          oREToNAND               ;
     output                          oALEToNAND              ;
     output                          oCLEToNAND              ;
-    
-    
+
+    reg                           r0_DQSOutEnable           ;
+    reg                           r0_DQOutEnable            ;
+    reg   [7:0]                   r0_PO_DQStrobe            ;
+    reg   [31:0]                  r0_PO_DQ                  ;
+    reg   [2*NumberOfWays - 1:0]  r0_PO_ChipEnable          ;
+    reg   [3:0]                   r0_PO_ReadEnable          ;
+    reg   [3:0]                   r0_PO_WriteEnable         ;
+    reg   [3:0]                   r0_PO_AddressLatchEnable  ;
+    reg   [3:0]                   r0_PO_CommandLatchEnable  ;
+
+    reg                           r1_DQSOutEnable           ;
+    reg                           r1_DQOutEnable            ;
+    reg   [7:0]                   r1_PO_DQStrobe            ;
+    reg   [31:0]                  r1_PO_DQ                  ;
+    reg   [2*NumberOfWays - 1:0]  r1_PO_ChipEnable          ;
+    reg   [3:0]                   r1_PO_ReadEnable          ;
+    reg   [3:0]                   r1_PO_WriteEnable         ;
+    reg   [3:0]                   r1_PO_AddressLatchEnable  ;
+    reg   [3:0]                   r1_PO_CommandLatchEnable  ;
+
+    // always @ (posedge iSystemClock) begin
+    //     r0_DQSOutEnable          <= ~iDQSOutEnable         ;
+    //     r0_DQOutEnable           <= ~iDQOutEnable          ;
+    //     r0_PO_DQStrobe           <= iPO_DQStrobe          ;
+    //     r0_PO_DQ                 <= iPO_DQ                ;
+    //     r0_PO_ChipEnable         <= iPO_ChipEnable        ;
+    //     r0_PO_ReadEnable         <= iPO_ReadEnable        ;
+    //     r0_PO_WriteEnable        <= iPO_WriteEnable       ;
+    //     r0_PO_AddressLatchEnable <= iPO_AddressLatchEnable;
+    //     r0_PO_CommandLatchEnable <= iPO_CommandLatchEnable;
+        
+    //     r1_DQSOutEnable          <= r0_DQSOutEnable         ;
+    //     r1_DQOutEnable           <= r0_DQOutEnable          ;
+    //     r1_PO_DQStrobe           <= r0_PO_DQStrobe          ;
+    //     r1_PO_DQ                 <= r0_PO_DQ                ;
+    //     r1_PO_ChipEnable         <= r0_PO_ChipEnable        ;
+    //     r1_PO_ReadEnable         <= r0_PO_ReadEnable        ;
+    //     r1_PO_WriteEnable        <= r0_PO_WriteEnable       ;
+    //     r1_PO_AddressLatchEnable <= r0_PO_AddressLatchEnable;
+    //     r1_PO_CommandLatchEnable <= r0_PO_CommandLatchEnable;
+    // end
+
+    // reg       dbg_DQS;
+    // reg [7:0] dbg_DQ;
+
+    // always @(posedge iOutputDrivingClock) begin
+    //     dbg_DQS <= oDQSToNAND;
+    //     dbg_DQ <= oDQToNAND;
+    // end
+
+    // ila_0 ila0(
+    // .clk(iOutputDrivingClock),
+    // .probe0(dbg_DQS),
+    // .probe1(dbg_DQ));
+
     reg     rDQSOutEnable_buffer;
     reg     rDQSOut_IOBUF_T;
     reg     rDQOutEnable_buffer;
@@ -75,9 +129,13 @@ module NFC_Physical_Output
             rDQOut_IOBUF_T       <= ~rDQOutEnable_buffer;
         end       
     end
-    
+
     genvar c, d;
-    
+    // ila_0 ila0(
+    // .clk(iSystemClock),
+    // .probe0(iPO_DQStrobe[3:0]),
+    // .probe1(iPO_DQ[15:0])
+    // );
     OSERDESE2
     #
     (
@@ -123,7 +181,7 @@ module NFC_Physical_Output
         .TBYTEIN    (0                      ),
         .TCE        (1'b1                   )
     );
-    
+
     generate
     for (c = 0; c < 8; c = c + 1)
     begin : DQOSERDESBits
@@ -154,9 +212,9 @@ module NFC_Physical_Output
             .CLK        (iOutputDrivingClock),
             .CLKDIV     (iSystemClock       ),
             .D1         (iPO_DQ[ 0 + c]     ),
-            .D2         (iPO_DQ[ 0 + c]     ),
-            .D3         (iPO_DQ[ 8 + c]     ),
-            .D4         (iPO_DQ[ 8 + c]     ),
+            .D2         (iPO_DQ[ 8 + c]     ),
+            .D3         (iPO_DQ[16 + c]     ),
+            .D4         (iPO_DQ[24 + c]     ),
             .D5         (iPO_DQ[16 + c]     ),
             .D6         (iPO_DQ[16 + c]     ),
             .D7         (iPO_DQ[24 + c]     ),

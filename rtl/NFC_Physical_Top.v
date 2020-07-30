@@ -145,10 +145,8 @@ module NFC_Physical_Top
     wire    [NumberOfWays - 1:0]    wReadyBusyFromNAND  ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf0   ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf1   ;
-    
-    
-    // Input
-    
+
+
     NFC_Physical_Input
     #
     (

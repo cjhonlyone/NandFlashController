@@ -272,7 +272,7 @@ module NFC_Atom_Command_Async
                     rDQOutEnable        <= 1;
 
                     rDQStrobe           <= 8'h0;
-                    rDQ                 <= {16'h00, rCAData[39:32],rCAData[39:32]};
+                    rDQ                 <= {4{rCAData[39:32]}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= (rACA_TimeCounter <= 4'd4) ? 4'b0011 : 4'b0000;
@@ -295,7 +295,7 @@ module NFC_Atom_Command_Async
                     rDQOutEnable        <= 1;
 
                     rDQStrobe           <= 8'h0;
-                    rDQ                 <= {16'h00, rCAData[31:24],rCAData[31:24]};
+                    rDQ                 <= {4{rCAData[31:24]}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= (rACA_TimeCounter <= 4'd4) ? 4'b0011 : 4'b0000;
@@ -318,7 +318,7 @@ module NFC_Atom_Command_Async
                     rDQOutEnable        <= 1;
 
                     rDQStrobe           <= 8'h0;
-                    rDQ                 <= {16'h00, rCAData[23:16],rCAData[23:16]};
+                    rDQ                 <= {4{rCAData[23:16]}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= (rACA_TimeCounter <= 4'd4) ? 4'b0011 : 4'b0000;
@@ -341,7 +341,7 @@ module NFC_Atom_Command_Async
                     rDQOutEnable        <= 1;
 
                     rDQStrobe           <= 8'h0;
-                    rDQ                 <= {16'h00, rCAData[15:8],rCAData[15:8]};
+                    rDQ                 <= {4{rCAData[15:8]}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= (rACA_TimeCounter <= 4'd4) ? 4'b0011 : 4'b0000;
@@ -364,7 +364,7 @@ module NFC_Atom_Command_Async
                     rDQOutEnable        <= 1;
 
                     rDQStrobe           <= 8'h0;
-                    rDQ                 <= {16'h00, rCAData[7:0],rCAData[7:0]};
+                    rDQ                 <= {4{rCAData[7:0]}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
                     rWriteEnable        <= (rACA_TimeCounter <= 4'd4) ? 4'b0011 : 4'b0000;

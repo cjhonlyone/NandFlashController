@@ -297,7 +297,7 @@ assign m_axi_awsize = AXI_BURST_SIZE;
 assign m_axi_awburst = 2'b01;
 assign m_axi_awlock = 1'b0;
 assign m_axi_awcache = 4'b0011;
-assign m_axi_awprot = 3'b010;
+assign m_axi_awprot = 3'b000;
 assign m_axi_awvalid = m_axi_awvalid_reg;
 assign m_axi_bready = m_axi_bready_reg;
 

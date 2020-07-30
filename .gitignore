@@ -4,3 +4,5 @@
 /prj/*.log
 /prj/*.jou
 /prj/transcript
+/ip/*
+!/ip/NandFlashController_ip.tcl

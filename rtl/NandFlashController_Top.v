@@ -40,6 +40,9 @@ module NandFlashController_Top
 
     oReadyBusy                  ,
 
+    iDelayTapValid              ,
+    iDelayTap                   ,
+
     IO_NAND_DQS                 ,
     IO_NAND_DQ                  ,
     O_NAND_CE                   ,
@@ -84,6 +87,9 @@ module NandFlashController_Top
     
     output  [NumberOfWays - 1:0]   oReadyBusy              ;
 
+    input                          iDelayTapValid          ;
+    input  [4:0]                   iDelayTap               ;
+
     inout                          IO_NAND_DQS             ;
     inout                  [7:0]   IO_NAND_DQ              ;
     output  [NumberOfWays - 1:0]   O_NAND_CE               ;
@@ -93,6 +99,7 @@ module NandFlashController_Top
     output                         O_NAND_CLE              ;
     input   [NumberOfWays - 1:0]   I_NAND_RB               ;
     output                         O_NAND_WP               ;
+
 
 
     // CI with ACG
@@ -284,8 +291,8 @@ module NandFlashController_Top
             .iPI_BUFF_OutSel             (wPI_BUFF_OutSel             ),
             .oPI_DQ                      (wPI_DQ                      ),
             .oPI_ValidFlag               (wPI_ValidFlag               ),
-            .iACG_PHY_DelayTapLoad       (wACG_PHY_DelayTapLoad       ),
-            .iACG_PHY_DelayTap           (wACG_PHY_DelayTap           ),
+            .iACG_PHY_DelayTapLoad       (iDelayTapValid              ),
+            .iACG_PHY_DelayTap           (iDelayTap                   ),
             .oPHY_ACG_DelayReady         (wPHY_ACG_DelayReady         ),
             .iACG_PHY_DQSOutEnable       (wACG_PHY_DQSOutEnable       ),
             .iACG_PHY_DQOutEnable        (wACG_PHY_DQOutEnable        ),

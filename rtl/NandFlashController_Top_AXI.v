@@ -6,16 +6,16 @@ module NandFlashController_Top_AXI
     /*
     * AXI-lite slave interface
     */
-    parameter ADDR_WIDTH           = 32,
-    parameter DATA_WIDTH           = 32,
-    parameter STRB_WIDTH           = DATA_WIDTH/8,
+    parameter AXIL_ADDR_WIDTH           = 32,
+    parameter AXIL_DATA_WIDTH           = 32,
+    parameter AXIL_STRB_WIDTH           = AXIL_DATA_WIDTH/8,
     /*
     * AXI master interface
     */
     parameter AXI_ID_WIDTH         = 2 ,
     parameter AXI_ADDR_WIDTH       = 32,
     parameter AXI_DATA_WIDTH       = 64,
-    parameter AXI_MAX_BURST_LEN    = 256,
+    parameter AXI_MAX_BURST_LEN    = 16,
     parameter AXI_STRB_WIDTH       = AXI_DATA_WIDTH/8,
     
     parameter IDelayValue          = 20,
@@ -28,22 +28,22 @@ module NandFlashController_Top_AXI
     /*
     * AXI-lite slave interface
     */
-    input  wire [ADDR_WIDTH-1:0]      s_axil_awaddr      ,
+    input  wire [AXIL_ADDR_WIDTH-1:0]      s_axil_awaddr      ,
     input  wire [2:0]                 s_axil_awprot      ,
     input  wire                       s_axil_awvalid     ,
     output wire                       s_axil_awready     ,
-    input  wire [DATA_WIDTH-1:0]      s_axil_wdata       ,
-    input  wire [STRB_WIDTH-1:0]      s_axil_wstrb       ,
+    input  wire [AXIL_DATA_WIDTH-1:0]      s_axil_wdata       ,
+    input  wire [AXIL_STRB_WIDTH-1:0]      s_axil_wstrb       ,
     input  wire                       s_axil_wvalid      ,
     output wire                       s_axil_wready      ,
     output wire [1:0]                 s_axil_bresp       ,
     output wire                       s_axil_bvalid      ,
     input  wire                       s_axil_bready      ,
-    input  wire [ADDR_WIDTH-1:0]      s_axil_araddr      ,
+    input  wire [AXIL_ADDR_WIDTH-1:0]      s_axil_araddr      ,
     input  wire [2:0]                 s_axil_arprot      ,
     input  wire                       s_axil_arvalid     ,
     output wire                       s_axil_arready     ,
-    output wire [DATA_WIDTH-1:0]      s_axil_rdata       ,
+    output wire [AXIL_DATA_WIDTH-1:0]      s_axil_rdata       ,
     output wire [1:0]                 s_axil_rresp       ,
     output wire                       s_axil_rvalid      ,
     input  wire                       s_axil_rready      ,
@@ -51,43 +51,62 @@ module NandFlashController_Top_AXI
     output wire                       m_axi_clk          ,
     output wire                       m_axi_rst          ,
     /*
-    * AXI master interface
-    */
-    output wire [AXI_ID_WIDTH-1:0]    m_axi_awid         ,
-    output wire [AXI_ADDR_WIDTH-1:0]  m_axi_awaddr       ,
-    output wire [7:0]                 m_axi_awlen        ,
-    output wire [2:0]                 m_axi_awsize       ,
-    output wire [1:0]                 m_axi_awburst      ,
-    output wire                       m_axi_awlock       ,
-    output wire [3:0]                 m_axi_awcache      ,
-    output wire [2:0]                 m_axi_awprot       ,
-    output wire                       m_axi_awvalid      ,
-    input  wire                       m_axi_awready      ,
-    output wire [AXI_DATA_WIDTH-1:0]  m_axi_wdata        ,
-    output wire [AXI_STRB_WIDTH-1:0]  m_axi_wstrb        ,
-    output wire                       m_axi_wlast        ,
-    output wire                       m_axi_wvalid       ,
-    input  wire                       m_axi_wready       ,
-    input  wire [AXI_ID_WIDTH-1:0]    m_axi_bid          ,
-    input  wire [1:0]                 m_axi_bresp        ,
-    input  wire                       m_axi_bvalid       ,
-    output wire                       m_axi_bready       ,
-    output wire [AXI_ID_WIDTH-1:0]    m_axi_arid         ,
-    output wire [AXI_ADDR_WIDTH-1:0]  m_axi_araddr       ,
-    output wire [7:0]                 m_axi_arlen        ,
-    output wire [2:0]                 m_axi_arsize       ,
-    output wire [1:0]                 m_axi_arburst      ,
-    output wire                       m_axi_arlock       ,
-    output wire [3:0]                 m_axi_arcache      ,
-    output wire [2:0]                 m_axi_arprot       ,
-    output wire                       m_axi_arvalid      ,
-    input  wire                       m_axi_arready      ,
-    input  wire [AXI_ID_WIDTH-1:0]    m_axi_rid          ,
-    input  wire [AXI_DATA_WIDTH-1:0]  m_axi_rdata        ,
-    input  wire [1:0]                 m_axi_rresp        ,
-    input  wire                       m_axi_rlast        ,
-    input  wire                       m_axi_rvalid       ,
-    output wire                       m_axi_rready       ,
+     * AXI master interface
+     */
+    output wire [AXI_ID_WIDTH-1:0]    m_axi_awid,
+    output wire [AXI_ADDR_WIDTH-1:0]  m_axi_awaddr,
+    output wire [7:0]                 m_axi_awlen,
+    output wire [2:0]                 m_axi_awsize,
+    output wire [1:0]                 m_axi_awburst,
+    output wire                       m_axi_awlock,
+    output wire [3:0]                 m_axi_awcache,
+    output wire [2:0]                 m_axi_awprot,
+
+    output wire                       m_axi_awqos,
+    // output wire                       m_axi_awregion,
+    // output wire [AWUSER_WIDTH-1:0]    m_axi_awuser,
+
+    output wire                       m_axi_awvalid,
+    input  wire                       m_axi_awready,
+    output wire [AXI_DATA_WIDTH-1:0]  m_axi_wdata,
+    output wire [AXI_STRB_WIDTH-1:0]  m_axi_wstrb,
+    output wire                       m_axi_wlast,
+
+    // output wire [WUSER_WIDTH-1:0]     m_axi_wuser,
+
+    output wire                       m_axi_wvalid,
+    input  wire                       m_axi_wready,
+    input  wire [AXI_ID_WIDTH-1:0]    m_axi_bid,
+    input  wire [1:0]                 m_axi_bresp,
+
+    // input  wire [BUSER_WIDTH-1:0]     m_axi_buser,
+
+    input  wire                       m_axi_bvalid,
+    output wire                       m_axi_bready,
+    output wire [AXI_ID_WIDTH-1:0]    m_axi_arid,
+    output wire [AXI_ADDR_WIDTH-1:0]  m_axi_araddr,
+    output wire [7:0]                 m_axi_arlen,
+    output wire [2:0]                 m_axi_arsize,
+    output wire [1:0]                 m_axi_arburst,
+    output wire                       m_axi_arlock,
+    output wire [3:0]                 m_axi_arcache,
+    output wire [2:0]                 m_axi_arprot,
+
+    output wire                       m_axi_arqos,
+    // output wire                       m_axi_arregion,
+    // output wire [ARUSER_WIDTH-1:0]    m_axi_aruser,
+
+    output wire                       m_axi_arvalid,
+    input  wire                       m_axi_arready,
+    input  wire [AXI_ID_WIDTH-1:0]    m_axi_rid,
+    input  wire [AXI_DATA_WIDTH-1:0]  m_axi_rdata,
+    input  wire [1:0]                 m_axi_rresp,
+    input  wire                       m_axi_rlast,
+
+    // input  wire [RUSER_WIDTH-1:0]     m_axi_ruser,
+    
+    input  wire                       m_axi_rvalid,
+    output wire                       m_axi_rready,
     
     input  wire                       iSystemClock       ,
     input  wire                       iDelayRefClock     ,
@@ -108,6 +127,7 @@ module NandFlashController_Top_AXI
 );
 
     wire                         waxil_AxilValid   ;
+    wire [ 5:0]                  waxil_DelayTapLoad;
     wire [31:0]                  waxil_Command     ;
     wire                         waxil_CommandValid;
     wire [31:0]                  waxil_Address     ;
@@ -119,6 +139,7 @@ module NandFlashController_Top_AXI
     wire [31:0]                  waxil_NandRBStatus;
 
     wire                         wAxilValid   ;
+    wire [ 5:0]                  wDelayTapLoad;
     wire [31:0]                  wCommand     ;
     wire                         wCommandValid;
     wire [31:0]                  wAddress     ;
@@ -162,13 +183,18 @@ module NandFlashController_Top_AXI
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
 
+
+    assign m_axi_awqos = 4'b0000;
+    assign m_axi_arqos = 4'b0000;
+
+
     NandFlashController_AXIL_Reg #(
-            .DATA_WIDTH(DATA_WIDTH),
-            .ADDR_WIDTH(ADDR_WIDTH),
+            .DATA_WIDTH(AXIL_DATA_WIDTH),
+            .ADDR_WIDTH(AXIL_ADDR_WIDTH),
             .PIPELINE_OUTPUT(0)
         ) inst_NandFlashController_AXIL_Reg (
             .clk            (s_axil_clk         ),
-            .rst            (s_axil_rst         ),
+            .rst            (~s_axil_rst         ),
             .s_axil_awaddr  (s_axil_awaddr      ),
             .s_axil_awprot  (s_axil_awprot      ),
             .s_axil_awvalid (s_axil_awvalid     ),
@@ -190,6 +216,8 @@ module NandFlashController_Top_AXI
             .s_axil_rready  (s_axil_rready      ),
 
             .oAxilValid     (waxil_AxilValid    ),
+            .oDelayTapLoad  (waxil_DelayTapLoad ),
+
             .oCommand       (waxil_Command      ),
             .oCommandValid  (waxil_CommandValid ),
             .oAddress       (waxil_Address      ),
@@ -203,7 +231,7 @@ module NandFlashController_Top_AXI
 
     axis_async_fifo #(
         .DEPTH(16),
-        .DATA_WIDTH(32+32+16+1),
+        .DATA_WIDTH(32+32+16+1+5),
         .KEEP_ENABLE(0),
         .KEEP_WIDTH(1),
         .LAST_ENABLE(0),
@@ -221,10 +249,10 @@ module NandFlashController_Top_AXI
     )
     axil_sys (
         // Common reset
-        .async_rst(s_axil_rst),
+        .async_rst(~s_axil_rst),
         // AXI input
         .s_clk(s_axil_clk),
-        .s_axis_tdata({waxil_Command,waxil_Address,waxil_Length,waxil_CommandValid}),
+        .s_axis_tdata({waxil_Command,waxil_Address,waxil_Length,waxil_CommandValid, waxil_DelayTapLoad}),
         .s_axis_tkeep(1),
         .s_axis_tvalid(waxil_AxilValid),
         .s_axis_tready(),
@@ -234,7 +262,7 @@ module NandFlashController_Top_AXI
     //    .s_axis_tuser(s_axis_tuser),
         // AXI output
         .m_clk(iSystemClock),
-        .m_axis_tdata({wCommand,wAddress,wLength,wCommandValid}),
+        .m_axis_tdata({wCommand,wAddress,wLength,wCommandValid,wDelayTapLoad}),
         .m_axis_tkeep(),
         .m_axis_tvalid(wAxilValid),
         .m_axis_tready(1)
@@ -264,7 +292,7 @@ module NandFlashController_Top_AXI
     )
     sys_axil (
         // Common reset
-        .async_rst(s_axil_rst),
+        .async_rst(~s_axil_rst),
         // AXI input
         .s_clk(iSystemClock),
         .s_axis_tdata({wCommandFail,wTNFCStatus,wNandRBStatus,wNFCWriteTransValid,wNFCReadTransValid}),
@@ -353,6 +381,9 @@ module NandFlashController_Top_AXI
             .oStatus             (wNFCStatus     ),
             .oStatusValid        (wNFCStatusValid),
 
+            .iDelayTapValid      (wDelayTapLoad[5]),
+            .iDelayTap           (wDelayTapLoad[4:0]),
+
             .IO_NAND_DQS         (IO_NAND_DQS),
             .IO_NAND_DQ          (IO_NAND_DQ),
             .O_NAND_CE           (O_NAND_CE),
@@ -394,7 +425,18 @@ module NandFlashController_Top_AXI
     wire [AXIS_ID_WIDTH-1:0]   s_axis_read_desc_id     = 0                    ;
     wire [AXIS_DEST_WIDTH-1:0] s_axis_read_desc_dest   = 0                    ;
     wire [AXIS_USER_WIDTH-1:0] s_axis_read_desc_user   = 0                    ;
-    
+
+        // ila_0 ila0(
+        // .clk(s_axil_clk),
+        // .probe0(waxil_WriteTransValid),
+        // .probe1(waxil_DMARAddress),
+        // .probe2(waxil_Length[15:0]));
+
+        // ila_0 ila1(
+        // .clk(s_axil_clk),
+        // .probe0(waxil_ReadTransValid),
+        // .probe1(waxil_DMAWAddress),
+        // .probe2(waxil_Length[15:0]));
     wire                       s_axis_write_desc_valid = waxil_ReadTransValid ;
     wire                       s_axis_write_desc_ready                        ;
     wire [AXI_ADDR_WIDTH-1:0]  s_axis_write_desc_addr  = waxil_DMAWAddress    ;
@@ -458,7 +500,7 @@ module NandFlashController_Top_AXI
     )
     axi_dma (
         .clk                            (s_axil_clk                      ),
-        .rst                            (s_axil_rst                      ),
+        .rst                            (~s_axil_rst                      ),
 
         .s_axis_read_desc_addr          (s_axis_read_desc_addr          ),
         .s_axis_read_desc_len           (s_axis_read_desc_len           ),
@@ -576,7 +618,7 @@ module NandFlashController_Top_AXI
         // .s_axis_tuser(s_axis_tuser),
         // AXI output
         .m_clk(s_axil_clk),
-        .m_rst(s_axil_rst),
+        .m_rst(~s_axil_rst),
         .m_axis_tdata (s_axis_write_data_tdata),
         .m_axis_tkeep (s_axis_write_data_tkeep),
         .m_axis_tvalid(s_axis_write_data_tvalid),
@@ -617,7 +659,7 @@ module NandFlashController_Top_AXI
     Write_async_fifo (
         // AXI input
         .s_clk(s_axil_clk),
-        .s_rst(s_axil_rst),
+        .s_rst(~s_axil_rst),
         .s_axis_tdata (m_axis_read_data_tdata ),
         .s_axis_tkeep (m_axis_read_data_tkeep ),
         .s_axis_tvalid(m_axis_read_data_tvalid),
