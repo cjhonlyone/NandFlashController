@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-
 module NFC_Atom_Datainput_Sync
 #
 (
@@ -91,8 +90,14 @@ module NFC_Atom_Datainput_Sync
     reg  [3:0]                    rDIS_TimeCounter        ;
 
     wire                          wBuff_Ready             ;
- 
-localparam tWPST_timer = 3;
+
+    localparam Write_Valid = 4'b0010;
+    localparam Write_Idle  = 4'b0011;
+
+    localparam Out_Enable  = 0;
+    localparam Out_Disable = 1;
+    
+    localparam tWPST_timer = 3;
 
     wire                          wtWPSTDone = (rDIS_TimeCounter == tWPST_timer) ? 1 : 0 ; // tCKWR
     wire                          wTimerDone = (rDIS_TimeCounter == 4'd3) ? 1 : 0 ; // tCAD
@@ -174,17 +179,17 @@ localparam tWPST_timer = 3;
             rReady              <= 1'b0;
             rLastStep           <= 1'b0;
 
-            rTargetWay          <= { NumberOfWays{1'b0} };
+            rTargetWay          <= { NumberOfWays{1'b1} };
             rNumOfData          <= 16'h0;
             
             // rBuff_Ready         <= 1;
             
-            rDQSOutEnable       <= 1;    
-            rDQOutEnable        <= 1;
+            rDQSOutEnable       <= Out_Enable;    
+            rDQOutEnable        <= Out_Enable;
 
-            rChipEnable         <= { 2*NumberOfWays{1'b0} };
+            rChipEnable         <= { 2*NumberOfWays{1'b1} };
             rReadEnable         <= 4'b0011;
-            rWriteEnable        <= 4'b0000;
+            rWriteEnable        <= Write_Idle;
             rAddressLatchEnable <= 4'h0;
             rCommandLatchEnable <= 4'h0; 
 
@@ -196,19 +201,19 @@ localparam tWPST_timer = 3;
                     rReady              <= 1'b0;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= { NumberOfWays{1'b0} };
+                    rTargetWay          <= { NumberOfWays{1'b1} };
                     rNumOfData          <= 16'h0;
                     
                     
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     
                     
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0000;
+                    rWriteEnable        <= Write_Idle;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 
@@ -219,19 +224,19 @@ localparam tWPST_timer = 3;
                     rReady              <= 1'b1;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= { NumberOfWays{1'b0} };
+                    rTargetWay          <= { NumberOfWays{1'b1} };
                     rNumOfData          <= 16'h0;
                     
                     
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     
                     
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 
@@ -242,19 +247,19 @@ localparam tWPST_timer = 3;
                     rReady              <= 1'b0;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= iTargetWay;
+                    rTargetWay          <= ~iTargetWay;
                     rNumOfData          <= iNumOfData;
                     
                     
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     
                     
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -270,14 +275,14 @@ localparam tWPST_timer = 3;
                     
                     
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     
                     
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0000;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -293,13 +298,13 @@ localparam tWPST_timer = 3;
                     
                     
                     
-                    rDQSOutEnable       <= 0;    
-                    rDQOutEnable        <= 0;
+                    rDQSOutEnable       <= Out_Disable;    
+                    rDQOutEnable        <= Out_Disable;
 
                     
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0000;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -314,13 +319,13 @@ localparam tWPST_timer = 3;
                     rNumOfData          <= rNumOfData;
                     
                     
-                    rDQSOutEnable       <= 0;    
-                    rDQOutEnable        <= 0;
+                    rDQSOutEnable       <= Out_Disable;    
+                    rDQOutEnable        <= Out_Disable;
 
 
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0000;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0011;
                     rCommandLatchEnable <= 4'b0011;
 
@@ -335,14 +340,14 @@ localparam tWPST_timer = 3;
                     rNumOfData          <= rNumOfData;
                     
                     
-                    rDQSOutEnable       <= 0;    
-                    rDQOutEnable        <= 0;
+                    rDQSOutEnable       <= Out_Disable;    
+                    rDQOutEnable        <= Out_Disable;
 
                     
                     
                     rChipEnable         <= (rDIS_TimeCounter < tWPST_timer) ? {rTargetWay ,rTargetWay} : 0;
                     rReadEnable         <= (rDIS_TimeCounter < tWPST_timer) ? 4'b0000 : 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -353,19 +358,19 @@ localparam tWPST_timer = 3;
                     rReady              <= 1'b0;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= { NumberOfWays{1'b0} };
+                    rTargetWay          <= { NumberOfWays{1'b1} };
                     rNumOfData          <= 16'h0;
                     
                     
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     
                     
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0000;
+                    rWriteEnable        <= Write_Idle;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 

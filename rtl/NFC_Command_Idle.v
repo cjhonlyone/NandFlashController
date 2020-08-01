@@ -40,7 +40,7 @@ module NFC_Command_Idle
 
 	assign oACG_Command         = 8'b0000_0000;    
 	assign oACG_CommandOption   = 3'b000;    
-	assign oACG_TargetWay       = 8'h00;    
+	assign oACG_TargetWay       = 8'hff;    
 	assign oACG_NumOfData       = 16'd0;    
 	assign oACG_CASelect        = 1'b1;    
 	assign oACG_CAData          = 40'h00_00_00_00_00;    

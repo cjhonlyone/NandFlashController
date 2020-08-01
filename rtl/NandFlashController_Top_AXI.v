@@ -18,7 +18,7 @@ module NandFlashController_Top_AXI
     parameter AXI_MAX_BURST_LEN    = 16,
     parameter AXI_STRB_WIDTH       = AXI_DATA_WIDTH/8,
     
-    parameter IDelayValue          = 20,
+    parameter IDelayValue          = 15,
     parameter InputClockBufferType = 0 ,
     parameter NumberOfWays         = 2 
 )
@@ -110,7 +110,8 @@ module NandFlashController_Top_AXI
     
     input  wire                       iSystemClock       ,
     input  wire                       iDelayRefClock     ,
-    input  wire                       iOutputDrivingClock,
+    // input  wire                       iOutputDrivingClock,
+    input  wire                       iSystemClock_90    ,
     input  wire                       iReset             ,
     /*
     * Pin Pad
@@ -351,7 +352,8 @@ module NandFlashController_Top_AXI
         ) inst_NandFlashController_Top (
             .iSystemClock        (iSystemClock),
             .iDelayRefClock      (iDelayRefClock),
-            .iOutputDrivingClock (iOutputDrivingClock),
+            // .iOutputDrivingClock (iOutputDrivingClock),
+            .iSystemClock_90     (iSystemClock_90),
             .iReset              (iReset),
 
             .iOpcode             (wNFCOpcode),

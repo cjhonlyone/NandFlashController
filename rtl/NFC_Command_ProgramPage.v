@@ -273,7 +273,7 @@ module NFC_Command_ProgramPage
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
-                    rACG_TargetWay     <= iWaySelect;
+                    rACG_TargetWay     <= ~iWaySelect;
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
@@ -289,7 +289,7 @@ module NFC_Command_ProgramPage
 
                     rACG_Command       <= 8'b0000_0000;
                     rACG_CommandOption <= 3'b000;
-                    rACG_TargetWay     <= iWaySelect;
+                    rACG_TargetWay     <= ~iWaySelect;
                     rACG_NumOfData     <= 16'h0000;
                     rACG_CASelect      <= 1'b1;
                     rACG_CAData        <= 40'h00_00_00_00_00;
@@ -403,7 +403,7 @@ module NFC_Command_ProgramPage
     end
 
 //    always @ (posedge iSystemClock) begin
-//        rACG_ReadyBusy <= rACG_TargetWay & iACG_ReadyBusy;
+//        rACG_ReadyBusy <= (~rACG_TargetWay) & iACG_ReadyBusy;
 //        rWay_ReadyBusy <= | rACG_ReadyBusy;
 //    end
 

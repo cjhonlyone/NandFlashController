@@ -7,7 +7,8 @@ module NFC_Physical_Output
 )
 (
     iSystemClock            ,
-    iOutputDrivingClock     ,
+    // iOutputDrivingClock     ,
+    iSystemClock_90         ,
     iModuleReset            ,
     iDQSOutEnable           ,
     iDQOutEnable            ,
@@ -35,7 +36,8 @@ module NFC_Physical_Output
     //            CLKDIV: SDR 100MHz CLK: SDR 200MHz OQ: DDR 200MHz
     //            output resolution: 2.50 ns
     input                           iSystemClock            ;
-    input                           iOutputDrivingClock     ;
+    // input                           iOutputDrivingClock     ;
+    input                           iSystemClock_90         ;
     input                           iModuleReset            ;
     input                           iDQSOutEnable           ;
     input                           iDQOutEnable            ;
@@ -111,40 +113,40 @@ module NFC_Physical_Output
     // .probe0(dbg_DQS),
     // .probe1(dbg_DQ));
 
-    reg     rDQSOutEnable_buffer;
-    reg     rDQSOut_IOBUF_T;
-    reg     rDQOutEnable_buffer;
-    reg     rDQOut_IOBUF_T;
+    // reg     rDQSOutEnable_buffer;
+    // reg     rDQSOut_IOBUF_T;
+    // reg     rDQOutEnable_buffer;
+    // reg     rDQOut_IOBUF_T;
     
-    always @ (posedge iSystemClock) begin
-        if (iModuleReset) begin
-            rDQSOutEnable_buffer <= 0;
-            rDQSOut_IOBUF_T      <= 1;
-            rDQOutEnable_buffer  <= 0;
-            rDQOut_IOBUF_T       <= 1;
-        end else begin
-            rDQSOutEnable_buffer <= iDQSOutEnable;
-            rDQSOut_IOBUF_T      <= ~rDQSOutEnable_buffer;
-            rDQOutEnable_buffer  <= iDQOutEnable;
-            rDQOut_IOBUF_T       <= ~rDQOutEnable_buffer;
-        end       
-    end
+    // always @ (posedge iSystemClock) begin
+    //     if (iModuleReset) begin
+    //         rDQSOutEnable_buffer <= 0;
+    //         rDQSOut_IOBUF_T      <= 1;
+    //         rDQOutEnable_buffer  <= 0;
+    //         rDQOut_IOBUF_T       <= 1;
+    //     end else begin
+    //         rDQSOutEnable_buffer <= iDQSOutEnable;
+    //         rDQSOut_IOBUF_T      <= ~rDQSOutEnable_buffer;
+    //         rDQOutEnable_buffer  <= iDQOutEnable;
+    //         rDQOut_IOBUF_T       <= ~rDQOutEnable_buffer;
+    //     end       
+    // end
 
     genvar c, d;
     ODDR
     #(
         .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
         .INIT           (1'b0),
-        .SRTYPE         ("ASYNC")
+        .SRTYPE         ("SYNC")
     )
     Inst_DQSODDR
     (
         .D1             (iPO_DQStrobe[0]),
-        .D2             (iPO_DQStrobe[1]),
+        .D2             (iPO_DQStrobe[2]),
         .C              (iSystemClock),
         .CE             (1),
         .Q              (oDQSToNAND),
-        .R              (iModuleReset),
+        .R              (1'b0),
         .S              (1'b0)
     );
 
@@ -152,16 +154,16 @@ module NFC_Physical_Output
     #(
         .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
         .INIT           (1'b0),
-        .SRTYPE         ("ASYNC")
+        .SRTYPE         ("SYNC")
     )
     Inst_DQSTODDR
     (
-        .D1             (rDQSOut_IOBUF_T),
-        .D2             (rDQSOut_IOBUF_T),
+        .D1             (iDQSOutEnable),
+        .D2             (iDQSOutEnable),
         .C              (iSystemClock),
         .CE             (1),
         .Q              (oDQSOutEnableToPinpad),
-        .R              (iModuleReset),
+        .R              (1'b0),
         .S              (1'b0)
     );
 
@@ -173,16 +175,16 @@ module NFC_Physical_Output
         #(
             .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
             .INIT           (1'b0),
-            .SRTYPE         ("ASYNC")
+            .SRTYPE         ("SYNC")
         )
         Inst_DQODDR
         (
             .D1             (iPO_DQ[ 0 + c]),
             .D2             (iPO_DQ[16 + c]),
-            .C              (iSystemClock),
+            .C              (iSystemClock_90),
             .CE             (1),
             .Q              (oDQToNAND[c]),
-            .R              (iModuleReset),
+            .R              (1'b0),
             .S              (1'b0)
         );
 
@@ -190,16 +192,16 @@ module NFC_Physical_Output
         #(
             .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
             .INIT           (1'b0),
-            .SRTYPE         ("ASYNC")
+            .SRTYPE         ("SYNC")
         )
         Inst_DQTODDR
         (
-            .D1             (rDQOut_IOBUF_T),
-            .D2             (rDQOut_IOBUF_T),
-            .C              (iSystemClock),
+            .D1             (iDQOutEnable),
+            .D2             (iDQOutEnable),
+            .C              (iSystemClock_90),
             .CE             (1),
             .Q              (oDQOutEnableToPinpad[c]),
-            .R              (iModuleReset),
+            .R              (1'b0),
             .S              (1'b0)
         );
     end
@@ -212,7 +214,7 @@ module NFC_Physical_Output
         #(
             .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
             .INIT           (1'b0),
-            .SRTYPE         ("ASYNC")
+            .SRTYPE         ("SYNC")
         )
         Inst_CEODDR
         (
@@ -221,7 +223,7 @@ module NFC_Physical_Output
             .C              (iSystemClock),
             .CE             (1),
             .Q              (oCEToNAND[d]),
-            .R              (iModuleReset),
+            .R              (1'b0),
             .S              (1'b0)
         );
     end
@@ -230,8 +232,8 @@ module NFC_Physical_Output
     ODDR
     #(
         .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
-        .INIT           (1'b0),
-        .SRTYPE         ("ASYNC")
+        .INIT           (1'b1),
+        .SRTYPE         ("SYNC")
     )
     Inst_REODDR
     (
@@ -240,15 +242,15 @@ module NFC_Physical_Output
         .C              (iSystemClock),
         .CE             (1),
         .Q              (oREToNAND),
-        .R              (iModuleReset),
+        .R              (1'b0),
         .S              (1'b0)
     );
 
     ODDR
     #(
         .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
-        .INIT           (1'b0),
-        .SRTYPE         ("ASYNC")
+        .INIT           (1'b1),
+        .SRTYPE         ("SYNC")
     )
     Inst_WEODDR
     (
@@ -257,7 +259,7 @@ module NFC_Physical_Output
         .C              (iSystemClock),
         .CE             (1),
         .Q              (oWEToNAND),
-        .R              (iModuleReset),
+        .R              (1'b0),
         .S              (1'b0)
     );
 
@@ -265,7 +267,7 @@ module NFC_Physical_Output
     #(
         .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
         .INIT           (1'b0),
-        .SRTYPE         ("ASYNC")
+        .SRTYPE         ("SYNC")
     )
     Inst_ALEODDR
     (
@@ -274,7 +276,7 @@ module NFC_Physical_Output
         .C              (iSystemClock),
         .CE             (1),
         .Q              (oALEToNAND),
-        .R              (iModuleReset),
+        .R              (1'b0),
         .S              (1'b0)
     );
 
@@ -282,7 +284,7 @@ module NFC_Physical_Output
     #(
         .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
         .INIT           (1'b0),
-        .SRTYPE         ("ASYNC")
+        .SRTYPE         ("SYNC")
     )
     Inst_CLEODDR
     (
@@ -291,7 +293,7 @@ module NFC_Physical_Output
         .C              (iSystemClock),
         .CE             (1),
         .Q              (oCLEToNAND),
-        .R              (iModuleReset),
+        .R              (1'b0),
         .S              (1'b0)
     );
 

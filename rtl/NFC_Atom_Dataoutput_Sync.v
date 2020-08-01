@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-
 module NFC_Atom_Dataoutput_Sync
 #
 (
@@ -78,12 +77,9 @@ module NFC_Atom_Dataoutput_Sync
     reg  [3:0]                    rDOS_TimeCounter        ;
 
  
-    reg  [7:0]                    rDQStrobe_m1            ;
-    reg  [63:0]                   rDQ_m1                  ;
-    reg  [7:0]                    rDQStrobe_m2            ;
-    reg  [63:0]                   rDQ_m2                  ;
 
-    wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd2) ? 1 : 0 ; // this is for tCAD
+
+    wire                          wtWPSTDone = (rDOS_TimeCounter == 4'd3) ? 1 : 0 ; // this is for tCAD
     wire                          wTimerDone = (rDOS_TimeCounter == 4'd1) ? 1 : 0 ;
     wire                          wTimerHalf = (rDOS_TimeCounter <= 4'd4) ? 1 : 0 ;
     wire                          wDOSDone   = (rDOS_DataCounter == rNumOfData) ? 1 : 0 ;
@@ -91,6 +87,12 @@ module NFC_Atom_Dataoutput_Sync
     wire  [31:0]                  wUperData  = {16'h00, iWriteData[15:8], iWriteData[15:8]};
     wire  [31:0]                  wDownData  = {16'h00, iWriteData[ 7:0], iWriteData[ 7:0]};
 
+    localparam Write_Valid = 4'b0010;
+    localparam Write_Idle  = 4'b0011;
+
+    localparam Out_Enable  = 0;
+    localparam Out_Disable = 1;
+    
     // FSM Parameters/Wires/Regs
     localparam DOS_FSM_BIT = 8;
     localparam DOS_RESET = 8'b0000_0001;
@@ -167,19 +169,19 @@ module NFC_Atom_Dataoutput_Sync
             rReady              <= 1'b0;
             rLastStep           <= 1'b0;
 
-            rTargetWay          <= { NumberOfWays{1'b0} };
+            rTargetWay          <= { NumberOfWays{1'b1} };
             rNumOfData          <= 16'h0;
             rWriteReady         <= 1'b0;
             rWriteData          <= 16'd0;
             
-            rDQSOutEnable       <= 1;    
-            rDQOutEnable        <= 1;
+            rDQSOutEnable       <= Out_Enable;    
+            rDQOutEnable        <= Out_Enable;
 
             rDQStrobe           <= 8'h0;
             rDQ                 <= 32'h0000;
-            rChipEnable         <= { 2*NumberOfWays{1'b0} };
+            rChipEnable         <= { 2*NumberOfWays{1'b1} };
             rReadEnable         <= 4'b0011;
-            rWriteEnable        <= 4'b0000;
+            rWriteEnable        <= Write_Idle;
             rAddressLatchEnable <= 4'h0;
             rCommandLatchEnable <= 4'h0; 
 
@@ -191,19 +193,19 @@ module NFC_Atom_Dataoutput_Sync
                     rReady              <= 1'b0;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= { NumberOfWays{1'b0} };
+                    rTargetWay          <= { NumberOfWays{1'b1} };
                     rNumOfData          <= 16'h0;
                     rWriteReady         <= 1'b0;
                     rWriteData          <= 16'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= 32'h0000;
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0000;
+                    rWriteEnable        <= Write_Idle;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 
@@ -214,19 +216,19 @@ module NFC_Atom_Dataoutput_Sync
                     rReady              <= 1'b1;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= { NumberOfWays{1'b0} };
+                    rTargetWay          <= { NumberOfWays{1'b1} };
                     rNumOfData          <= 16'h0;
                     rWriteReady         <= 1'b0;
                     rWriteData          <= 16'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= 32'h0000;
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 
@@ -237,19 +239,19 @@ module NFC_Atom_Dataoutput_Sync
                     rReady              <= 1'b0;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= iTargetWay;
+                    rTargetWay          <= ~iTargetWay;
                     rNumOfData          <= iNumOfData;
                     rWriteReady         <= 1'b0;
                     rWriteData          <= 16'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= 32'h0000;
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -265,14 +267,14 @@ module NFC_Atom_Dataoutput_Sync
                     rWriteReady         <= 1'b0;
                     rWriteData          <= 16'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= 32'h0000;
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -288,14 +290,14 @@ module NFC_Atom_Dataoutput_Sync
                     rWriteReady         <= 1'b0;
                     rWriteData          <= 16'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= rDQ;
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -311,14 +313,14 @@ module NFC_Atom_Dataoutput_Sync
                     rWriteReady         <= 1'b1;
                     rWriteData          <= 16'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= rDQ;
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -334,14 +336,14 @@ module NFC_Atom_Dataoutput_Sync
                     rWriteReady         <= 1'b1;
                     rWriteData          <= (rWriteReady) ? iWriteData : rWriteData;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'b0000_1100;
                     rDQ                 <= {{2{iWriteData[15:8]}}, {2{iWriteData[7:0]}}};
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0011;
                     rCommandLatchEnable <= 4'b0011;
 
@@ -357,14 +359,14 @@ module NFC_Atom_Dataoutput_Sync
                     rWriteReady         <= 1'b0;
                     rWriteData          <= rWriteData;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= 32'h0000;
                     rChipEnable         <= {rTargetWay ,rTargetWay};
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0001;
+                    rWriteEnable        <= Write_Valid;
                     rAddressLatchEnable <= 4'b0000;
                     rCommandLatchEnable <= 4'b0000;
 
@@ -375,19 +377,19 @@ module NFC_Atom_Dataoutput_Sync
                     rReady              <= 1'b0;
                     rLastStep           <= 1'b0;
 
-                    rTargetWay          <= { NumberOfWays{1'b0} };
+                    rTargetWay          <= { NumberOfWays{1'b1} };
                     rNumOfData          <= 16'h0;
                     rWriteReady         <= 1'b0;
                     rWriteData          <= 32'd0;
                     
-                    rDQSOutEnable       <= 1;    
-                    rDQOutEnable        <= 1;
+                    rDQSOutEnable       <= Out_Enable;    
+                    rDQOutEnable        <= Out_Enable;
 
                     rDQStrobe           <= 8'h0;
                     rDQ                 <= 32'h0000;
-                    rChipEnable         <= { 2*NumberOfWays{1'b0} };
+                    rChipEnable         <= { 2*NumberOfWays{1'b1} };
                     rReadEnable         <= 4'b0011;
-                    rWriteEnable        <= 4'b0000;
+                    rWriteEnable        <= Write_Idle;
                     rAddressLatchEnable <= 4'h0;
                     rCommandLatchEnable <= 4'h0; 
 
@@ -398,21 +400,30 @@ module NFC_Atom_Dataoutput_Sync
         end
     end
 
+    reg  [7:0]                    rDQStrobe_m1            ;
+    reg  [7:0]                    rDQStrobe_m2            ;
+    reg  [7:0]                    rDQStrobe_m3            ;
+
+    reg  [63:0]                   rDQ_m1                  ;
+    reg  [63:0]                   rDQ_m2                  ;
+    reg  [63:0]                   rDQ_m3                  ;
 
 	always @(posedge iSystemClock) begin
-		if (iReset) begin
-			// reset
-			rDQStrobe_m1 <= 8'h00;
-			rDQStrobe_m2 <= 8'h00;
-			rDQ_m1 <= 32'd0;
-			rDQ_m2 <= 32'd0;
-		end
-		else begin
+		// if (iReset) begin
+		// 	// reset
+		// 	rDQStrobe_m1 <= 8'h00;
+		// 	rDQStrobe_m2 <= 8'h00;
+		// 	rDQ_m1 <= 64'd0;
+		// 	rDQ_m2 <= 64'd0;
+		// end
+		// else begin
 			rDQStrobe_m1 <= rDQStrobe;
 			rDQStrobe_m2 <= rDQStrobe_m1;
-			rDQ_m1 <= {rDQ[31:0], rDQ[23:0], rDQ_m1[63:56]};
+            rDQStrobe_m3 <= rDQStrobe_m2;
+			rDQ_m1 <= {32'd0, rDQ};
 			rDQ_m2 <= rDQ_m1;
-		end
+            rDQ_m3 <= rDQ_m2;
+		// end
 	end
 
     assign oReady              = rReady                  ;
@@ -423,7 +434,7 @@ module NFC_Atom_Dataoutput_Sync
     assign oDQSOutEnable       = rDQSOutEnable           ;   
     assign oDQOutEnable        = rDQOutEnable            ;   
     assign oDQStrobe           = rDQStrobe_m1            ;   
-    assign oDQ                 = rDQ_m1[31:0]                  ;   
+    assign oDQ                 = rDQ_m2[31:0]                  ;   
     assign oChipEnable         = rChipEnable             ;   
     assign oReadEnable         = rReadEnable             ;   
     assign oWriteEnable        = rWriteEnable            ;   
