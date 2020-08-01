@@ -26,7 +26,7 @@ module tb_NandFlashController_Top_AXI;
 	parameter AXI_MAX_BURST_LEN    = 256             ;
 	parameter AXI_STRB_WIDTH       = AXI_DATA_WIDTH/8;
 	
-	parameter IDelayValue          = 20              ;
+	parameter IDelayValue          = 15              ;
 	parameter InputClockBufferType = 0               ;
 	parameter NumberOfWays         = 2               ;
 
@@ -39,19 +39,29 @@ module tb_NandFlashController_Top_AXI;
     reg                           iSystemClock            ; // SDR 100MHz
     reg                           iDelayRefClock          ; // SDR 200Mhz
     reg                           iOutputDrivingClock     ; // SDR 200Mhz
+    reg                           iSystemClock_90         ;
     reg                           iReset                  ;
     // glbl glbl();
     // 100 MHz
     initial                 
     begin
         iSystemClock     <= 1'b0;
+        iSystemClock_90  <= 1'b0;
         #10000;
         forever
         begin    
             iSystemClock <= 1'b1;
-            #6000;
+            iSystemClock_90 <= 1'b0;
+            #3000;
+            iSystemClock <= 1'b1;
+            iSystemClock_90 <= 1'b1;
+            #3000;
             iSystemClock <= 1'b0;
-            #6000;
+            iSystemClock_90 <= 1'b1;
+            #3000;
+            iSystemClock <= 1'b0;
+            iSystemClock_90 <= 1'b0;
+            #3000;
         end
     end
 
@@ -241,7 +251,8 @@ module tb_NandFlashController_Top_AXI;
 			
 			.iSystemClock        (iSystemClock        ),
 			.iDelayRefClock      (iDelayRefClock      ),
-			.iOutputDrivingClock (iOutputDrivingClock ),
+			// .iOutputDrivingClock (iOutputDrivingClock ),
+            .iSystemClock_90     (iSystemClock_90),
 			.iReset              (iReset              ),
 
 			.IO_NAND_DQS         (IO_NAND_DQS         ),
@@ -483,16 +494,16 @@ module tb_NandFlashController_Top_AXI;
         AXIL32_OUT(`rLength, {16'd0, number});
         // AXIL32_OUT(`rDMARAddress, 0); //DMA addr
         AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b000011});
-        // AXIL32_IN(`rNFCStatus, status);
-        // @(posedge s_axil_clk);
-        // while(status[0] == 0) begin
-	       //  AXIL32_IN(`rNFCStatus, status);
-	       //  @(posedge s_axil_clk);
-	       //  end
-        // while(status[0] == 1) begin
-	       //  AXIL32_IN(`rNFCStatus, status);
-	       //  @(posedge s_axil_clk);
-	       //  end
+            AXIL32_IN(`rNFCStatus, status);
+            @(posedge s_axil_clk);
+            while(status[0] == 0) begin
+                AXIL32_IN(`rNFCStatus, status);
+                @(posedge s_axil_clk);
+                end
+            while(status[0] == 1) begin
+                AXIL32_IN(`rNFCStatus, status);
+                @(posedge s_axil_clk);
+                end
         end
     endtask
 
@@ -502,16 +513,16 @@ module tb_NandFlashController_Top_AXI;
         AXIL32_OUT(`rLength, {16'd0, number});
         // AXIL32_OUT(`rDMARAddress, 0); //DMA addr
         AXIL32_OUT(`rCommand, {11'd0, 5'b00001, 10'd0, 6'b000011});
-        // AXIL32_IN(`rNFCStatus, status);
-        // @(posedge s_axil_clk);
-        // while(status[0] == 0) begin
-	       //  AXIL32_IN(`rNFCStatus, status);
-	       //  @(posedge s_axil_clk);
-	       //  end
-        // while(status[0] == 1) begin
-	       //  AXIL32_IN(`rNFCStatus, status);
-	       //  @(posedge s_axil_clk);
-	       //  end
+            AXIL32_IN(`rNFCStatus, status);
+            @(posedge s_axil_clk);
+            while(status[0] == 0) begin
+                AXIL32_IN(`rNFCStatus, status);
+                @(posedge s_axil_clk);
+                end
+            while(status[0] == 1) begin
+                AXIL32_IN(`rNFCStatus, status);
+                @(posedge s_axil_clk);
+                end
         end
     endtask
 
@@ -521,16 +532,16 @@ module tb_NandFlashController_Top_AXI;
         AXIL32_OUT(`rLength, {16'd0, number});
         // AXIL32_OUT(`rDMARAddress, 0); //DMA addr
         AXIL32_OUT(`rCommand, {11'd0, 5'b00010, 10'd0, 6'b000011});
-        // AXIL32_IN(`rNFCStatus, status);
-        // @(posedge s_axil_clk);
-        // while(status[0] == 0) begin
-	       //  AXIL32_IN(`rNFCStatus, status);
-	       //  @(posedge s_axil_clk);
-	       //  end
-        // while(status[0] == 1) begin
-	       //  AXIL32_IN(`rNFCStatus, status);
-	       //  @(posedge s_axil_clk);
-	       //  end
+            AXIL32_IN(`rNFCStatus, status);
+            @(posedge s_axil_clk);
+            while(status[0] == 0) begin
+                AXIL32_IN(`rNFCStatus, status);
+                @(posedge s_axil_clk);
+                end
+            while(status[0] == 1) begin
+                AXIL32_IN(`rNFCStatus, status);
+                @(posedge s_axil_clk);
+                end
         end
     endtask
 
@@ -592,7 +603,7 @@ module tb_NandFlashController_Top_AXI;
     task readstatus_70h;
         begin
         AXIL32_OUT(`rCommand, {11'd0, 5'b00100, 10'd0, 6'b000111});
-        AXIL32_IN(`rNFCStatus, status);
+        
         @(posedge s_axil_clk);
         while(status[0] == 0) begin
 	        AXIL32_IN(`rNFCStatus, status);
@@ -602,6 +613,7 @@ module tb_NandFlashController_Top_AXI;
 	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
+        AXIL32_IN(`rNFCStatus, status);
         end
     endtask
 
@@ -618,6 +630,7 @@ module tb_NandFlashController_Top_AXI;
 	        AXIL32_IN(`rNFCStatus, status);
 	        @(posedge s_axil_clk);
 	        end
+        AXIL32_IN(`rNFCStatus, status);
         end
     endtask
 
@@ -642,77 +655,42 @@ module tb_NandFlashController_Top_AXI;
             // plane0 page0
             set_rowaddr({{5'd0},{block},page});
             readstatus_70h;
-            AXIL32_IN(`rNFCStatus, status);
             while (RDY == 0) begin
                 readstatus_70h;
-                AXIL32_IN(`rNFCStatus, status);
             end
             base_adr = global_row[7]*6 + global_row[2:0];
             AXIL32_OUT(`rDMARAddress, base_adr*4320);
             progpage_80h_10h_multplane(16'd4320);
-	        AXIL32_IN(`rNFCStatus, status);
-	        @(posedge s_axil_clk);
-	        while(status[0] == 0) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
-	        while(status[0] == 1) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
+
 
             // plane1 page0
             set_rowaddr({{5'd0},{rblock},page});
-            readstatus_78h;
-            AXIL32_IN(`rNFCStatus, status);
+            readstatus_70h;
             while (RDY == 0) begin
-                readstatus_78h;
-                AXIL32_IN(`rNFCStatus, status);
+                readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
             AXIL32_OUT(`rDMARAddress, base_adr*4320);
             progpage_80h_15h_cache(16'd4320);
-	        AXIL32_IN(`rNFCStatus, status);
-	        @(posedge s_axil_clk);
-	        while(status[0] == 0) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
-	        while(status[0] == 1) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
+
 
             // plane0 page1 cache
             
             set_rowaddr({{5'd0},{block},{rpage}});
-            readstatus_78h;
-            AXIL32_IN(`rNFCStatus, status);
+            readstatus_70h;
             while (RDY == 0) begin
-                readstatus_78h;
-                AXIL32_IN(`rNFCStatus, status);
+                readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
             AXIL32_OUT(`rDMARAddress, base_adr*4320);
             progpage_80h_10h_multplane(16'd4320);
-	        AXIL32_IN(`rNFCStatus, status);
-	        @(posedge s_axil_clk);
-	        while(status[0] == 0) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
-	        while(status[0] == 1) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
+
 
             // plane1 page1 cache
             set_rowaddr({{5'd0},{rblock},{rpage}});
-            readstatus_78h;
-            AXIL32_IN(`rNFCStatus, status);
+            readstatus_70h;
             while (RDY == 0) begin
-                readstatus_78h;
-                AXIL32_IN(`rNFCStatus, status);
+                readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
             AXIL32_OUT(`rDMARAddress, base_adr*4320);
@@ -721,16 +699,6 @@ module tb_NandFlashController_Top_AXI;
             else
                 progpage_80h_15h_cache(16'd4320);
 
-	        AXIL32_IN(`rNFCStatus, status);
-	        @(posedge s_axil_clk);
-	        while(status[0] == 0) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
-	        while(status[0] == 1) begin
-		        AXIL32_IN(`rNFCStatus, status);
-		        @(posedge s_axil_clk);
-		        end
         end
     endtask
 
@@ -761,7 +729,7 @@ module tb_NandFlashController_Top_AXI;
 		iReset     <= 0;
 		s_axil_rst <= 1;
 
-        select_way(8'd1);
+        select_way(8'd2);
         reset_ffh;
         set_feature(32'h14000000);
         setfeature_efh;
@@ -769,10 +737,9 @@ module tb_NandFlashController_Top_AXI;
         program_multiplane_cache(11'd0, 7'd2, 0);
         program_multiplane_cache(11'd0, 7'd4, 1);
 
-
+        readstatus_70h;
         while (ARDY == 0) begin
             readstatus_70h;
-            AXIL32_IN(`rNFCStatus, status);
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});

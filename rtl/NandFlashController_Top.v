@@ -10,7 +10,8 @@ module NandFlashController_Top
 (
     iSystemClock                , // 1x clk
     iDelayRefClock              , // 200MHz
-    iOutputDrivingClock         , // 2x clk
+    // iOutputDrivingClock         , // 2x clk
+    iSystemClock_90             ,
     iReset                      ,
 
     iOpcode                     ,
@@ -57,7 +58,8 @@ module NandFlashController_Top
     
     input                          iSystemClock            ;
     input                          iDelayRefClock          ;
-    input                          iOutputDrivingClock     ;
+    // input                          iOutputDrivingClock     ;
+    input                          iSystemClock_90         ;
     input                          iReset                  ;
 
     input   [5:0]                  iOpcode                 ;
@@ -283,7 +285,8 @@ module NandFlashController_Top
         ) inst_NFC_Physical_Top (
             .iSystemClock                (iSystemClock                ),
             .iDelayRefClock              (iDelayRefClock              ),
-            .iOutputDrivingClock         (iOutputDrivingClock         ),
+            // .iOutputDrivingClock         (iOutputDrivingClock         ),
+            .iSystemClock_90             (iSystemClock_90             ),
             .iACG_PHY_PinIn_Reset        (wACG_PHY_PinIn_Reset        ),
             .iACG_PHY_PinIn_BUFF_Reset   (wACG_PHY_PinIn_BUFF_Reset   ),
             .iACG_PHY_PinOut_Reset       (wACG_PHY_PinOut_Reset       ),

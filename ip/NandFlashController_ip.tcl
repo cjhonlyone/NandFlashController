@@ -151,13 +151,13 @@ set_property range $range [ipx::get_address_blocks axi_lite \
 ipx::add_bus_parameter ASSOCIATED_BUSIF [ipx::get_bus_interfaces s_axil_clk \
   -of_objects [ipx::current_core]]
 set_property value s_axil [ipx::get_bus_parameters ASSOCIATED_BUSIF \
-  -of_objects [ipx::get_bus_interfaces s_axil_clk \
+  -of_objects [ipx::get_bus_interfaces s_ax`il_clk \
   -of_objects [ipx::current_core]]]
 
 
 ipx::infer_bus_interface iSystemClock xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
 ipx::infer_bus_interface iDelayRefClock xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
-ipx::infer_bus_interface iOutputDrivingClock xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
+ipx::infer_bus_interface iSystemClock_90 xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
 
 ipx::infer_bus_interface iReset xilinx.com:signal:reset_rtl:1.0 [ipx::current_core]
 

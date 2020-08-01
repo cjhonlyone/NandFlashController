@@ -9,9 +9,12 @@ module NFC_Physical_Input
 (
     iSystemClock    ,
     iDelayRefClock  ,
-    iOutputDrivingClock ,
+    // iOutputDrivingClock ,
+    iSystemClock_90         ,
     iModuleReset    ,
     iBufferReset    ,
+
+    iAddressLatchEnable,
     iPI_Buff_RE     ,
     iPI_Buff_WE     ,
     iPI_Buff_OutSel ,
@@ -33,9 +36,11 @@ module NFC_Physical_Input
 );
     input           iSystemClock        ;
     input           iDelayRefClock      ;
-    input           iOutputDrivingClock     ;
+    // input           iOutputDrivingClock     ;
+    input                           iSystemClock_90         ;
     input           iModuleReset        ;
     input           iBufferReset        ;
+    input   [3:0]                   iAddressLatchEnable ;
     input           iPI_Buff_RE         ;
     input           iPI_Buff_WE         ;
     input   [2:0]   iPI_Buff_OutSel     ; // 000: IN_FIFO, 100: Nm4+Nm3, 101: Nm3+Nm2, 110: Nm2+Nm1, 111: Nm1+ZERO
@@ -80,6 +85,8 @@ module NFC_Physical_Input
     wire    wDelayedDQSClock    ;
     wire    wtestFULL;
     
+    wire [7:0] wDelayedDQ         ;
+
     IDELAYCTRL
     Inst_DQSIDELAYCTRL
     (
@@ -112,54 +119,16 @@ module NFC_Physical_Input
         .LDPIPEEN       (0                  ),
         .REGRST         (0       )
     );
+    IBUFG
+    Inst_DQSCLOCK
+    (
+        .I  (wDelayedDQS        ),
+        .O  (wDelayedDQSClock   )
+    );
 
-    generate
-        // InputClockBufferType
-        // 0: IBUFG (default)
-        // 1: IBUFG + BUFG
-        // 2: BUFR
-        if (InputClockBufferType == 0)
-        begin
-            IBUFG
-            Inst_DQSCLOCK
-            (
-                .I  (wDelayedDQS        ),
-                .O  (wDelayedDQSClock   )
-            );
-        end
-        else if (InputClockBufferType == 1)
-        begin
-            wire wDelayedDQSClockUnbuffered;
-            IBUFG
-            Inst_DQSCLOCK_IBUFG
-            (
-                .I  (wDelayedDQS                ),
-                .O  (wDelayedDQSClockUnbuffered )
-            );
-            BUFG
-            Inst_DQSCLOCK_BUFG
-            (
-                .I  (wDelayedDQSClockUnbuffered ),
-                .O  (wDelayedDQSClock           )
-            );
-        end
-        else if (InputClockBufferType == 2)
-        begin
-            BUFR
-            Inst_DQSCLOCK
-            (
-                .I  (wDelayedDQS        ),
-                .O  (wDelayedDQSClock   ),
-                .CE (1                  ),
-                .CLR(0                  )
-            );
-        end
-        else
-        begin
-        end
-    endgenerate
-    
+
     genvar c;
+
     
     wire    [7:0]   wDQAtRising     ;
     wire    [7:0]   wDQAtFalling    ;
@@ -167,6 +136,31 @@ module NFC_Physical_Input
     generate
     for (c = 0; c < 8; c = c + 1)
     begin: DQIDDRBits    
+        // IDELAYE2
+        // #
+        // (
+        //     .IDELAY_TYPE        ("FIXED"),//"VAR_LOAD" ),
+        //     .DELAY_SRC          ("IDATAIN"  ),
+        //     .IDELAY_VALUE       (IDelayValue),
+        //     .SIGNAL_PATTERN     ("CLOCK"    ),
+        //     .REFCLK_FREQUENCY   (200        )
+        // )
+        // Inst_DQSIDELAY
+        // (
+        //     .CNTVALUEOUT    (                   ),
+        //     .DATAOUT        (wDelayedDQ[c]        ),
+        //     .C              (iDelayRefClock     ),
+        //     .CE             (0                  ),
+        //     .CINVCTRL       (0                  ),
+        //     .CNTVALUEIN     (iPI_DelayTap       ),
+        //     .DATAIN         (0                  ),
+        //     .IDATAIN        (iDQFromNAND[c]       ),
+        //     .INC            (0                  ),
+        //     .LD             (iPI_DelayTapLoad   ),
+        //     .LDPIPEEN       (0                  ),
+        //     .REGRST         (0       )
+        // );
+
         IDDR
         #
         (
@@ -187,82 +181,106 @@ module NFC_Physical_Input
         );
     end
     endgenerate
-        
-    reg    [7:0]   rDQAtRising     ;
-    reg    [7:0]   rDQAtRising_m1     ;
-    reg    [7:0]   rDQAtFalling    ;
-    reg            rDQSFromNAND;
-    reg            rDQSFromNAND_m1;
-    reg            rDQSFromNAND_m2;
     
-    always @ (posedge iOutputDrivingClock) begin
-        // if (iBufferReset) begin
-        //     rDQAtRising <= 0;
-        //     rDQAtRising_m1 <= 0;
-        //     rDQAtFalling <= 0;
-        //     rDQSFromNAND <= 0;
-        //     rDQSFromNAND_m1 <= 0;
-        //     rDQSFromNAND_m2 <= 0;
-        // end else begin
-            rDQAtRising <= wDQAtRising;
-            rDQAtRising_m1 <= rDQAtRising;
-            
-            rDQAtFalling <= wDQAtFalling;
-            
-            rDQSFromNAND <= wDelayedDQSClock;
-            rDQSFromNAND_m1 <= rDQSFromNAND & iPI_Buff_WE;
-            rDQSFromNAND_m2 <= rDQSFromNAND_m1;
+    wire [7:0] DQ_dly        ;
+    wire [7:0] DQ_iddr_r     ;
+    wire [7:0] DQ_iddr_f     ;
 
-            // r0_PI_Buff_WE <= iPI_Buff_WE;
-            // r1_PI_Buff_WE <= r0_PI_Buff_WE;
-            // r2_PI_Buff_WE <= r1_PI_Buff_WE;
-        // end
+    wire [7:0] DQ_iddr_r0    ;
+    wire [7:0] DQ_iddr_f0    ;
+    wire [7:0] DQ_iddr_r180  ;
+    wire [7:0] DQ_iddr_f180  ;
+    wire [7:0] DQ_iddr_r180_2;
+
+    generate
+    for (c = 0; c < 8; c = c + 1)
+    begin: FF    
+        // clk0 data path
+        FD FD_DQ_IDDR_R0
+        (
+            .Q(DQ_iddr_r0[c]),
+            .C(iSystemClock),
+            .D(wDQAtRising[c])
+        );
+        FD_1 FD_DQ_IDDR_F0
+        (
+            .Q(DQ_iddr_f0[c]),
+            .C(iSystemClock),
+            .D(wDQAtFalling[c])
+        );
+
+        // clk180 data path
+
+
+        FD_1 FD_DQ_IDDR_R180
+        (
+            .Q(DQ_iddr_r180[c]),
+            .C(iSystemClock),
+            .D(wDQAtRising[c])
+        );
+        FD FD_DQ_IDDR_R180_2
+        (
+            .Q(DQ_iddr_r180_2[c]),
+            .C(iSystemClock),
+            .D(DQ_iddr_r180[c])
+        );
+        FD FD_DQ_IDDR_F180
+        (
+            .Q(DQ_iddr_f180[c]),
+            .C(iSystemClock),
+            .D(wDQAtFalling[c])
+        );
+
     end
-    
+    endgenerate   
+
+    // wire wDQS_Valid_180_2;
+    // wire wDQS_Valid_180;
+    // FD_1 IDQS_Valid_180
+    // (
+    //     .Q(wDQS_Valid_180),
+    //     .C(iSystemClock),
+    //     .D(wDelayedDQSClock)
+    // );
+    // FD IDQS_Valid_180_2
+    // (
+    //     .Q(wDQS_Valid_180_2),
+    //     .C(iSystemClock),
+    //     .D(wDQS_Valid_180)
+    // );
+
+    reg [7:0] rd_data_r;
+    reg [7:0] rd_data_f;
+    reg [3:0] rd_data_valid_SRL;
+    reg       rd_data_valid;
+
+    always @(posedge iSystemClock) begin
+        rd_data_r <= DQ_iddr_r180_2;
+        rd_data_f <= DQ_iddr_f180;
+        rd_data_valid_SRL <= {rd_data_valid_SRL[2:0],iAddressLatchEnable[0] & iPI_Buff_WE};
+        rd_data_valid <= rd_data_valid_SRL[3];
+    end
+
+    // ila_0 ila0(
+    // .clk(iSystemClock),
+    // .probe0(rd_data_r),
+    // .probe1(rd_data_f),
+    // .probe2(rd_data_valid),
+    // .probe3(DQ_iddr_r0),
+    // .probe4(DQ_iddr_f0)
+    // );
+
     wire    [7:0]   wDQ0  ;
     wire    [7:0]   wDQ1  ;
     wire    [7:0]   wDQ2  ;
     wire    [7:0]   wDQ3  ;
     
-    // reg rIN_FIFO_WE_Latch;
-    
-    // always @ (posedge wDelayedDQSClock, posedge iBufferReset) begin
-    //     if (iBufferReset) begin
-    //         rIN_FIFO_WE_Latch <= 0;
-    //     end else begin
-    //         rIN_FIFO_WE_Latch <= iPI_Buff_WE;
-    //     end
-    // end
+
 
     wire [11:0] RDCOUNT;
     wire [11:0] WRCOUNT;
 
-//    IN_FIFO
-//    #
-//    (
-//        .ARRAY_MODE ("ARRAY_MODE_4_X_8")
-//    )
-//    Inst_DQINFIFO4x4
-//    (
-//        .D0     (rDQAtRising_m1[3:0]               ),
-//        .D1     (rDQAtRising_m1[7:4]               ),
-//        .D2     (rDQAtFalling[3:0]              ),
-//        .D3     (rDQAtFalling[7:4]              ),
-//        .Q0     ({ wDQ2[3:0], wDQ0[3:0] }       ),
-//        .Q1     ({ wDQ2[7:4], wDQ0[7:4] }       ),
-//        .Q2     ({ wDQ3[3:0], wDQ1[3:0] }       ),
-//        .Q3     ({ wDQ3[7:4], wDQ1[7:4] }       ),
-        
-//        .RDCLK  (iSystemClock                   ),
-//        .RDEN   (iPI_Buff_RE                    ),
-//        .EMPTY  (oPI_Buff_Empty                 ),
-        
-//        .WRCLK  (iDelayRefClock               ),
-//        .WREN   (rDQSFromNAND_m2              ),
-//        .FULL   (wtestFULL),
-        
-//        .RESET  (iBufferReset                   )
-//    );
+
     reg          rPI_Buff_Valid      ;
     reg          rPI_Buff_Valid_m1   ;
     reg          rPI_Buff_Valid_m2   ;
@@ -358,123 +376,16 @@ module NFC_Physical_Input
         .RST(iBufferReset), // 1-bit input: Asynchronous Reset
         .RSTREG(1'b0), // 1-bit input: Output register set/reset
         // Write Control Signals: 1-bit (each) input: Write clock and enable input signals
-        .WRCLK(iOutputDrivingClock), // 1-bit input: Write clock
-        .WREN(rDQSFromNAND_m2), // 1-bit input: Write enable
+        .WRCLK(iSystemClock), // 1-bit input: Write clock
+        .WREN(rd_data_valid), // 1-bit input: Write enable
         // Write Data: 32-bit (each) input: Write input data
-        .DI({16'd0, rDQAtFalling,rDQAtRising_m1}), // 32-bit input: Data input
+        .DI({16'd0, rd_data_f,rd_data_r}), // 32-bit input: Data input
         .DIP(4'b0) // 4-bit input: Parity input
         );
-
-    // reg          r_buffer0_PI_Buff_Valid      ;
-    // reg  [15:0]  r_buffer0_PI_Buff_Data       ;
-    // reg  [ 1:0]  r_buffer0_PI_Buff_Keep       ;
-    // reg          r_buffer0_PI_Buff_Last       ;
-    // reg          r_buffer1_PI_Buff_Valid      ;
-    // reg  [15:0]  r_buffer1_PI_Buff_Data       ;
-    // reg  [ 1:0]  r_buffer1_PI_Buff_Keep       ;
-    // reg          r_buffer1_PI_Buff_Last       ;
-    // always @(posedge iSystemClock) begin
-    //     r_buffer0_PI_Buff_Valid <= rPI_Buff_Valid_m4;
-    //     r_buffer0_PI_Buff_Data  <= rPI_Buff_Data    ;
-    //     r_buffer0_PI_Buff_Keep  <= rPI_Buff_Keep    ;
-    //     r_buffer0_PI_Buff_Last  <= rPI_Buff_Last    ;
-
-    //     r_buffer1_PI_Buff_Valid <= r_buffer0_PI_Buff_Valid;
-    //     r_buffer1_PI_Buff_Data  <= r_buffer0_PI_Buff_Data ;
-    //     r_buffer1_PI_Buff_Keep  <= r_buffer0_PI_Buff_Keep ;
-    //     r_buffer1_PI_Buff_Last  <= r_buffer0_PI_Buff_Last ;
-    // end
 
     assign oPI_Buff_Valid = rPI_Buff_Valid_m4;
     assign oPI_Buff_Data  = rPI_Buff_Data    ;
     assign oPI_Buff_Keep  = rPI_Buff_Keep    ;
     assign oPI_Buff_Last  = rPI_Buff_Last    ;
 
-
-
-
-    // reg [15:0]  rNm2_Buffer     ;
-    // reg [15:0]  rNm3_Buffer     ;
-    // reg [15:0]  rNm4_Buffer     ;
-    
-    // wire        wNm1_ValidFlag  ;
-    // reg         rNm2_ValidFlag  ;
-    // reg         rNm3_ValidFlag  ;
-    // reg         rNm4_ValidFlag  ;
-    
-    // reg [31:0]  rPI_DQ          ;
-    
-    // assign wNm1_ValidFlag = rIN_FIFO_WE_Latch;
-    
-    // always @ (posedge wDelayedDQSClock, posedge iBufferReset) begin
-    //     if (iBufferReset) begin
-    //         rNm2_Buffer[15:0] <= 0;
-    //         rNm3_Buffer[15:0] <= 0;
-    //         rNm4_Buffer[15:0] <= 0;
-            
-    //         rNm2_ValidFlag <= 0;
-    //         rNm3_ValidFlag <= 0;
-    //         rNm4_ValidFlag <= 0;
-    //     end else begin
-    //         rNm2_Buffer[15:0] <= { wDQAtFalling[7:0], wDQAtRising[7:0] };
-    //         rNm3_Buffer[15:0] <= rNm2_Buffer[15:0];
-    //         rNm4_Buffer[15:0] <= rNm3_Buffer[15:0];
-            
-    //         rNm2_ValidFlag <= wNm1_ValidFlag;
-    //         rNm3_ValidFlag <= rNm2_ValidFlag;
-    //         rNm4_ValidFlag <= rNm3_ValidFlag;
-    //     end
-    // end
-    
-    // // 000: IN_FIFO, 001 ~ 011: reserved
-    // // 100: Nm4+Nm3, 101: Nm3+Nm2, 110: Nm2+Nm1, 111: Nm1+ZERO
-    
-    // always @ (*) begin
-    //     case ( iPI_Buff_OutSel[2:0] )
-    //         3'b000: begin // 000: IN_FIFO
-    //             rPI_DQ[ 7: 0] <= wDQ0[7:0];
-    //             rPI_DQ[15: 8] <= wDQ1[7:0];
-    //             rPI_DQ[23:16] <= wDQ2[7:0];
-    //             rPI_DQ[31:24] <= wDQ3[7:0];
-    //         end
-    //         3'b100: begin // 100: Nm4+Nm3
-    //             rPI_DQ[ 7: 0] <= rNm4_Buffer[ 7: 0];
-    //             rPI_DQ[15: 8] <= rNm4_Buffer[15: 8];
-    //             rPI_DQ[23:16] <= rNm3_Buffer[ 7: 0];
-    //             rPI_DQ[31:24] <= rNm3_Buffer[15: 8];
-    //         end
-    //         3'b101: begin // 101: Nm3+Nm2
-    //             rPI_DQ[ 7: 0] <= rNm3_Buffer[ 7: 0];
-    //             rPI_DQ[15: 8] <= rNm3_Buffer[15: 8];
-    //             rPI_DQ[23:16] <= rNm2_Buffer[ 7: 0];
-    //             rPI_DQ[31:24] <= rNm2_Buffer[15: 8];
-    //         end
-    //         3'b110: begin // 110: Nm2+Nm1
-    //             rPI_DQ[ 7: 0] <= rNm2_Buffer[ 7: 0];
-    //             rPI_DQ[15: 8] <= rNm2_Buffer[15: 8];
-    //             rPI_DQ[23:16] <= wDQAtRising[ 7: 0];
-    //             rPI_DQ[31:24] <= wDQAtFalling[ 7: 0];
-    //         end
-    //         3'b111: begin // 111: Nm1+ZERO
-    //             rPI_DQ[ 7: 0] <= wDQAtRising[ 7: 0];
-    //             rPI_DQ[15: 8] <= wDQAtFalling[ 7: 0];
-    //             rPI_DQ[23:16] <= 0;
-    //             rPI_DQ[31:24] <= 0;
-    //         end
-    //         default: begin // 001 ~ 011: reserved
-    //             rPI_DQ[ 7: 0] <= wDQ0[7:0];
-    //             rPI_DQ[15: 8] <= wDQ1[7:0];
-    //             rPI_DQ[23:16] <= wDQ2[7:0];
-    //             rPI_DQ[31:24] <= wDQ3[7:0];
-    //         end
-    //     endcase
-    // end
-    
-    // assign oPI_DQ[ 7: 0] = rPI_DQ[ 7: 0];
-    // assign oPI_DQ[15: 8] = rPI_DQ[15: 8];
-    // assign oPI_DQ[23:16] = rPI_DQ[23:16];
-    // assign oPI_DQ[31:24] = rPI_DQ[31:24];
-    
-    // assign oPI_ValidFlag[3:0] = { wNm1_ValidFlag, rNm2_ValidFlag, rNm3_ValidFlag, rNm4_ValidFlag };
-    
 endmodule

@@ -31,15 +31,21 @@ module NFC_Atom_Command_Idle
     output  [3:0]                   oAddressLatchEnable     ;
     output  [3:0]                   oCommandLatchEnable     ;
 
-    assign oDQSOutEnable       = 1                          ;
-    assign oDQOutEnable        = 1                          ;   
+    localparam Write_Valid = 4'b0010;
+    localparam Write_Idle  = 4'b0011;
 
-    assign oDQStrobe           = 8'h0                       ;   
-    assign oDQ                 = 32'h0000                   ;   
-    assign oChipEnable         = { iTargetWay,iTargetWay }  ;   
-    assign oReadEnable         = 4'b0011                    ;   
-    assign oWriteEnable        = 4'b0000                    ;   
-    assign oAddressLatchEnable = 4'h0                       ;   
-    assign oCommandLatchEnable = 4'h0                       ; 
+    localparam Out_Enable  = 0;
+    localparam Out_Disable = 1;
+
+    assign oDQSOutEnable       = Out_Enable ;
+    assign oDQOutEnable        = Out_Enable ;   
+    
+    assign oDQStrobe           = 8'h0       ;   
+    assign oDQ                 = 32'h0000   ;   
+    assign oChipEnable         = { iTargetWay,iTargetWay };   
+    assign oReadEnable         = 4'b0011    ;   
+    assign oWriteEnable        = Write_Idle ;   
+    assign oAddressLatchEnable = 4'h0       ;   
+    assign oCommandLatchEnable = 4'h0       ; 
 
 endmodule
