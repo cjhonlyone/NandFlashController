@@ -159,9 +159,12 @@
 ### Clock Domain
 
 `s_axi_clk` AXI interface clock (100MHz)
+
 `iSystemClock` Nand Controllor logic clock (83.333MHz, sync mode 4)
+
 `iDelayRefClock` 200MHz for IODELAY2 
-`iOutputDrivingClock` 2x `iSystemClock` for OSERDESE2 (166.666MHz)
+
+`iSystemClock_90` Nand Controllor DQ output clock
 
 ### Modules and Files 
 
