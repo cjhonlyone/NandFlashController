@@ -11,8 +11,12 @@ module NFC_Physical_Input
     iDelayRefClock  ,
     // iOutputDrivingClock ,
     iSystemClock_90         ,
+    iSystemClock_4x,
     iModuleReset    ,
     iBufferReset    ,
+
+    iPO_DQStrobe            ,
+    iPO_DQ                  ,
 
     iAddressLatchEnable,
     iPI_Buff_RE     ,
@@ -37,9 +41,12 @@ module NFC_Physical_Input
     input           iSystemClock        ;
     input           iDelayRefClock      ;
     // input           iOutputDrivingClock     ;
-    input                           iSystemClock_90         ;
+    input           iSystemClock_90         ;
+    input           iSystemClock_4x         ;
     input           iModuleReset        ;
     input           iBufferReset        ;
+    input   [7:0]                   iPO_DQStrobe            ; // DQS, full res.
+    input   [31:0]                  iPO_DQ                  ;
     input   [3:0]                   iAddressLatchEnable ;
     input           iPI_Buff_RE         ;
     input           iPI_Buff_WE         ;
@@ -86,6 +93,8 @@ module NFC_Physical_Input
     wire    wtestFULL;
     
     wire [7:0] wDelayedDQ         ;
+
+
 
     IDELAYCTRL
     Inst_DQSIDELAYCTRL
@@ -262,12 +271,12 @@ module NFC_Physical_Input
     end
 
     // ila_0 ila0(
-    // .clk(iSystemClock),
+    // .clk(iSystemClock_4x),
     // .probe0(rd_data_r),
     // .probe1(rd_data_f),
     // .probe2(rd_data_valid),
-    // .probe3(DQ_iddr_r0),
-    // .probe4(DQ_iddr_f0)
+    // .probe3(wDQAtRising),
+    // .probe4(wDQAtFalling)
     // );
 
     wire    [7:0]   wDQ0  ;

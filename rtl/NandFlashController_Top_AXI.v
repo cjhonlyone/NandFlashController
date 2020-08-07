@@ -112,6 +112,7 @@ module NandFlashController_Top_AXI
     input  wire                       iDelayRefClock     ,
     // input  wire                       iOutputDrivingClock,
     input  wire                       iSystemClock_90    ,
+    input  wire                       iSystemClock_4x,
     input  wire                       iReset             ,
     /*
     * Pin Pad
@@ -232,7 +233,7 @@ module NandFlashController_Top_AXI
 
     axis_async_fifo #(
         .DEPTH(16),
-        .DATA_WIDTH(32+32+16+1+5),
+        .DATA_WIDTH(32+32+16+1+6),
         .KEEP_ENABLE(0),
         .KEEP_WIDTH(1),
         .LAST_ENABLE(0),
@@ -275,7 +276,7 @@ module NandFlashController_Top_AXI
 
     axis_async_fifo #(
         .DEPTH(16),
-        .DATA_WIDTH(1+32+32),
+        .DATA_WIDTH(1+32+32+1+1),
         .KEEP_ENABLE(0),
         .KEEP_WIDTH(1),
         .LAST_ENABLE(0),
@@ -354,6 +355,7 @@ module NandFlashController_Top_AXI
             .iDelayRefClock      (iDelayRefClock),
             // .iOutputDrivingClock (iOutputDrivingClock),
             .iSystemClock_90     (iSystemClock_90),
+            .iSystemClock_4x     (iSystemClock_4x),
             .iReset              (iReset),
 
             .iOpcode             (wNFCOpcode),

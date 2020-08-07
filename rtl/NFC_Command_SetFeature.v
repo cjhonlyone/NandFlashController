@@ -328,10 +328,14 @@ module NFC_Command_SetFeature
         end
     end
 
+    reg   [NumberOfWays - 1:0]    rACG_TargetWay_m1;
     always @ (posedge iSystemClock) begin
-        rACG_ReadyBusy <= (~rACG_TargetWay) & iACG_ReadyBusy;
+        rACG_TargetWay_m1 <= (~rACG_TargetWay);
+        rACG_ReadyBusy <= rACG_TargetWay_m1 & iACG_ReadyBusy;
         rWay_ReadyBusy <= | rACG_ReadyBusy;
     end
+
+
 
     always @ (posedge iSystemClock) begin
         if (iReset) begin

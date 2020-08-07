@@ -12,6 +12,7 @@ module NandFlashController_Top
     iDelayRefClock              , // 200MHz
     // iOutputDrivingClock         , // 2x clk
     iSystemClock_90             ,
+    iSystemClock_4x,
     iReset                      ,
 
     iOpcode                     ,
@@ -60,6 +61,7 @@ module NandFlashController_Top
     input                          iDelayRefClock          ;
     // input                          iOutputDrivingClock     ;
     input                          iSystemClock_90         ;
+    input           iSystemClock_4x         ;
     input                          iReset                  ;
 
     input   [5:0]                  iOpcode                 ;
@@ -287,6 +289,7 @@ module NandFlashController_Top
             .iDelayRefClock              (iDelayRefClock              ),
             // .iOutputDrivingClock         (iOutputDrivingClock         ),
             .iSystemClock_90             (iSystemClock_90             ),
+            .iSystemClock_4x              (iSystemClock_4x),
             .iACG_PHY_PinIn_Reset        (wACG_PHY_PinIn_Reset        ),
             .iACG_PHY_PinIn_BUFF_Reset   (wACG_PHY_PinIn_BUFF_Reset   ),
             .iACG_PHY_PinOut_Reset       (wACG_PHY_PinOut_Reset       ),

@@ -19,6 +19,7 @@ module NFC_Pinpad
     iCLEToNAND      ,
     oRBFromNAND     ,
     iWPToNAND       ,
+    
     IO_NAND_DQS     ,
     IO_NAND_DQ      ,
     O_NAND_CE       ,
