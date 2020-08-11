@@ -7,11 +7,20 @@
 
 # Table of Contents
 
+- [Performance](#Performance)
 - [NFC RAW Interface](#NFC-RAW-Interface)
 - [AXI Interface](#AXI-Interface)
 - [Modules and Files ](#Modules-and-Files)
 - [How to Use](#How-to-Use)
 - [Building IP and simulation](#Building-IP-and-simulation)
+
+### Performance 
+
+-----
+
+- Tested device : MT29F64GAECA
+- Program(multi-cache, 1 Data Bus 1 RB) : 33MB/s
+
 
 ### NFC RAW Interface
 
