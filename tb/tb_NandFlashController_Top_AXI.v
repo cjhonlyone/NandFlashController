@@ -52,13 +52,13 @@ module tb_NandFlashController_Top_AXI;
         begin    
             iSystemClock <= 1'b1;
             iSystemClock_120 <= 1'b0;
-            #4000;
+            #3000;
             iSystemClock <= 1'b1;
             iSystemClock_120 <= 1'b1;
             #2000;
             iSystemClock <= 1'b0;
             iSystemClock_120 <= 1'b1;
-            #4000;
+            #3000;
             iSystemClock <= 1'b0;
             iSystemClock_120 <= 1'b0;
             #2000;
@@ -729,9 +729,9 @@ module tb_NandFlashController_Top_AXI;
 		iReset     <= 0;
 		s_axil_rst <= 1;
 
-        select_way(8'd2);
+        select_way(8'd1);
         reset_ffh;
-        set_feature(32'h14000000);
+        set_feature(32'h15000000);
         setfeature_efh;
         program_multiplane_cache(11'd0, 7'd0, 0);
         program_multiplane_cache(11'd0, 7'd2, 0);

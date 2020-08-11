@@ -1,0 +1,26 @@
+#-----------------------------------------------------------
+# Vivado v2017.4 (64-bit)
+# SW Build 2086221 on Fri Dec 15 20:55:39 MST 2017
+# IP Build 2085800 on Fri Dec 15 22:25:07 MST 2017
+# Start of session at: Tue Aug 11 21:08:00 2020
+# Process ID: 21576
+# Current directory: D:/work/OPENSSD/NandFlashController/prj/zynq_prj
+# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent17500 D:\work\OPENSSD\NandFlashController\prj\zynq_prj\zynq_lwip.xpr
+# Log file: D:/work/OPENSSD/NandFlashController/prj/zynq_prj/vivado.log
+# Journal file: D:/work/OPENSSD/NandFlashController/prj/zynq_prj\vivado.jou
+#-----------------------------------------------------------
+start_gui
+open_project D:/work/OPENSSD/NandFlashController/prj/zynq_prj/zynq_lwip.xpr
+update_compile_order -fileset sources_1
+open_bd_design {D:/work/zynq/zynq_lwip/zynq_lwip.srcs/sources_1/bd/design_1/design_1.bd}
+startgroup
+set_property -dict [list CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0}] [get_bd_cells processing_system7_0]
+endgroup
+save_bd_design
+reset_project
+open_bd_design {D:/work/zynq/zynq_lwip/zynq_lwip.srcs/sources_1/bd/design_1/design_1.bd}
+export_ip_user_files -of_objects  [get_files D:/work/zynq/zynq_lwip/zynq_lwip.srcs/constrs_1/new/new.xdc] -no_script -reset -force -quiet
+remove_files  -fileset constrs_1 D:/work/zynq/zynq_lwip/zynq_lwip.srcs/constrs_1/new/new.xdc
+export_ip_user_files -of_objects  [get_files D:/work/zynq/zynq_lwip/zynq_lwip.srcs/constrs_1/new/top.xdc] -no_script -reset -force -quiet
+remove_files  -fileset constrs_1 D:/work/zynq/zynq_lwip/zynq_lwip.srcs/constrs_1/new/top.xdc
+add_files -fileset constrs_1 -norecurse D:/work/OPENSSD/NandFlashController/prj/top.xdc

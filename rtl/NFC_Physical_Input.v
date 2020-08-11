@@ -260,22 +260,22 @@ module NFC_Physical_Input
 
     reg [7:0] rd_data_r;
     reg [7:0] rd_data_f;
-    reg [3:0] rd_data_valid_SRL;
+    reg [4:0] rd_data_valid_SRL;
     reg       rd_data_valid;
 
     always @(posedge iSystemClock) begin
         rd_data_r <= DQ_iddr_r180_2;
         rd_data_f <= DQ_iddr_f180;
-        rd_data_valid_SRL <= {rd_data_valid_SRL[2:0],iAddressLatchEnable[0] & iPI_Buff_WE};
+        rd_data_valid_SRL <= {rd_data_valid_SRL[3:0],iAddressLatchEnable[0] & iPI_Buff_WE};
         rd_data_valid <= rd_data_valid_SRL[3];
     end
 
     // ila_0 ila0(
-    // .clk(iSystemClock_4x),
+    // .clk(iDelayRefClock),
     // .probe0(rd_data_r),
     // .probe1(rd_data_f),
     // .probe2(rd_data_valid),
-    // .probe3(wDQAtRising),
+    // .probe3(wDQAtRising), 
     // .probe4(wDQAtFalling)
     // );
 
