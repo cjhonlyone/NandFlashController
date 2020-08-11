@@ -39,29 +39,29 @@ module tb_NandFlashController_Top_AXI;
     reg                           iSystemClock            ; // SDR 100MHz
     reg                           iDelayRefClock          ; // SDR 200Mhz
     reg                           iOutputDrivingClock     ; // SDR 200Mhz
-    reg                           iSystemClock_90         ;
+    reg                           iSystemClock_120         ;
     reg                           iReset                  ;
     // glbl glbl();
     // 100 MHz
     initial                 
     begin
         iSystemClock     <= 1'b0;
-        iSystemClock_90  <= 1'b0;
+        iSystemClock_120  <= 1'b0;
         #10000;
         forever
         begin    
             iSystemClock <= 1'b1;
-            iSystemClock_90 <= 1'b0;
-            #3000;
+            iSystemClock_120 <= 1'b0;
+            #4000;
             iSystemClock <= 1'b1;
-            iSystemClock_90 <= 1'b1;
-            #3000;
+            iSystemClock_120 <= 1'b1;
+            #2000;
             iSystemClock <= 1'b0;
-            iSystemClock_90 <= 1'b1;
-            #3000;
+            iSystemClock_120 <= 1'b1;
+            #4000;
             iSystemClock <= 1'b0;
-            iSystemClock_90 <= 1'b0;
-            #3000;
+            iSystemClock_120 <= 1'b0;
+            #2000;
         end
     end
 
@@ -252,7 +252,7 @@ module tb_NandFlashController_Top_AXI;
 			.iSystemClock        (iSystemClock        ),
 			.iDelayRefClock      (iDelayRefClock      ),
 			// .iOutputDrivingClock (iOutputDrivingClock ),
-            .iSystemClock_90     (iSystemClock_90),
+            .iSystemClock_120     (iSystemClock_120),
 			.iReset              (iReset              ),
 
 			.IO_NAND_DQS         (IO_NAND_DQS         ),

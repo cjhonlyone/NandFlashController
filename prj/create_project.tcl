@@ -45,7 +45,6 @@ add_files -fileset sources_1 ../lib/verilog-axi/rtl/axi_ram.v
 add_files -fileset sources_1 ../lib/axis/rtl/axis_async_fifo.v
 add_files -fileset sources_1 ../lib/axis/rtl/axis_async_fifo_adapter.v
 add_files -fileset sources_1 ../lib/axis/rtl/axis_adapter.v
-add_files -fileset sources_1 ../lib/axis/rtl/axis_fifo.v
 set_property top NandFlashController_Top_AXI [get_filesets sources_1]
 set_property top tb_NandFlashController_Top_AXI [get_filesets sim_1]
 update_compile_order -fileset sources_1

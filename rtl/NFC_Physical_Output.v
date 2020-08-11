@@ -8,7 +8,7 @@ module NFC_Physical_Output
 (
     iSystemClock            ,
     // iOutputDrivingClock     ,
-    iSystemClock_90         ,
+    iSystemClock_120         ,
     iModuleReset            ,
     iDQSOutEnable           ,
     iDQOutEnable            ,
@@ -37,7 +37,7 @@ module NFC_Physical_Output
     //            output resolution: 2.50 ns
     input                           iSystemClock            ;
     // input                           iOutputDrivingClock     ;
-    input                           iSystemClock_90         ;
+    input                           iSystemClock_120         ;
     input                           iModuleReset            ;
     input                           iDQSOutEnable           ;
     input                           iDQOutEnable            ;
@@ -96,7 +96,7 @@ module NFC_Physical_Output
 
     generate
     for (c = 0; c < 8; c = c + 1)
-    begin : DQOSERDESBits
+    begin : DQODDRBits
 
         ODDR
         #(
@@ -108,7 +108,7 @@ module NFC_Physical_Output
         (
             .D1             (iPO_DQ[ 0 + c]),
             .D2             (iPO_DQ[16 + c]),
-            .C              (iSystemClock_90),
+            .C              (iSystemClock_120),
             .CE             (1),
             .Q              (oDQToNAND[c]),
             .R              (1'b0),
@@ -125,7 +125,7 @@ module NFC_Physical_Output
         (
             .D1             (iDQOutEnable),
             .D2             (iDQOutEnable),
-            .C              (iSystemClock_90),
+            .C              (iSystemClock_120),
             .CE             (1),
             .Q              (oDQOutEnableToPinpad[c]),
             .R              (1'b0),
@@ -136,7 +136,7 @@ module NFC_Physical_Output
 
     generate
     for (d = 0; d < NumberOfWays; d = d + 1)
-    begin : CEOSERDESBits
+    begin : CEODDRBits
         ODDR
         #(
             .DDR_CLK_EDGE   ("SAME_EDGE"), //"OPPOSITE_EDGE"  "SAME_EDGE
