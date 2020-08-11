@@ -10,8 +10,8 @@ module NFC_Physical_Input
     iSystemClock    ,
     iDelayRefClock  ,
     // iOutputDrivingClock ,
-    iSystemClock_90         ,
-    iSystemClock_4x,
+    // iSystemClock_120         ,
+    // iSystemClock_4x,
     iModuleReset    ,
     iBufferReset    ,
 
@@ -41,8 +41,8 @@ module NFC_Physical_Input
     input           iSystemClock        ;
     input           iDelayRefClock      ;
     // input           iOutputDrivingClock     ;
-    input           iSystemClock_90         ;
-    input           iSystemClock_4x         ;
+    // input           iSystemClock_120         ;
+    // input           iSystemClock_4x         ;
     input           iModuleReset        ;
     input           iBufferReset        ;
     input   [7:0]                   iPO_DQStrobe            ; // DQS, full res.

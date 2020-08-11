@@ -157,8 +157,7 @@ set_property value s_axil [ipx::get_bus_parameters ASSOCIATED_BUSIF \
 
 ipx::infer_bus_interface iSystemClock xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
 ipx::infer_bus_interface iDelayRefClock xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
-ipx::infer_bus_interface iSystemClock_90 xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
-ipx::infer_bus_interface iSystemClock_4x xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
+ipx::infer_bus_interface iSystemClock_120 xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
 ipx::infer_bus_interface iReset xilinx.com:signal:reset_rtl:1.0 [ipx::current_core]
 
 ipx::save_core [ipx::current_core]

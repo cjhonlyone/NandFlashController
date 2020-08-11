@@ -39,8 +39,6 @@ prj: $(tb_NFC_Physical_FILES) $(NFC_Physical_FILES) $(NFC_Command_FILES)
 	for x in $(nand_model_FILES);      do echo "add_files -fileset sim_1 $$x" >> create_project.tcl; done
 
 	for x in $(AXILIB_FILES);         do echo "add_files -fileset sources_1 $$x" >> create_project.tcl; done
-
-	echo "add_files -fileset sources_1 ../lib/axis/rtl/axis_fifo.v" >> create_project.tcl;
 	
 	echo "set_property top NandFlashController_Top_AXI [get_filesets sources_1]" >> create_project.tcl;
 	echo "set_property top tb_NandFlashController_Top_AXI [get_filesets sim_1]" >> create_project.tcl;

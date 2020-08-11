@@ -11,8 +11,8 @@ module NFC_Physical_Top
     // clock
     iSystemClock            ,
     iDelayRefClock          ,
-    iSystemClock_90             ,
-    iSystemClock_4x,
+    iSystemClock_120             ,
+    // iSystemClock_4x,
     // reset from ACG
     iACG_PHY_PinIn_Reset               ,
     iACG_PHY_PinIn_BUFF_Reset          ,
@@ -72,8 +72,8 @@ module NFC_Physical_Top
     input                           iSystemClock                ; // SDR 100MHz
     input                           iDelayRefClock              ; // SDR 200MHz
     // input                           iOutputDrivingClock         ; // SDR 200Mhz
-    input                           iSystemClock_90             ;
-    input           iSystemClock_4x         ;
+    input                           iSystemClock_120             ;
+    // input           iSystemClock_4x         ;
     // reset from ACG
     input                           iACG_PHY_PinIn_Reset        ;
     input                           iACG_PHY_PinIn_BUFF_Reset   ;
@@ -158,8 +158,8 @@ module NFC_Physical_Top
     (
         .iSystemClock       (iSystemClock               ),
         .iDelayRefClock     (iDelayRefClock             ),
-        .iSystemClock_90    (iSystemClock_90            ),
-        .iSystemClock_4x    (iSystemClock_4x),
+        // .iSystemClock_120    (iSystemClock_120            ),
+        // .iSystemClock_4x    (iSystemClock_4x),
         .iModuleReset       (iACG_PHY_PinIn_Reset                  ),
         .iBufferReset       (iACG_PHY_PinIn_BUFF_Reset             ),
 
@@ -204,7 +204,7 @@ module NFC_Physical_Top
     Inst_NFC_Physical_Output
     (
         .iSystemClock           (iSystemClock           ),
-        .iSystemClock_90        (iSystemClock_90        ),
+        .iSystemClock_120        (iSystemClock_120        ),
         
         .iModuleReset           (iACG_PHY_PinOut_Reset              ),
         

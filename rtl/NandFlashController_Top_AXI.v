@@ -107,12 +107,14 @@ module NandFlashController_Top_AXI
     
     input  wire                       m_axi_rvalid,
     output wire                       m_axi_rready,
+
+    output wire  [NumberOfWays - 1:0] dbg_RB,
     
     input  wire                       iSystemClock       ,
     input  wire                       iDelayRefClock     ,
     // input  wire                       iOutputDrivingClock,
-    input  wire                       iSystemClock_90    ,
-    input  wire                       iSystemClock_4x,
+    input  wire                       iSystemClock_120    ,
+    // input  wire                       iSystemClock_4x,
     input  wire                       iReset             ,
     /*
     * Pin Pad
@@ -181,6 +183,7 @@ module NandFlashController_Top_AXI
     wire                         wNFCReadTransValid         ;
     
     wire  [NumberOfWays - 1:0]   wNFCReadyBusy              ;
+    assign dbg_RB = wNFCReadyBusy;
 
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
@@ -354,8 +357,8 @@ module NandFlashController_Top_AXI
             .iSystemClock        (iSystemClock),
             .iDelayRefClock      (iDelayRefClock),
             // .iOutputDrivingClock (iOutputDrivingClock),
-            .iSystemClock_90     (iSystemClock_90),
-            .iSystemClock_4x     (iSystemClock_4x),
+            .iSystemClock_120     (iSystemClock_120),
+            // .iSystemClock_4x     (iSystemClock_4x),
             .iReset              (iReset),
 
             .iOpcode             (wNFCOpcode),
