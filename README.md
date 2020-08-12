@@ -19,8 +19,8 @@
 -----
 
 - Tested device : MT29F64GAECA
-- Program(multi-cache, 1 Data Bus 1 RB) : 33MB/s
-
+- write speed is 48.442570 MB/s (multiplane-cache, 1 Data Bus 1 RB)
+- read speed is 93.782234 MB/s (just read)
 
 ### NFC RAW Interface
 
