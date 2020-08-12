@@ -29,6 +29,7 @@ module tb_NandFlashController_Top_AXI;
 	parameter IDelayValue          = 15              ;
 	parameter InputClockBufferType = 0               ;
 	parameter NumberOfWays         = 2               ;
+    parameter PageSize             = 8640            ; 
 
 	reg                           s_axil_clk              ;
 	reg                           s_axil_rst              ;
@@ -185,7 +186,8 @@ module tb_NandFlashController_Top_AXI;
 			.AXI_STRB_WIDTH       (AXI_STRB_WIDTH       ),
 			.IDelayValue          (IDelayValue          ),
 			.InputClockBufferType (InputClockBufferType ),
-			.NumberOfWays         (NumberOfWays         )
+			.NumberOfWays         (NumberOfWays         ),
+            .PageSize             (PageSize)
 		) inst_NandFlashController_Top_AXI (
 			.s_axil_clk          (s_axil_clk          ),
 			.s_axil_rst          (s_axil_rst          ),
@@ -552,8 +554,8 @@ module tb_NandFlashController_Top_AXI;
         begin
         base_adr = global_row[7]*6 + global_row[2:0];
         AXIL32_OUT(`rLength, {16'd0, number});
-        AXIL32_OUT(`rDMAWAddress, base_adr*4320+12*4320); //DMA addr
-        AXIL32_OUT(`rCommand, {11'd0, 5'b00101, 10'd0, 6'b000100});
+        AXIL32_OUT(`rDMAWAddress, base_adr*PageSize+12*PageSize); //DMA addr
+        AXIL32_OUT(`rCommand, {11'd0, 5'b00000, 10'd0, 6'b000100});
         AXIL32_IN(`rNFCStatus, status);
         @(posedge s_axil_clk);
 
@@ -659,8 +661,8 @@ module tb_NandFlashController_Top_AXI;
                 readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(`rDMARAddress, base_adr*4320);
-            progpage_80h_10h_multplane(16'd4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*PageSize);
+            progpage_80h_10h_multplane(PageSize);
 
 
             // plane1 page0
@@ -670,8 +672,8 @@ module tb_NandFlashController_Top_AXI;
                 readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(`rDMARAddress, base_adr*4320);
-            progpage_80h_15h_cache(16'd4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*PageSize);
+            progpage_80h_15h_cache(PageSize);
 
 
             // plane0 page1 cache
@@ -682,8 +684,8 @@ module tb_NandFlashController_Top_AXI;
                 readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(`rDMARAddress, base_adr*4320);
-            progpage_80h_10h_multplane(16'd4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*PageSize);
+            progpage_80h_10h_multplane(PageSize);
 
 
             // plane1 page1 cache
@@ -693,11 +695,11 @@ module tb_NandFlashController_Top_AXI;
                 readstatus_70h;
             end
             base_adr = global_row[7]*6 + global_row[2:0];
-            AXIL32_OUT(`rDMARAddress, base_adr*4320);
+            AXIL32_OUT(`rDMARAddress, base_adr*PageSize);
             if (finished)
-                progpage_80h_10h(16'd4320);
+                progpage_80h_10h(PageSize);
             else
-                progpage_80h_15h_cache(16'd4320);
+                progpage_80h_15h_cache(PageSize);
 
         end
     endtask
@@ -718,7 +720,7 @@ module tb_NandFlashController_Top_AXI;
 		AXIL32_WriteChannel(   0, 3'd0, 0, 0, 4'hf, 0, 0);
 
 	    for (i = 0; i < 2**14; i = i + 1) begin
-	    	if (i < 540*12) begin
+	    	if (i < (PageSize/8*12)) begin
 	    		axi_ram.mem[i] =  {$random(seed),$random(seed)};
 	    	end else begin
 	    		axi_ram.mem[i] =  0;
@@ -743,42 +745,42 @@ module tb_NandFlashController_Top_AXI;
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd0},{7'd1}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd0},{7'd2}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd0},{7'd3}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd0},{7'd4}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd0},{7'd5}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
 
 
         set_rowaddr({{5'd0},{11'd1},{7'd0}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd1},{7'd1}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd1},{7'd2}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd1},{7'd3}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd1},{7'd4}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
         set_rowaddr({{5'd0},{11'd1},{7'd5}});
-        readpage_00h_30h(16'd4320,1);
+        readpage_00h_30h(PageSize,1);
 
         repeat (100) @(posedge s_axil_clk);
 
-        for (i = 0; i < 540*12; i=i+1) begin
+        for (i = 0; i < (PageSize/8*12); i=i+1) begin
         	
-        	if (axi_ram.mem[i] != axi_ram.mem[i+540*12]) begin
+        	if (axi_ram.mem[i] != axi_ram.mem[i+(PageSize/8*12)]) begin
         		$display("test wrong!");
-        		$display("data %d %016x %016x",i, axi_ram.mem[i],axi_ram.mem[i+540*12]);
+        		$display("data %d %016x %016x",i, axi_ram.mem[i],axi_ram.mem[i+(PageSize/8*12)]);
         		$stop;
         	end else if (i<10) begin
-        		$display("data %d %016x %016x",i, axi_ram.mem[i],axi_ram.mem[i+540*12]);
+        		$display("data %d %016x %016x",i, axi_ram.mem[i],axi_ram.mem[i+(PageSize/8*12)]);
         	end
         end
 
@@ -803,31 +805,31 @@ module tb_NandFlashController_Top_AXI;
         end
 
         set_rowaddr({{5'd0},{11'd0},{7'd0}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd0},{7'd1}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd0},{7'd2}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd0},{7'd3}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd0},{7'd4}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd0},{7'd5}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
 
 
         set_rowaddr({{5'd0},{11'd1},{7'd0}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd1},{7'd1}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd1},{7'd2}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd1},{7'd3}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd1},{7'd4}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
         set_rowaddr({{5'd0},{11'd1},{7'd5}});
-        readpage_00h_30h(16'd4320,0);
+        readpage_00h_30h(PageSize,0);
 
 
         $display("test finished!");

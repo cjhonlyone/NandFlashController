@@ -20,7 +20,8 @@ module NandFlashController_Top_AXI
     
     parameter IDelayValue          = 15,
     parameter InputClockBufferType = 0 ,
-    parameter NumberOfWays         = 2 
+    parameter NumberOfWays         = 2 ,
+    parameter PageSize             = 8640
 )
 (
     input  wire                       s_axil_clk         ,
@@ -108,7 +109,7 @@ module NandFlashController_Top_AXI
     input  wire                       m_axi_rvalid,
     output wire                       m_axi_rready,
 
-    output wire  [NumberOfWays - 1:0] dbg_RB,
+    // output wire  [NumberOfWays - 1:0] dbg_RB,
     
     input  wire                       iSystemClock       ,
     input  wire                       iDelayRefClock     ,
@@ -183,7 +184,7 @@ module NandFlashController_Top_AXI
     wire                         wNFCReadTransValid         ;
     
     wire  [NumberOfWays - 1:0]   wNFCReadyBusy              ;
-    assign dbg_RB = wNFCReadyBusy;
+    // assign dbg_RB = wNFCReadyBusy;
 
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
@@ -352,7 +353,8 @@ module NandFlashController_Top_AXI
     NandFlashController_Top #(
             .IDelayValue(IDelayValue),
             .InputClockBufferType(InputClockBufferType),
-            .NumberOfWays(NumberOfWays)
+            .NumberOfWays(NumberOfWays),
+            .PageSize(PageSize)
         ) inst_NandFlashController_Top (
             .iSystemClock        (iSystemClock),
             .iDelayRefClock      (iDelayRefClock),
@@ -592,7 +594,7 @@ module NandFlashController_Top_AXI
 
 
     axis_async_fifo_adapter #(
-        .DEPTH(4320),
+        .DEPTH(PageSize),
         .S_DATA_WIDTH(16),
         .S_KEEP_ENABLE(1),
         .S_KEEP_WIDTH(2),
@@ -644,7 +646,7 @@ module NandFlashController_Top_AXI
     );
 
     axis_async_fifo_adapter #(
-        .DEPTH(4320),
+        .DEPTH(PageSize),
         .S_DATA_WIDTH(AXI_DATA_WIDTH),
         .S_KEEP_ENABLE(1),
         .S_KEEP_WIDTH(AXI_DATA_WIDTH/8),

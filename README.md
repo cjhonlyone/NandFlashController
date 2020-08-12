@@ -229,6 +229,14 @@ MT29F64G can run Sync mode 4.
 
 Get the current Feature.
 
+#### Read Parameter Page(ECh)
+
+- Sync
+- opcode : 6'b000001
+- length : 4320 means 4320 Bytes, must be even
+
+ Read Parameter Page
+
 #### Program Page(80h)
 
 - Sync
