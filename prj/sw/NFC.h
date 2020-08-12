@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include "xparameters.h"
+#include <xil_io.h>
 
 #define NFC XPAR_NANDFLASHCONTROLLER_0_BASEADDR
 
@@ -30,6 +33,8 @@ void reset_ffh(uint32_t way);
 void setfeature_efh(uint32_t way);
 
 void getfeature_eeh(uint32_t way);
+
+void readparameterpage(uint32_t way, uint32_t DMAWAddress);
 
 void progpage_80h_10h(uint32_t way, uint32_t col, uint32_t row, uint32_t length, uint32_t DMARAddress);
 

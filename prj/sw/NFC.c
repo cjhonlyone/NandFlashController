@@ -1,4 +1,5 @@
-#inlcude "NFC.h"
+#include "NFC.h"
+
 
 void select_way(uint32_t way)
 {
@@ -48,6 +49,15 @@ void getfeature_eeh(uint32_t way)
 {
 	select_way(way);
 	Xil_Out32(NFC+rCommand, 0x00000005);	
+	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
+	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
+}
+void readparameterpage(uint32_t way, uint32_t DMAWAddress)
+{
+	select_way(way);
+	set_length(256);
+	Xil_Out32(NFC+rDMAWAddress, DMAWAddress);
+	Xil_Out32(NFC+rCommand, 0x00010004);
 	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
 	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
 }
