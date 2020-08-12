@@ -37,8 +37,8 @@ set_property -dict {LOC B5  IOSTANDARD LVCMOS18 SLEW FAST} [get_ports O_NAND_WP_
 #set_property -dict {LOC  C4 IOSTANDARD LVCMOS18 SLEW FAST} [get_ports O_NAND_WP_0];
 
 
-create_generated_clock -name output_clock -source [get_pins design_1_i/NandFlashController_0/inst/inst_NandFlashController_Top/inst_NFC_Physical_Top/Inst_NFC_Physical_Output/Inst_DQSODDR/C] -multiply_by 1 -invert [get_ports IO_NAND_DQS_0]
-set data_clock clk_out1_design_1_clk_wiz_0_0;
+create_generated_clock -name output_clock -source [get_pins -hierarchical -filter {NAME =~ *Inst_DQSODDR/C}] -multiply_by 1 -invert [get_ports IO_NAND_DQS_0]
+set data_clock [get_clocks -of_objects [get_pins -hierarchical -regexp -filter {NAME =~ ".+/NandFlashController[_\d]+/iSystemClock"}]];
 
 set fwclk        output_clock;     # forwarded clock name (generated using create_generated_clock at output clock port)        
 set tsu_r        0.800;            # destination device setup time requirement for rising edge
@@ -76,13 +76,13 @@ set_input_delay -clock $input_clock -min [expr $input_clock_period/2 - $skew_bfe
 set_input_delay -clock $input_clock -max [expr $input_clock_period/2 + $skew_are] [get_ports $input_ports] -clock_fall -add_delay;
 set_input_delay -clock $input_clock -min [expr $input_clock_period/2 - $skew_bre] [get_ports $input_ports] -clock_fall -add_delay;
 
-set_multicycle_path -setup -end -rise_from [get_clocks virclk] -rise_to [get_clocks clk_out1_design_1_clk_wiz_0_0] 0
-set_multicycle_path -setup -end -fall_from [get_clocks virclk] -fall_to [get_clocks clk_out1_design_1_clk_wiz_0_0] 0
+set_multicycle_path -setup -end -rise_from [get_clocks virclk] -rise_to [get_clocks $data_clock] 0
+set_multicycle_path -setup -end -fall_from [get_clocks virclk] -fall_to [get_clocks $data_clock] 0
 
-set_false_path -setup -fall_from [get_clocks virclk] -rise_to [get_clocks clk_out1_design_1_clk_wiz_0_0]
-set_false_path -setup -rise_from [get_clocks virclk] -fall_to [get_clocks clk_out1_design_1_clk_wiz_0_0]
-set_false_path -hold -rise_from [get_clocks virclk] -rise_to [get_clocks clk_out1_design_1_clk_wiz_0_0]
-set_false_path -hold -fall_from [get_clocks virclk] -fall_to [get_clocks clk_out1_design_1_clk_wiz_0_0]
+set_false_path -setup -fall_from [get_clocks virclk] -rise_to [get_clocks $data_clock]
+set_false_path -setup -rise_from [get_clocks virclk] -fall_to [get_clocks $data_clock]
+set_false_path -hold -rise_from [get_clocks virclk] -rise_to [get_clocks $data_clock]
+set_false_path -hold -fall_from [get_clocks virclk] -fall_to [get_clocks $data_clock]
 
 
 set_false_path -from [get_clocks virclk] -to [get_clocks output_clock]

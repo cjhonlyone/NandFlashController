@@ -3,7 +3,8 @@
 module NFC_Command_Issue_Top
 #
 (
-    parameter NumberOfWays    =   4
+    parameter NumberOfWays    =   4,
+    parameter PageSize        = 8640
 )
 (
     iSystemClock             ,  
@@ -741,7 +742,7 @@ module NFC_Command_Issue_Top
 
 
     // Parameters
-    parameter DEPTH = 4320;
+    parameter DEPTH = PageSize;
     parameter DATA_WIDTH = 16;
     parameter KEEP_ENABLE = (DATA_WIDTH>8);
     parameter KEEP_WIDTH = (DATA_WIDTH/8);

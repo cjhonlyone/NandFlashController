@@ -5,7 +5,8 @@ module NandFlashController_Top
 (
     parameter IDelayValue          = 20,
     parameter InputClockBufferType = 0,
-    parameter NumberOfWays         = 2
+    parameter NumberOfWays         = 2,
+    parameter PageSize             = 8640
 )
 (
     iSystemClock                , // 1x clk
@@ -174,7 +175,8 @@ module NandFlashController_Top
 
 
     NFC_Command_Issue_Top #(
-            .NumberOfWays(NumberOfWays)
+            .NumberOfWays(NumberOfWays),
+            .PageSize(PageSize)
         ) inst_NFC_Command_Issue_Top (
             .iSystemClock           (iSystemClock          ),
             .iReset                 (iReset                ),
