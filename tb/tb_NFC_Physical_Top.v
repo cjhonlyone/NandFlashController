@@ -26,41 +26,49 @@ module tb_NFC_Physical_Top;
 	parameter InputClockBufferType = 0;
 	parameter NumberOfWays         = 2;
 	
-    reg                           iSystemClock            ; // SDR 100MHz
-    reg                           iDelayRefClock          ; // SDR 200Mhz
-    reg                           iOutputDrivingClock     ; // SDR 200Mhz
     // wire                           iReset                  ;
 	// glbl glbl();
 	// 100 MHz
-	initial                 
-	begin
-		iSystemClock     <= 1'b0;
-		#10000;
-		forever
-		begin	 
-			iSystemClock <= 1'b1;
-			#5000;
-			iSystemClock <= 1'b0;
-			#5000;
-		end
-	end
+    reg                           iSystemClock            ; // SDR 100MHz
+    reg                           iDelayRefClock          ; // SDR 200Mhz
+    reg                           iSystemClock_120         ;
+    // glbl glbl();
+    // 100 MHz
+    initial                 
+    begin
+        iSystemClock     <= 1'b0;
+        iSystemClock_120  <= 1'b0;
+        #10000;
+        forever
+        begin    
+            iSystemClock <= 1'b1;
+            iSystemClock_120 <= 1'b0;
+            #3000;
+            iSystemClock <= 1'b1;
+            iSystemClock_120 <= 1'b1;
+            #2000;
+            iSystemClock <= 1'b0;
+            iSystemClock_120 <= 1'b1;
+            #3000;
+            iSystemClock <= 1'b0;
+            iSystemClock_120 <= 1'b0;
+            #2000;
+        end
+    end
 
-	// 200 MHz
-	initial                 
-	begin
-		iDelayRefClock          <= 1'b0;
-		iOutputDrivingClock     <= 1'b0;
-		#10000;
-		forever
-		begin	 
-			iDelayRefClock      <= 1'b1;
-			iOutputDrivingClock <= 1'b1;
-			#2500;
-			iDelayRefClock      <= 1'b0;
-			iOutputDrivingClock <= 1'b0;
-			#2500;
-		end
-	end
+    // 200 MHz
+    initial                 
+    begin
+        iDelayRefClock          <= 1'b0;
+        #10000;
+        forever
+        begin    
+            iDelayRefClock      <= 1'b1;
+            #2500;
+            iDelayRefClock      <= 1'b0;
+            #2500;
+        end
+    end
 
     // reset from ACG
     reg                           iACG_PHY_PinIn_Reset        ;
@@ -120,10 +128,14 @@ module tb_NFC_Physical_Top;
         ) inst_NFC_Physical_Top (
             .iSystemClock                (iSystemClock),
             .iDelayRefClock              (iDelayRefClock),
-            .iOutputDrivingClock         (iOutputDrivingClock),
+            .iSystemClock_120            (iSystemClock_120),
             .iACG_PHY_PinIn_Reset        (iACG_PHY_PinIn_Reset),
             .iACG_PHY_PinIn_BUFF_Reset   (iACG_PHY_PinIn_BUFF_Reset),
             .iACG_PHY_PinOut_Reset       (iACG_PHY_PinOut_Reset),
+            .iPI_BUFF_RE                 (iPI_BUFF_RE),
+            .iPI_BUFF_OutSel             (iPI_BUFF_OutSel),
+            .oPI_DQ                      (oPI_DQ),
+            .oPI_ValidFlag               (oPI_ValidFlag),
             .iACG_PHY_DelayTapLoad       (iACG_PHY_DelayTapLoad),
             .iACG_PHY_DelayTap           (iACG_PHY_DelayTap),
             .oPHY_ACG_DelayReady         (oPHY_ACG_DelayReady),
@@ -155,6 +167,7 @@ module tb_NFC_Physical_Top;
             .I_NAND_RB                   (I_NAND_RB),
             .O_NAND_WP                   (O_NAND_WP)
         );
+
 
 	nand_model nand_b0_1 (
         //clocks

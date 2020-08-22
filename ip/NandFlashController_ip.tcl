@@ -55,6 +55,7 @@ add_bus "m_axi" "master" \
         {"m_axi_awsize" "AWSIZE"} \
         {"m_axi_awburst" "AWBURST"} \
         {"m_axi_awlock" "AWLOCK"} \
+        {"m_axi_awuser" "AWUSER"} \
         {"m_axi_awcache" "AWCACHE"} \
         {"m_axi_awprot" "AWPROT"} \
         {"m_axi_awqos" "AWQOS"} \
@@ -75,6 +76,7 @@ add_bus "m_axi" "master" \
         {"m_axi_arsize" "ARSIZE"} \
         {"m_axi_arburst" "ARBURST"} \
         {"m_axi_arlock" "ARLOCK"} \
+        {"m_axi_aruser" "ARUSER"} \
         {"m_axi_arcache" "ARCACHE"} \
         {"m_axi_arprot" "ARPROT"} \
         {"m_axi_arqos" "ARQOS"} \

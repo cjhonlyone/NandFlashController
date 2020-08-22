@@ -3,12 +3,13 @@
 module NandFlashController_Top_AXI
 #
 (
+    parameter AXI_HPorACP          = 1, // 1 means hp port, 0 means acp port
     /*
     * AXI-lite slave interface
     */
-    parameter AXIL_ADDR_WIDTH           = 32,
-    parameter AXIL_DATA_WIDTH           = 32,
-    parameter AXIL_STRB_WIDTH           = AXIL_DATA_WIDTH/8,
+    parameter AXIL_ADDR_WIDTH      = 32,
+    parameter AXIL_DATA_WIDTH      = 32,
+    parameter AXIL_STRB_WIDTH      = AXIL_DATA_WIDTH/8,
     /*
     * AXI master interface
     */
@@ -17,6 +18,8 @@ module NandFlashController_Top_AXI
     parameter AXI_DATA_WIDTH       = 64,
     parameter AXI_MAX_BURST_LEN    = 16,
     parameter AXI_STRB_WIDTH       = AXI_DATA_WIDTH/8,
+    parameter AXI_ARUSER_WIDTH     = 5,
+    parameter AXI_AWUSER_WIDTH     = 5,
     
     parameter IDelayValue          = 15,
     parameter InputClockBufferType = 0 ,
@@ -63,9 +66,9 @@ module NandFlashController_Top_AXI
     output wire [3:0]                 m_axi_awcache,
     output wire [2:0]                 m_axi_awprot,
 
-    output wire                       m_axi_awqos,
+    output wire [3:0]                 m_axi_awqos,
     // output wire                       m_axi_awregion,
-    // output wire [AWUSER_WIDTH-1:0]    m_axi_awuser,
+    output wire [AXI_AWUSER_WIDTH-1:0]    m_axi_awuser,
 
     output wire                       m_axi_awvalid,
     input  wire                       m_axi_awready,
@@ -93,9 +96,9 @@ module NandFlashController_Top_AXI
     output wire [3:0]                 m_axi_arcache,
     output wire [2:0]                 m_axi_arprot,
 
-    output wire                       m_axi_arqos,
+    output wire [3:0]                 m_axi_arqos,
     // output wire                       m_axi_arregion,
-    // output wire [ARUSER_WIDTH-1:0]    m_axi_aruser,
+    output wire [AXI_ARUSER_WIDTH-1:0]    m_axi_aruser,
 
     output wire                       m_axi_arvalid,
     input  wire                       m_axi_arready,
@@ -192,6 +195,20 @@ module NandFlashController_Top_AXI
 
     assign m_axi_awqos = 4'b0000;
     assign m_axi_arqos = 4'b0000;
+
+    assign m_axi_awprot = 3'b000;
+    assign m_axi_arprot = 3'b000;
+
+    generate
+        if (AXI_HPorACP == 0) begin
+            assign m_axi_awuser = 5'b00001;
+            assign m_axi_aruser = 5'b00001;
+        end else begin
+            assign m_axi_awuser = 5'b00000;
+            assign m_axi_aruser = 5'b00000;
+        end
+    endgenerate
+    // acp coherent request
 
 
     NandFlashController_AXIL_Reg #(
@@ -559,7 +576,7 @@ module NandFlashController_Top_AXI
         .m_axi_awburst (m_axi_awburst ),
         .m_axi_awlock  (m_axi_awlock  ),
         .m_axi_awcache (m_axi_awcache ),
-        .m_axi_awprot  (m_axi_awprot  ),
+        // .m_axi_awprot  (m_axi_awprot  ),
         .m_axi_awvalid (m_axi_awvalid ),
         .m_axi_awready (m_axi_awready ),
         .m_axi_wdata   (m_axi_wdata   ),
@@ -578,7 +595,7 @@ module NandFlashController_Top_AXI
         .m_axi_arburst (m_axi_arburst ),
         .m_axi_arlock  (m_axi_arlock  ),
         .m_axi_arcache (m_axi_arcache ),
-        .m_axi_arprot  (m_axi_arprot  ),
+        // .m_axi_arprot  (m_axi_arprot  ),
         .m_axi_arvalid (m_axi_arvalid ),
         .m_axi_arready (m_axi_arready ),
         .m_axi_rid     (m_axi_rid     ),

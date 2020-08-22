@@ -31,7 +31,7 @@ int g_no_device_flag = 1;
 #define INT_SEND_EP     0x02
 
 #define SEND_BUFF_LEN    8640
-#define RECV_BUFF_LEN    8640
+#define RECV_BUFF_LEN    8704
 
 #define VID 0x03fd
 #define PID 0x0103	//jlq
@@ -314,7 +314,7 @@ UINT bulk_rev_thread(LPVOID pParam){  //线程要调用的函数
 			}
 			else
 			{
-				for (int i = 0; i < (2048 + 112); i++)
+				for (int i = 0; i < (128); i++)
 				{
 					if (i % 4 == 0)
 					{

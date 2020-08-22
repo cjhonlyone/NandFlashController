@@ -266,7 +266,7 @@ assign m_axi_arsize = AXI_BURST_SIZE;
 assign m_axi_arburst = 2'b01;
 assign m_axi_arlock = 1'b0;
 assign m_axi_arcache = 4'b0011;
-assign m_axi_arprot = 3'b000;
+assign m_axi_arprot = 3'b010;
 assign m_axi_arvalid = m_axi_arvalid_reg;
 assign m_axi_rready = m_axi_rready_reg;
 
