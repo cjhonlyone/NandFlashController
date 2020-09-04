@@ -78,15 +78,18 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\work\zynq\USBHOSTAPP\USBHOSTAPP;$(IncludePath)</IncludePath>
-    <ReferencePath>D:\work\zynq\USBHOSTAPP\USBHOSTAPP;$(ReferencePath)</ReferencePath>
-    <LibraryPath>D:\work\zynq\USBHOSTAPP\USBHOSTAPP;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\USBHOSTAPP;$(IncludePath)</IncludePath>
+    <ReferencePath>..\USBHOSTAPP;$(ReferencePath)</ReferencePath>
+    <LibraryPath>..\USBHOSTAPP;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>..\USBHOSTAPP;$(WindowsSDK_IncludePath);</IncludePath>
+    <ReferencePath>..\USBHOSTAPP;$(VC_ReferencesPath_x64);</ReferencePath>
+    <LibraryPath>..\USBHOSTAPP;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -177,6 +180,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>libusb-1.0.lib;</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>

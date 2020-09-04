@@ -3,10 +3,10 @@
 <!--                                                         -->
 <!-- Copyright 1986-2017 Xilinx, Inc. All Rights Reserved.   -->
 
-<Project Version="7" Minor="35" Path="D:/work/openssd/NandFlashController/ip/NandFlashController.xpr">
+<Project Version="7" Minor="35" Path="D:/zynq/NandFlashController/ip/NandFlashController.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
   <Configuration>
-    <Option Name="Id" Val="06c7ce22b5974fe4b98de002b4f5a229"/>
+    <Option Name="Id" Val="e4d644a1fa2e48b896bfbd4195c4080a"/>
     <Option Name="Part" Val="xc7vx485tffg1157-1"/>
     <Option Name="CompiledLibDir" Val="$PCACHEDIR/compile_simlib"/>
     <Option Name="CompiledLibDirXSim" Val=""/>

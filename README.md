@@ -18,10 +18,14 @@
 
 -----
 
-- Tested device : MT29F64GAECA
-- write speed is 48.442570 MB/s (multiplane-cache, 1 Data Bus 1 RB)
-- read speed is 93.782234 MB/s (just read)
+- Tested device : MT29F64G08AECABH1 (mode 5, 8192 Bytes per Page)
+- write speed is 48 MB/s (multiplane-cache, 1 Data Bus 1 RB)
+- read speed is 93 MB/s (just read)
 
+- Tested device : MT29F64G08AMCBBH2 (mode 4, 4096 Bytes per Page)
+- write speed is 37 MB/s (multiplane-cache, 1 Data Bus 1 RB)
+- read speed is 72 MB/s (just read)
+- 
 ### NFC RAW Interface
 
 ------
@@ -273,5 +277,6 @@ Get the current Feature.
 - need modelsim 10.6d / Vivado Simualtor
 
 ```bash
-make prj
+# build Zynq Project
+source ./BuildZynqPrj.tcl
 ```

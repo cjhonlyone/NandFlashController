@@ -37,10 +37,10 @@ void reset_ffh(uint32_t way)
 	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
 	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
 }
-void setfeature_efh(uint32_t way)
+void setfeature_efh(uint32_t way, uint32_t feature)
 {
 	select_way(way);
-	set_feature(0x15000000);
+	set_feature(feature);
 	Xil_Out32(NFC+rCommand, 0x00000002);	
 	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
 	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
@@ -126,8 +126,9 @@ uint8_t readstatus_70h(uint32_t way)
 {
 	select_way(way);
 	Xil_Out32(NFC+rCommand, 0x00000007);	
-	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
-	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
+	usleep(1);
+//	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
+//	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
 
 	u8 status = ((Xil_In32(NFC+rNFCStatus) & 0x0000ff00) >> 8);
 	return status;
@@ -137,9 +138,9 @@ uint8_t readstatus_78h(uint32_t way, uint32_t row)
 	select_way(way);
 	select_row(row);
 	Xil_Out32(NFC+rCommand, 0x00010007);	
-
-	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
-	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
+	usleep(1);
+//	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000000));
+//	while(((Xil_In32(NFC+rNFCStatus) & 0x00000001) == 0x00000001));
 
 	u8 status = ((Xil_In32(NFC+rNFCStatus) & 0x0000ff00) >> 8);
 	return status;
