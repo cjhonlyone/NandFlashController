@@ -1,8 +1,1 @@
 ##ignore this file##
-/prj/NandFlashController/
-/prj/*.dmp
-/prj/*.log
-/prj/*.jou
-/prj/transcript
-/ip/*
-!/ip/NandFlashController_ip.tcl
