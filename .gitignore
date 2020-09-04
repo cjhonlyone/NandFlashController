@@ -6,5 +6,3 @@
 /prj/transcript
 /ip/*
 !/ip/NandFlashController_ip.tcl
-/pcsoftware/USBHOSTAPP/x64/Debug
-/pcsoftware/USBHOSTAPP/USBHOSTAPP/x64/Debug
