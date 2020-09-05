@@ -2,4 +2,4 @@
 !generate_ip.tcl
 !NandFlashController_ip.tcl
 !.gitignore
-!.Makefile
+!Makefile
