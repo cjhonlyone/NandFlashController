@@ -122,13 +122,12 @@ static uint8_t * usb_rx_bufferPtr = (uint8_t *)usb_rx_buffer;
 static uint8_t * usb_tx_bufferPtr = (uint8_t *)usb_tx_buffer;
 #define UsbPacketSize 8704
 
-u32 test_WRconsistent(u32 page_size)
+u32 test_WRconsistent(u32 way, u32 page_size)
 {
     uint16_t j = 0;
     uint32_t m ,k ;
     m = 0;
     k=0;
-	u32 way = 1;
 
 	//erase first block
     eraseblock_60h_d0h(way,0);
@@ -172,10 +171,9 @@ u32 test_WRconsistent(u32 page_size)
 
 }
 
-float test_writespeed(u32 page_size)
+float test_writespeed(u32 way, u32 page_size)
 {
     uint32_t m =0;
-	u32 way = 1;
 	XTime tEnd, tCur;
 	u32 tUsed;
     eraseblock_60h_d0h(way,0);
@@ -220,12 +218,11 @@ float test_writespeed(u32 page_size)
 	wspeed = (page_size >> 11)*1000000/(float)(tUsed)/2;
 	return wspeed;
 }
-float test_readspeed(u32 page_size)
+float test_readspeed(u32 way, u32 page_size)
 {
 
     uint32_t m;
     m = 0;
-	u32 way = 1;
 	XTime tEnd, tCur;
 	u32 tUsed;
 	XTime_GetTime(&tCur);
@@ -269,8 +266,10 @@ int main()
 	u32 way = 1;
 	u32 bytes;
     uint16_t j = 0;
-    reset_ffh(way);
-    setfeature_efh(way, 0x14000000);
+    reset_ffh(1);
+    reset_ffh(2);
+    setfeature_efh(1, 0x14000000);
+    setfeature_efh(2, 0x14000000);
 
 
 
@@ -392,6 +391,7 @@ int main()
 					usleep(DelayForUsbTransferUs);
 					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);
 					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
+					way = *(u32*)(usb_rx_bufferPtr+12);
 					usleep(DelayForUsbTransferUs);
 					memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
 					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
@@ -409,6 +409,7 @@ int main()
 					usleep(DelayForUsbTransferUs);
 					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);
 					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
+					way = *(u32*)(usb_rx_bufferPtr+12);
 					usleep(DelayForUsbTransferUs);
 					memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
 					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
@@ -425,7 +426,7 @@ int main()
 					usleep(DelayForUsbTransferUs);
 					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);
 					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
-
+					way = *(u32*)(usb_rx_bufferPtr+12);
 					memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
 					Xil_DCacheFlushRange((u32)usb_rx_bufferPtr+32,NandPageSize);
 					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
@@ -441,6 +442,7 @@ int main()
 				{
 					usleep(DelayForUsbTransferUs);
 					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
+					way = *(u32*)(usb_rx_bufferPtr+12);
 					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
 					eraseblock_60h_d0h(way,FLASH(0, UsbCmdFlashBlock));
 					while((readstatus_70h(way) & (ARDY)) == 0x00);
@@ -455,6 +457,7 @@ int main()
 				{
 					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);//block num
 					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
+					way = *(u32*)(usb_rx_bufferPtr+12);
 						for (j = 0;j<128;j++)
 						{
 							usleep(DelayForUsbTransferUs-200);
@@ -474,8 +477,10 @@ int main()
 				}
 				else if (usb_rx_bufferPtr[2] == TESTWRconsistent) //
 				{
+					way = *(u32*)(usb_rx_bufferPtr+12);
+
 					u32 tmp;
-					tmp = test_WRconsistent(NandPageSize);
+					tmp = test_WRconsistent(way, NandPageSize);
 
 					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (TESTWRconsistent << 16);
 					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
@@ -486,8 +491,10 @@ int main()
 				}
 				else if (usb_rx_bufferPtr[2] == TESTreadspeed) //
 				{
+					way = *(u32*)(usb_rx_bufferPtr+12);
+
 					float tmp;
-					tmp = test_readspeed(NandPageSize);
+					tmp = test_readspeed(way, NandPageSize);
 
 					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (TESTreadspeed << 16);
 					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
@@ -498,8 +505,10 @@ int main()
 				}
 				else if (usb_rx_bufferPtr[2] == TESTwritespeed) //
 				{
+					way = *(u32*)(usb_rx_bufferPtr+12);
+
 					float tmp;
-					tmp = test_writespeed(NandPageSize);
+					tmp = test_writespeed(way, NandPageSize);
 
 					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (TESTwritespeed << 16);
 					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;

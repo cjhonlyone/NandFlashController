@@ -245,7 +245,7 @@ BOOL CUSBHOSTAPPDlg::OnInitDialog()
 	USES_CONVERSION;
 	SetDlgItemText(IDC_EDIT1, A2T("0"));// page
 	SetDlgItemText(IDC_EDIT2, A2T("0"));// block
-
+	SetDlgItemText(IDC_EDIT4, A2T("1"));// block
 	static CFont font;
 	font.DeleteObject();
 	font.CreatePointFont(100, _T("Consolas"));
@@ -458,9 +458,10 @@ void CUSBHOSTAPPDlg::OnBnClickedButton2()
 
 		GetDlgItem(IDC_EDIT1)->GetWindowText(str);
 		*(u32 *)(send_buf + 4) = _tcstol(str, NULL, 10);
-
 		GetDlgItem(IDC_EDIT2)->GetWindowText(str);
 		*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
 		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
@@ -571,6 +572,9 @@ void CUSBHOSTAPPDlg::OnBnClickedButton4()
 		GetDlgItem(IDC_EDIT2)->GetWindowText(str);
 		*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
 
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
 		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
 		while (bulk_thread_finished == 0);
@@ -618,6 +622,9 @@ void CUSBHOSTAPPDlg::OnBnClickedButton5()
 
 		GetDlgItem(IDC_EDIT2)->GetWindowText(str);
 		*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
+
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
 		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
@@ -757,6 +764,8 @@ void CUSBHOSTAPPDlg::OnBnClickedButton6()
 		//while (bulk_thread_finished == 1);
 		//TRACE("read page %dx\n", bulk_thread_finished);
 		*(u32 *)(send_buf) = 0x00007f7e | (TESTWRconsistent << 16);
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
 		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
@@ -806,7 +815,8 @@ void CUSBHOSTAPPDlg::OnBnClickedButton7()
 		//while (bulk_thread_finished == 1);
 		//TRACE("read page %dx\n", bulk_thread_finished);
 		*(u32 *)(send_buf) = 0x00007f7e | (TESTwritespeed << 16);
-
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
 		if (ret != 0)
@@ -849,7 +859,8 @@ void CUSBHOSTAPPDlg::OnBnClickedButton8()
 		//while (bulk_thread_finished == 1);
 		//TRACE("read page %dx\n", bulk_thread_finished);
 		*(u32 *)(send_buf) = 0x00007f7e | (TESTreadspeed << 16);
-
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
 		if (ret != 0)
