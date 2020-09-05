@@ -63,6 +63,9 @@ Then copy sw to .sdk.
 - Sync mode 4 : iSystemClock and iSystemClock_120, 83.333MHz
 - set feature 0x14000000
 
+AXI-HP need `Xil_DCacheInvalidateRange` and `Xil_DCacheFlushRange`. 
+AXI-ACP do not need, Zynq PS will operate cache coherency by itself.
+
 ### NFC RAW Interface
 
 ------
