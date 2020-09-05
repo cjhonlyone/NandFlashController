@@ -1,7 +1,7 @@
 # SHELL := /bin/bash
 
 DEVICE=xc7k325tffg900-2
-Vivado_DIR=/cygdrive/d/Xilinx/Vivado/2017.4/bin
+Vivado_DIR=/cygdrive/c/Xilinx/Vivado/2017.4/bin
 
 # ip:
 ip:

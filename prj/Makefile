@@ -1,7 +1,7 @@
 # SHELL := /bin/bash
 
 DEVICE=xc7k325tffg900-2
-Vivado_DIR=/cygdrive/d/Xilinx/Vivado/2017.4/bin
+Vivado_DIR=/cygdrive/c/Xilinx/Vivado/2017.4/bin
 
 tb_NFC_Physical_FILES = $(wildcard ../tb/tb_NFC_Physical*.v)
 NFC_Physical_FILES = $(wildcard ../rtl/NFC_Physical*.v) $(wildcard ../rtl/NFC_Pin*.v)
@@ -57,7 +57,7 @@ CommonPrj: $(tb_NFC_Physical_FILES) $(NFC_Physical_FILES) $(NFC_Command_FILES)
 	
 # ip:
 ZynqPrj:
-	${Vivado_DIR}/vivado -mode tcl -source ./ZynqNandPrj/BuildZynqPrj.tcl
+	${Vivado_DIR}/vivado -mode tcl -source ./BuildZynqPrj.tcl
 
 clean:
 	rm -rf .Xil

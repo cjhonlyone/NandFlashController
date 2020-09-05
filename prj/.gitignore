@@ -1,2 +1,4 @@
-/ZynqNandPrj/ZynqNandFlash/
-/ZynqNandPrj/.Xil/
+/ZynqNandFlash/
+/.Xil/
+*.jou
+*.log
