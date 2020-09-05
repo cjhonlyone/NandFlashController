@@ -25,7 +25,44 @@
 - Tested device : MT29F64G08AMCBBH2 (mode 4, 4096 Bytes per Page)
 - write speed is 37 MB/s (multiplane-cache, 1 Data Bus 1 RB)
 - read speed is 72 MB/s (just read)
-- 
+
+### Building IP and simulation
+
+------
+
+- need modelsim 10.6d / Vivado Simualtor
+
+Build IP
+```bash
+cd ip
+make ip
+```
+
+### How to Use
+
+------
+
+Build example project (without Zynq PS)
+
+```bash
+cd prj
+make CommonPrj
+```
+
+Build example project (withZynq PS)
+
+```bash
+cd prj
+make ZynqPrj
+```
+
+Then copy sw to .sdk.
+
+- Sync mode 5 : iSystemClock and iSystemClock_120, 100MHz
+- set feature 0x15000000
+- Sync mode 4 : iSystemClock and iSystemClock_120, 83.333MHz
+- set feature 0x14000000
+
 ### NFC RAW Interface
 
 ------
@@ -177,7 +214,7 @@
 
 `iDelayRefClock` 200MHz for IODELAY2 
 
-`iSystemClock_90` Nand Controllor DQ output clock
+`iSystemClock_120` Nand Controllor DQ output clock
 
 ### Modules and Files 
 
@@ -190,10 +227,6 @@
 | `NFC_Command_*`           | Command Decode   |
 | `NFC_Atom_*`   | Atom Command (Command/Address/DataIn/DataOut) |
 | `NFC_Phy*`            | Pinpad |
-
-### How to Use
-
-------
 
 #### Select Way
 
@@ -270,13 +303,4 @@ Get the current Feature.
 - targetID : 5'b00000 Read Status normal(70h)
 - targetID : 5'b00001 Read Status Enhanced(78h)
 
-### Building IP and simulation
 
-------
-
-- need modelsim 10.6d / Vivado Simualtor
-
-```bash
-# build Zynq Project
-source ./BuildZynqPrj.tcl
-```
