@@ -60,6 +60,8 @@ ZynqPrj:
 	${Vivado_DIR}/vivado -mode tcl -source ./BuildZynqPrj.tcl
 
 clean:
+	rm -r create_project.tcl
 	rm -rf .Xil
 	rm -rf NandFlashController
+	rm -rf ZynqNandFlash
 	rm -r *.log *.jou *.dmp

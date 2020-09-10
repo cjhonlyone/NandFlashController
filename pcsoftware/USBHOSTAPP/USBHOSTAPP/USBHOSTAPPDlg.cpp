@@ -7,6 +7,10 @@
 #include "USBHOSTAPPDlg.h"
 #include "afxdialogex.h"
 
+//#include <ws2tcpip.h>
+#include <Winsock2.h>
+#pragma comment(lib,"Ws2_32.lib")
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -36,6 +40,7 @@ int g_no_device_flag = 1;
 #define VID 0x03fd
 #define PID 0x0103	//jlq
 
+volatile int sys_tcp = 0;
 volatile int exit_thread = 0;
 volatile int bulk_thread_finished = 0;
 volatile int bulk_rev_thread_ready = 0;
@@ -61,7 +66,7 @@ unsigned char send_buf[SEND_BUFF_LEN];  //usb发送缓冲区
 libusb_device_handle *handle = NULL;
 libusb_context *ctx = NULL;
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
-
+SOCKET clientSocket;//定义套接字句柄
 #pragma pack(1)
 struct nand_onfi_params {
 	/* rev info and features block */
@@ -206,6 +211,7 @@ BEGIN_MESSAGE_MAP(CUSBHOSTAPPDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON6, &CUSBHOSTAPPDlg::OnBnClickedButton6)
 	ON_BN_CLICKED(IDC_BUTTON7, &CUSBHOSTAPPDlg::OnBnClickedButton7)
 	ON_BN_CLICKED(IDC_BUTTON8, &CUSBHOSTAPPDlg::OnBnClickedButton8)
+	ON_BN_CLICKED(IDC_BUTTON9, &CUSBHOSTAPPDlg::OnBnClickedButton9)
 END_MESSAGE_MAP()
 
 
@@ -443,17 +449,58 @@ usb_exit:
 void CUSBHOSTAPPDlg::OnBnClickedButton2()
 {
 	// TODO:  在此添加控件通知处理程序代码
-	int ret = 0;
-	int actual_len = 0;
-	CString str = NULL;
-	u32 PaketNum = 1;
 	u8* bufferptr = NULL;
-	if (handle != NULL)
+	CString str = NULL;
+	if (sys_tcp == 0)
 	{
-		bulk_thread_finished = 1;
-		bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)PaketNum);
-		//while (bulk_thread_finished == 1);
-		//TRACE("read page %dx\n", bulk_thread_finished);
+		int ret = 0;
+		int actual_len = 0;
+		
+		u32 PaketNum = 1;
+
+		if (handle != NULL)
+		{
+			bulk_thread_finished = 1;
+			bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)PaketNum);
+			//while (bulk_thread_finished == 1);
+			//TRACE("read page %dx\n", bulk_thread_finished);
+			*(u32 *)(send_buf) = 0x00007f7e | (ReadPage << 16);
+
+			GetDlgItem(IDC_EDIT1)->GetWindowText(str);
+			*(u32 *)(send_buf + 4) = _tcstol(str, NULL, 10);
+			GetDlgItem(IDC_EDIT2)->GetWindowText(str);
+			*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
+			GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+			*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+			ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			}
+
+
+			//start = clock();
+
+			//int k = 0;
+
+			while (bulk_thread_finished == 0);
+
+
+			bufferptr = rev_buf + 32;
+			//TRACE("read page %08x %08x\n", *(u32*)(rev_buf + 32), *(u32*)(rev_buf + 36));
+
+		}
+		else
+		{
+			MessageBox(_T("USB 未连接"));
+			return;
+		}
+	}
+	else
+	{
 		*(u32 *)(send_buf) = 0x00007f7e | (ReadPage << 16);
 
 		GetDlgItem(IDC_EDIT1)->GetWindowText(str);
@@ -463,63 +510,60 @@ void CUSBHOSTAPPDlg::OnBnClickedButton2()
 		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
 		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
-		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
-		if (ret != 0)
+		if (SOCKET_ERROR == send(clientSocket, (const char*)send_buf, SEND_BUFF_LEN, 0))
 		{
-			//MessageBox(_T("USB 发送失败 %s"));
-			TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			TRACE("%d\n", WSAGetLastError());
+			
+			MessageBox(_T("tcp 发送失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
 		}
 
-
-		//start = clock();
-
-		//int k = 0;
-
-		while (bulk_thread_finished == 0);
-
-
+		if (SOCKET_ERROR == recv(clientSocket, (char *)rev_buf, RECV_BUFF_LEN, 0))
+		{
+			MessageBox(_T("tcp 接收失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
+		}
 		bufferptr = rev_buf + 32;
-		//TRACE("read page %08x %08x\n", *(u32*)(rev_buf + 32), *(u32*)(rev_buf + 36));
+	}
 
-		CEdit *pBoxOne;
-		CString str = _T("");
-		CString full_page = _T("");
-		CString temp = _T("");
-		pBoxOne = (CEdit*)GetDlgItem(IDC_EDIT3);
+	CEdit *pBoxOne;
+	str = _T("");
+	CString full_page = _T("");
+	CString temp = _T("");
+	pBoxOne = (CEdit*)GetDlgItem(IDC_EDIT3);
 
-		for (int i = 0; i < (2048); i++)
+	for (int i = 0; i < (2048); i++)
+	{
+
+		if (((i << 2) & 0x000000ff) == 0)
 		{
-
-			if (((i << 2) & 0x000000ff) == 0)
-			{
-				temp.Format(_T("Row %d\r\n"), i >> 7);
-				full_page = full_page + temp;
-			}
-
-
-			temp.Format(_T("%08X"), *(u32*)(bufferptr + i * 4));
-			full_page = full_page + temp;
-
-
-			if (((i & 0x00000007) == 0x00000007) && (i != 0))
-			{
-				temp.Format(_T("\r\n"));
-			}
-			else
-			{
-				temp.Format(_T(" "));
-			}
+			temp.Format(_T("Row %d\r\n"), i >> 7);
 			full_page = full_page + temp;
 		}
 
-		pBoxOne->SetWindowTextW(full_page);
 
+		temp.Format(_T("%08X"), *(u32*)(bufferptr + i * 4));
+		full_page = full_page + temp;
+
+
+		if (((i & 0x00000007) == 0x00000007) && (i != 0))
+		{
+			temp.Format(_T("\r\n"));
+		}
+		else
+		{
+			temp.Format(_T(" "));
+		}
+		full_page = full_page + temp;
 	}
-	else
-	{
-		MessageBox(_T("USB 未连接"));
-	}
+
+	pBoxOne->SetWindowTextW(full_page);
+
 
 
 }
@@ -553,51 +597,103 @@ void CUSBHOSTAPPDlg::OnBnClickedButton3()
 
 void CUSBHOSTAPPDlg::OnBnClickedButton4()
 {
+
 	// TODO:  在此添加控件通知处理程序代码
-	int ret = 0;
-	int actual_len = 0;
-	CString str = _T("");
-
-	if (handle != NULL)
+	u8* bufferptr = NULL;
+	CString str = NULL;
+	if (sys_tcp == 0)
 	{
+		int ret = 0;
+		int actual_len = 0;
 
-		bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
+		u32 PaketNum = 1;
+
+		if (handle != NULL)
+		{
+			bulk_thread_finished = 1;
+			bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)PaketNum);
+			//while (bulk_thread_finished == 1);
+			//TRACE("read page %dx\n", bulk_thread_finished);
+			*(u32 *)(send_buf) = 0x00007f7e | (EraseBlcok << 16);
+
+			GetDlgItem(IDC_EDIT1)->GetWindowText(str);
+			*(u32 *)(send_buf + 4) = _tcstol(str, NULL, 10);
+			GetDlgItem(IDC_EDIT2)->GetWindowText(str);
+			*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
+			GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+			*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+			ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			}
 
 
+			//start = clock();
+
+			//int k = 0;
+
+			while (bulk_thread_finished == 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("EraseBlcok Usb faild, err: %s\n", libusb_error_name(ret));
+			}
+
+
+
+
+		}
+		else
+		{
+			MessageBox(_T("USB 未连接"));
+			return;
+		}
+	}
+	else
+	{
 		*(u32 *)(send_buf) = 0x00007f7e | (EraseBlcok << 16);
 
 		GetDlgItem(IDC_EDIT1)->GetWindowText(str);
 		*(u32 *)(send_buf + 4) = _tcstol(str, NULL, 10);
-
 		GetDlgItem(IDC_EDIT2)->GetWindowText(str);
 		*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
-
 		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
 		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
-		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
-		while (bulk_thread_finished == 0);
-		if (ret != 0)
+		if (SOCKET_ERROR == send(clientSocket, (const char*)send_buf, SEND_BUFF_LEN, 0))
 		{
-			//MessageBox(_T("USB 发送失败 %s"));
-			TRACE("EraseBlcok Usb faild, err: %s\n", libusb_error_name(ret));
+			TRACE("%d\n", WSAGetLastError());
+
+			MessageBox(_T("tcp 发送失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
 		}
 
-
-		if (*(u32 *)(rev_buf + 12) & 0x00000001)
+		if (SOCKET_ERROR == recv(clientSocket, (char *)rev_buf, RECV_BUFF_LEN, 0))
 		{
-			MessageBox(_T("Erase Failed!"));
+			MessageBox(_T("tcp 接收失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
 		}
-		else
-		{
-			MessageBox(_T("Erase Successfully!"));
-		}
+		bufferptr = rev_buf + 32;
+	}
 
+
+	if (*(u32 *)(rev_buf + 12) & 0x00000001)
+	{
+		MessageBox(_T("Erase Failed!"));
 	}
 	else
 	{
-		MessageBox(_T("USB 未连接"));
+		MessageBox(_T("Erase Successfully!"));
 	}
 }
 
@@ -605,280 +701,515 @@ void CUSBHOSTAPPDlg::OnBnClickedButton4()
 void CUSBHOSTAPPDlg::OnBnClickedButton5()
 {
 	// TODO:  在此添加控件通知处理程序代码
-	int ret = 0;
-	int actual_len = 0;
-	CString str = _T("");
-
-	if (handle != NULL)
+	// TODO:  在此添加控件通知处理程序代码
+	u8* bufferptr = NULL;
+	CString str = NULL;
+	if (sys_tcp == 0)
 	{
+		int ret = 0;
+		int actual_len = 0;
 
-		bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
+		u32 PaketNum = 1;
+
+		if (handle != NULL)
+		{
+			bulk_thread_finished = 1;
+			bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)PaketNum);
+			//while (bulk_thread_finished == 1);
+			//TRACE("read page %dx\n", bulk_thread_finished);
+			*(u32 *)(send_buf) = 0x00007f7e | (ReadParameter << 16);
+
+			GetDlgItem(IDC_EDIT1)->GetWindowText(str);
+			*(u32 *)(send_buf + 4) = _tcstol(str, NULL, 10);
+			GetDlgItem(IDC_EDIT2)->GetWindowText(str);
+			*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
+			GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+			*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+			ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			}
 
 
+			//start = clock();
+
+			//int k = 0;
+
+			while (bulk_thread_finished == 0);
+
+
+			bufferptr = rev_buf + 32;
+			//TRACE("read page %08x %08x\n", *(u32*)(rev_buf + 32), *(u32*)(rev_buf + 36));
+
+		}
+		else
+		{
+			MessageBox(_T("USB 未连接"));
+			return;
+		}
+	}
+	else
+	{
 		*(u32 *)(send_buf) = 0x00007f7e | (ReadParameter << 16);
 
 		GetDlgItem(IDC_EDIT1)->GetWindowText(str);
 		*(u32 *)(send_buf + 4) = _tcstol(str, NULL, 10);
-
 		GetDlgItem(IDC_EDIT2)->GetWindowText(str);
 		*(u32 *)(send_buf + 8) = _tcstol(str, NULL, 10);
-
 		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
 		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
-		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
-		while (bulk_thread_finished == 0);
-		if (ret != 0)
+		if (SOCKET_ERROR == send(clientSocket, (const char*)send_buf, SEND_BUFF_LEN, 0))
 		{
-			//MessageBox(_T("USB 发送失败 %s"));
-			TRACE("EraseBlcok Usb faild, err: %s\n", libusb_error_name(ret));
+			TRACE("%d\n", WSAGetLastError());
+
+			MessageBox(_T("tcp 发送失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
 		}
 
-
-		CEdit *pBoxOne;
-		CString str;
-		CString full_page, temp;
-		pBoxOne = (CEdit*)GetDlgItem(IDC_EDIT3);
-
-		u8 *tmpptr = rev_buf+32;
-		struct nand_onfi_params *nand_onfi_params_ptr = (struct nand_onfi_params *)(rev_buf + 32);
-
-
-		char string[256];
-		USES_CONVERSION;
-		temp.Format(_T("rev info and features block\r\n")); full_page = full_page + temp;
-		memcpy(string, (char *)nand_onfi_params_ptr->sig, 4); string[4] = 0;
-		temp.Format(_T("sig[4]                     : %s\r\n"), A2W(string)); full_page = full_page + temp;
-		temp.Format(_T("revision                   : 0x%04x\r\n"), nand_onfi_params_ptr->revision); full_page = full_page + temp;
-		temp.Format(_T("features                   : 0x%04x\r\n"), nand_onfi_params_ptr->features); full_page = full_page + temp;
-		temp.Format(_T("opt_cmd                    : 0x%04x\r\n"), nand_onfi_params_ptr->opt_cmd); full_page = full_page + temp;
-		//memcpy(string, (char *)nand_onfi_params_ptr->reserved0, 2); string[2] = 0;
-		//temp.Format(_T("reserved0[2]               : %d\r\n"), nand_onfi_params_ptr->reserved0[2]); full_page = full_page + temp;
-		temp.Format(_T("ext_param_page_length      : %d\r\n"), nand_onfi_params_ptr->ext_param_page_length); full_page = full_page + temp;
-		temp.Format(_T("num_of_param_pages         : %d\r\n"), nand_onfi_params_ptr->num_of_param_pages); full_page = full_page + temp;
-		//memcpy(string, (char *)nand_onfi_params_ptr->reserved1, 17); string[17] = 0;
-		//temp.Format(_T("reserved1[17]              : %d\r\n"), nand_onfi_params_ptr->reserved1[17]); full_page = full_page + temp;
-		
-		temp.Format(_T("\r\nmanufacturer information block\r\n")); full_page = full_page + temp;
-		memcpy(string, nand_onfi_params_ptr->manufacturer, 12); string[12] = 0;
-		temp.Format(_T("manufacturer[12]           : %s\r\n"), A2W(string)); full_page = full_page + temp;
-		memcpy(string, nand_onfi_params_ptr->model, 20); string[20] = 0;
-		temp.Format(_T("model[20]                  : %s\r\n"), A2W(string)); full_page = full_page + temp;
-		temp.Format(_T("jedec_id                   : 0x%02x\r\n"), nand_onfi_params_ptr->jedec_id); full_page = full_page + temp;
-		temp.Format(_T("date_code                  : 0x%04x\r\n"), nand_onfi_params_ptr->date_code); full_page = full_page + temp;
-		//memcpy(string, (char *)nand_onfi_params_ptr->reserved2, 13); string[13] = 0;
-		//temp.Format(_T("reserved2[13]              : %d\r\n"), nand_onfi_params_ptr->reserved2[13]); full_page = full_page + temp;
-		
-		temp.Format(_T("\r\nmemory organization block\r\n")); full_page = full_page + temp;
-		temp.Format(_T("byte_per_page              : %d\r\n"), nand_onfi_params_ptr->byte_per_page); full_page = full_page + temp;
-		temp.Format(_T("spare_bytes_per_page       : %d\r\n"), nand_onfi_params_ptr->spare_bytes_per_page); full_page = full_page + temp;
-		temp.Format(_T("data_bytes_per_ppage       : %d\r\n"), nand_onfi_params_ptr->data_bytes_per_ppage); full_page = full_page + temp;
-		temp.Format(_T("spare_bytes_per_ppage      : %d\r\n"), nand_onfi_params_ptr->spare_bytes_per_ppage); full_page = full_page + temp;
-		temp.Format(_T("pages_per_block            : %d\r\n"), nand_onfi_params_ptr->pages_per_block); full_page = full_page + temp;
-		temp.Format(_T("blocks_per_lun             : %d\r\n"), nand_onfi_params_ptr->blocks_per_lun); full_page = full_page + temp;
-		temp.Format(_T("lun_count                  : %d\r\n"), nand_onfi_params_ptr->lun_count); full_page = full_page + temp;
-		temp.Format(_T("addr_cycles                : %d\r\n"), nand_onfi_params_ptr->addr_cycles); full_page = full_page + temp;
-		temp.Format(_T("bits_per_cell              : %d\r\n"), nand_onfi_params_ptr->bits_per_cell); full_page = full_page + temp;
-		temp.Format(_T("bb_per_lun                 : %d\r\n"), nand_onfi_params_ptr->bb_per_lun); full_page = full_page + temp;
-		temp.Format(_T("block_endurance            : %d\r\n"), nand_onfi_params_ptr->block_endurance); full_page = full_page + temp;
-		temp.Format(_T("guaranteed_good_blocks     : %d\r\n"), nand_onfi_params_ptr->guaranteed_good_blocks); full_page = full_page + temp;
-		temp.Format(_T("guaranteed_block_endurance : %d\r\n"), nand_onfi_params_ptr->guaranteed_block_endurance); full_page = full_page + temp;
-		temp.Format(_T("programs_per_page          : %d\r\n"), nand_onfi_params_ptr->programs_per_page); full_page = full_page + temp;
-		temp.Format(_T("ppage_attr                 : %d\r\n"), nand_onfi_params_ptr->ppage_attr); full_page = full_page + temp;
-		temp.Format(_T("ecc_bits                   : %d\r\n"), nand_onfi_params_ptr->ecc_bits); full_page = full_page + temp;
-		temp.Format(_T("interleaved_bits           : %d\r\n"), nand_onfi_params_ptr->interleaved_bits); full_page = full_page + temp;
-		temp.Format(_T("interleaved_ops            : %d\r\n"), nand_onfi_params_ptr->interleaved_ops); full_page = full_page + temp;
-		//memcpy(string, (char *)nand_onfi_params_ptr->reserved3, 13); string[13] = 0;
-		//temp.Format(_T("reserved3[13]              : %d\r\n"), nand_onfi_params_ptr->reserved3[13]); full_page = full_page + temp;
-		
-		temp.Format(_T("\r\nelectrical parameter block\r\n")); full_page = full_page + temp;
-		temp.Format(_T("io_pin_capacitance_max     : %d\r\n"), nand_onfi_params_ptr->io_pin_capacitance_max); full_page = full_page + temp;
-		temp.Format(_T("async_timing_mode          : 0x%04x\r\n"), nand_onfi_params_ptr->async_timing_mode); full_page = full_page + temp;
-		temp.Format(_T("program_cache_timing_mode  : 0x%04x\r\n"), nand_onfi_params_ptr->program_cache_timing_mode); full_page = full_page + temp;
-		temp.Format(_T("t_prog                     : %d\r\n"), nand_onfi_params_ptr->t_prog); full_page = full_page + temp;
-		temp.Format(_T("t_bers                     : %d\r\n"), nand_onfi_params_ptr->t_bers); full_page = full_page + temp;
-		temp.Format(_T("t_r                        : %d\r\n"), nand_onfi_params_ptr->t_r); full_page = full_page + temp;
-		temp.Format(_T("t_ccs                      : %d\r\n"), nand_onfi_params_ptr->t_ccs); full_page = full_page + temp;
-		temp.Format(_T("src_sync_timing_mode       : 0x%04x\r\n"), nand_onfi_params_ptr->src_sync_timing_mode); full_page = full_page + temp;
-		temp.Format(_T("src_ssync_features         : 0x%04x\r\n"), nand_onfi_params_ptr->src_ssync_features); full_page = full_page + temp;
-		temp.Format(_T("clk_pin_capacitance_typ    : %d\r\n"), nand_onfi_params_ptr->clk_pin_capacitance_typ); full_page = full_page + temp;
-		temp.Format(_T("io_pin_capacitance_typ     : %d\r\n"), nand_onfi_params_ptr->io_pin_capacitance_typ); full_page = full_page + temp;
-		temp.Format(_T("input_pin_capacitance_typ  : %d\r\n"), nand_onfi_params_ptr->input_pin_capacitance_typ); full_page = full_page + temp;
-		temp.Format(_T("input_pin_capacitance_max  : %d\r\n"), nand_onfi_params_ptr->input_pin_capacitance_max); full_page = full_page + temp;
-		temp.Format(_T("driver_strength_support    : %d\r\n"), nand_onfi_params_ptr->driver_strength_support); full_page = full_page + temp;
-		temp.Format(_T("t_int_r                    : %d\r\n"), nand_onfi_params_ptr->t_int_r); full_page = full_page + temp;
-		temp.Format(_T("t_adl                      : %d\r\n"), nand_onfi_params_ptr->t_adl); full_page = full_page + temp;
-		//memcpy(string, (char *)nand_onfi_params_ptr->reserved4, 8); string[8] = 0;
-		//temp.Format(_T("reserved4[8]               : %d\r\n"), nand_onfi_params_ptr->reserved4[8]); full_page = full_page + temp;
-		
-		temp.Format(_T("\r\nvendor\r\n")); full_page = full_page + temp;
-		temp.Format(_T("vendor_revision            : %d\r\n"), nand_onfi_params_ptr->vendor_revision); full_page = full_page + temp;
-
-		struct nand_onfi_vendor_micron *nand_onfi_vendor_micron_ptr = (struct nand_onfi_vendor_micron *)nand_onfi_params_ptr->vendor;
-		temp.Format(_T("\r\nnand_onfi_vendor_micron\r\n")); full_page = full_page + temp;
-		temp.Format(_T("two_plane_read                    : %d\r\n"), nand_onfi_vendor_micron_ptr->two_plane_read); full_page = full_page + temp;
-		temp.Format(_T("read_cache                        : %d\r\n"), nand_onfi_vendor_micron_ptr->read_cache); full_page = full_page + temp;
-		temp.Format(_T("read_unique_id                    : %d\r\n"), nand_onfi_vendor_micron_ptr->read_unique_id); full_page = full_page + temp;
-		temp.Format(_T("dq_imped                          : %d\r\n"), nand_onfi_vendor_micron_ptr->dq_imped); full_page = full_page + temp;
-		temp.Format(_T("dq_imped_num_settings             : %d\r\n"), nand_onfi_vendor_micron_ptr->dq_imped_num_settings); full_page = full_page + temp;
-		temp.Format(_T("dq_imped_feat_addr                : %d\r\n"), nand_onfi_vendor_micron_ptr->dq_imped_feat_addr); full_page = full_page + temp;
-		temp.Format(_T("rb_pulldown_strength              : %d\r\n"), nand_onfi_vendor_micron_ptr->rb_pulldown_strength); full_page = full_page + temp;
-		temp.Format(_T("rb_pulldown_strength_feat_addr    : %d\r\n"), nand_onfi_vendor_micron_ptr->rb_pulldown_strength_feat_addr); full_page = full_page + temp;
-		temp.Format(_T("rb_pulldown_strength_num_settings : %d\r\n"), nand_onfi_vendor_micron_ptr->rb_pulldown_strength_num_settings); full_page = full_page + temp;
-		temp.Format(_T("otp_mode                          : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_mode); full_page = full_page + temp;
-		temp.Format(_T("otp_page_start                    : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_page_start); full_page = full_page + temp;
-		temp.Format(_T("otp_data_prot_addr                : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_data_prot_addr); full_page = full_page + temp;
-		temp.Format(_T("otp_num_pages                     : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_num_pages); full_page = full_page + temp;
-		temp.Format(_T("otp_feat_addr                     : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_feat_addr); full_page = full_page + temp;
-		temp.Format(_T("read_retry_options                : %d\r\n"), nand_onfi_vendor_micron_ptr->read_retry_options); full_page = full_page + temp;
-		//temp.Format(_T("reserved[72]                      : %d\r\n"), nand_onfi_vendor_micron_ptr->reserved[72]); full_page = full_page + temp;
-		temp.Format(_T("param_revision                    : %d\r\n"), nand_onfi_vendor_micron_ptr->param_revision); full_page = full_page + temp;
-
-		//memcpy(string, (char *)nand_onfi_params_ptr->vendor, 88); string[88] = 0;
-		//temp.Format(_T("vendor[88]                 : %s\r\n"), A2W(string)); full_page = full_page + temp;
-		temp.Format(_T("\r\ncrc                        : 0x%04x\r\n"), nand_onfi_params_ptr->crc); full_page = full_page + temp;
-
-
-
-		pBoxOne->SetWindowTextW(full_page);
+		if (SOCKET_ERROR == recv(clientSocket, (char *)rev_buf, RECV_BUFF_LEN, 0))
+		{
+			MessageBox(_T("tcp 接收失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
+		}
+		bufferptr = rev_buf + 32;
 	}
-	else
-	{
-		MessageBox(_T("USB 未连接"));
-	}
+
+
+
+
+	CEdit *pBoxOne;
+	//CString str;
+	CString full_page, temp;
+	pBoxOne = (CEdit*)GetDlgItem(IDC_EDIT3);
+
+	u8 *tmpptr = rev_buf + 32;
+	struct nand_onfi_params *nand_onfi_params_ptr = (struct nand_onfi_params *)(rev_buf + 32);
+
+
+	char string[256];
+	USES_CONVERSION;
+	temp.Format(_T("rev info and features block\r\n")); full_page = full_page + temp;
+	memcpy(string, (char *)nand_onfi_params_ptr->sig, 4); string[4] = 0;
+	temp.Format(_T("sig[4]                     : %s\r\n"), A2W(string)); full_page = full_page + temp;
+	temp.Format(_T("revision                   : 0x%04x\r\n"), nand_onfi_params_ptr->revision); full_page = full_page + temp;
+	temp.Format(_T("features                   : 0x%04x\r\n"), nand_onfi_params_ptr->features); full_page = full_page + temp;
+	temp.Format(_T("opt_cmd                    : 0x%04x\r\n"), nand_onfi_params_ptr->opt_cmd); full_page = full_page + temp;
+	//memcpy(string, (char *)nand_onfi_params_ptr->reserved0, 2); string[2] = 0;
+	//temp.Format(_T("reserved0[2]               : %d\r\n"), nand_onfi_params_ptr->reserved0[2]); full_page = full_page + temp;
+	temp.Format(_T("ext_param_page_length      : %d\r\n"), nand_onfi_params_ptr->ext_param_page_length); full_page = full_page + temp;
+	temp.Format(_T("num_of_param_pages         : %d\r\n"), nand_onfi_params_ptr->num_of_param_pages); full_page = full_page + temp;
+	//memcpy(string, (char *)nand_onfi_params_ptr->reserved1, 17); string[17] = 0;
+	//temp.Format(_T("reserved1[17]              : %d\r\n"), nand_onfi_params_ptr->reserved1[17]); full_page = full_page + temp;
+
+	temp.Format(_T("\r\nmanufacturer information block\r\n")); full_page = full_page + temp;
+	memcpy(string, nand_onfi_params_ptr->manufacturer, 12); string[12] = 0;
+	temp.Format(_T("manufacturer[12]           : %s\r\n"), A2W(string)); full_page = full_page + temp;
+	memcpy(string, nand_onfi_params_ptr->model, 20); string[20] = 0;
+	temp.Format(_T("model[20]                  : %s\r\n"), A2W(string)); full_page = full_page + temp;
+	temp.Format(_T("jedec_id                   : 0x%02x\r\n"), nand_onfi_params_ptr->jedec_id); full_page = full_page + temp;
+	temp.Format(_T("date_code                  : 0x%04x\r\n"), nand_onfi_params_ptr->date_code); full_page = full_page + temp;
+	//memcpy(string, (char *)nand_onfi_params_ptr->reserved2, 13); string[13] = 0;
+	//temp.Format(_T("reserved2[13]              : %d\r\n"), nand_onfi_params_ptr->reserved2[13]); full_page = full_page + temp;
+
+	temp.Format(_T("\r\nmemory organization block\r\n")); full_page = full_page + temp;
+	temp.Format(_T("byte_per_page              : %d\r\n"), nand_onfi_params_ptr->byte_per_page); full_page = full_page + temp;
+	temp.Format(_T("spare_bytes_per_page       : %d\r\n"), nand_onfi_params_ptr->spare_bytes_per_page); full_page = full_page + temp;
+	temp.Format(_T("data_bytes_per_ppage       : %d\r\n"), nand_onfi_params_ptr->data_bytes_per_ppage); full_page = full_page + temp;
+	temp.Format(_T("spare_bytes_per_ppage      : %d\r\n"), nand_onfi_params_ptr->spare_bytes_per_ppage); full_page = full_page + temp;
+	temp.Format(_T("pages_per_block            : %d\r\n"), nand_onfi_params_ptr->pages_per_block); full_page = full_page + temp;
+	temp.Format(_T("blocks_per_lun             : %d\r\n"), nand_onfi_params_ptr->blocks_per_lun); full_page = full_page + temp;
+	temp.Format(_T("lun_count                  : %d\r\n"), nand_onfi_params_ptr->lun_count); full_page = full_page + temp;
+	temp.Format(_T("addr_cycles                : %d\r\n"), nand_onfi_params_ptr->addr_cycles); full_page = full_page + temp;
+	temp.Format(_T("bits_per_cell              : %d\r\n"), nand_onfi_params_ptr->bits_per_cell); full_page = full_page + temp;
+	temp.Format(_T("bb_per_lun                 : %d\r\n"), nand_onfi_params_ptr->bb_per_lun); full_page = full_page + temp;
+	temp.Format(_T("block_endurance            : %d\r\n"), nand_onfi_params_ptr->block_endurance); full_page = full_page + temp;
+	temp.Format(_T("guaranteed_good_blocks     : %d\r\n"), nand_onfi_params_ptr->guaranteed_good_blocks); full_page = full_page + temp;
+	temp.Format(_T("guaranteed_block_endurance : %d\r\n"), nand_onfi_params_ptr->guaranteed_block_endurance); full_page = full_page + temp;
+	temp.Format(_T("programs_per_page          : %d\r\n"), nand_onfi_params_ptr->programs_per_page); full_page = full_page + temp;
+	temp.Format(_T("ppage_attr                 : %d\r\n"), nand_onfi_params_ptr->ppage_attr); full_page = full_page + temp;
+	temp.Format(_T("ecc_bits                   : %d\r\n"), nand_onfi_params_ptr->ecc_bits); full_page = full_page + temp;
+	temp.Format(_T("interleaved_bits           : %d\r\n"), nand_onfi_params_ptr->interleaved_bits); full_page = full_page + temp;
+	temp.Format(_T("interleaved_ops            : %d\r\n"), nand_onfi_params_ptr->interleaved_ops); full_page = full_page + temp;
+	//memcpy(string, (char *)nand_onfi_params_ptr->reserved3, 13); string[13] = 0;
+	//temp.Format(_T("reserved3[13]              : %d\r\n"), nand_onfi_params_ptr->reserved3[13]); full_page = full_page + temp;
+
+	temp.Format(_T("\r\nelectrical parameter block\r\n")); full_page = full_page + temp;
+	temp.Format(_T("io_pin_capacitance_max     : %d\r\n"), nand_onfi_params_ptr->io_pin_capacitance_max); full_page = full_page + temp;
+	temp.Format(_T("async_timing_mode          : 0x%04x\r\n"), nand_onfi_params_ptr->async_timing_mode); full_page = full_page + temp;
+	temp.Format(_T("program_cache_timing_mode  : 0x%04x\r\n"), nand_onfi_params_ptr->program_cache_timing_mode); full_page = full_page + temp;
+	temp.Format(_T("t_prog                     : %d\r\n"), nand_onfi_params_ptr->t_prog); full_page = full_page + temp;
+	temp.Format(_T("t_bers                     : %d\r\n"), nand_onfi_params_ptr->t_bers); full_page = full_page + temp;
+	temp.Format(_T("t_r                        : %d\r\n"), nand_onfi_params_ptr->t_r); full_page = full_page + temp;
+	temp.Format(_T("t_ccs                      : %d\r\n"), nand_onfi_params_ptr->t_ccs); full_page = full_page + temp;
+	temp.Format(_T("src_sync_timing_mode       : 0x%04x\r\n"), nand_onfi_params_ptr->src_sync_timing_mode); full_page = full_page + temp;
+	temp.Format(_T("src_ssync_features         : 0x%04x\r\n"), nand_onfi_params_ptr->src_ssync_features); full_page = full_page + temp;
+	temp.Format(_T("clk_pin_capacitance_typ    : %d\r\n"), nand_onfi_params_ptr->clk_pin_capacitance_typ); full_page = full_page + temp;
+	temp.Format(_T("io_pin_capacitance_typ     : %d\r\n"), nand_onfi_params_ptr->io_pin_capacitance_typ); full_page = full_page + temp;
+	temp.Format(_T("input_pin_capacitance_typ  : %d\r\n"), nand_onfi_params_ptr->input_pin_capacitance_typ); full_page = full_page + temp;
+	temp.Format(_T("input_pin_capacitance_max  : %d\r\n"), nand_onfi_params_ptr->input_pin_capacitance_max); full_page = full_page + temp;
+	temp.Format(_T("driver_strength_support    : %d\r\n"), nand_onfi_params_ptr->driver_strength_support); full_page = full_page + temp;
+	temp.Format(_T("t_int_r                    : %d\r\n"), nand_onfi_params_ptr->t_int_r); full_page = full_page + temp;
+	temp.Format(_T("t_adl                      : %d\r\n"), nand_onfi_params_ptr->t_adl); full_page = full_page + temp;
+	//memcpy(string, (char *)nand_onfi_params_ptr->reserved4, 8); string[8] = 0;
+	//temp.Format(_T("reserved4[8]               : %d\r\n"), nand_onfi_params_ptr->reserved4[8]); full_page = full_page + temp;
+
+	temp.Format(_T("\r\nvendor\r\n")); full_page = full_page + temp;
+	temp.Format(_T("vendor_revision            : %d\r\n"), nand_onfi_params_ptr->vendor_revision); full_page = full_page + temp;
+
+	struct nand_onfi_vendor_micron *nand_onfi_vendor_micron_ptr = (struct nand_onfi_vendor_micron *)nand_onfi_params_ptr->vendor;
+	temp.Format(_T("\r\nnand_onfi_vendor_micron\r\n")); full_page = full_page + temp;
+	temp.Format(_T("two_plane_read                    : %d\r\n"), nand_onfi_vendor_micron_ptr->two_plane_read); full_page = full_page + temp;
+	temp.Format(_T("read_cache                        : %d\r\n"), nand_onfi_vendor_micron_ptr->read_cache); full_page = full_page + temp;
+	temp.Format(_T("read_unique_id                    : %d\r\n"), nand_onfi_vendor_micron_ptr->read_unique_id); full_page = full_page + temp;
+	temp.Format(_T("dq_imped                          : %d\r\n"), nand_onfi_vendor_micron_ptr->dq_imped); full_page = full_page + temp;
+	temp.Format(_T("dq_imped_num_settings             : %d\r\n"), nand_onfi_vendor_micron_ptr->dq_imped_num_settings); full_page = full_page + temp;
+	temp.Format(_T("dq_imped_feat_addr                : %d\r\n"), nand_onfi_vendor_micron_ptr->dq_imped_feat_addr); full_page = full_page + temp;
+	temp.Format(_T("rb_pulldown_strength              : %d\r\n"), nand_onfi_vendor_micron_ptr->rb_pulldown_strength); full_page = full_page + temp;
+	temp.Format(_T("rb_pulldown_strength_feat_addr    : %d\r\n"), nand_onfi_vendor_micron_ptr->rb_pulldown_strength_feat_addr); full_page = full_page + temp;
+	temp.Format(_T("rb_pulldown_strength_num_settings : %d\r\n"), nand_onfi_vendor_micron_ptr->rb_pulldown_strength_num_settings); full_page = full_page + temp;
+	temp.Format(_T("otp_mode                          : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_mode); full_page = full_page + temp;
+	temp.Format(_T("otp_page_start                    : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_page_start); full_page = full_page + temp;
+	temp.Format(_T("otp_data_prot_addr                : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_data_prot_addr); full_page = full_page + temp;
+	temp.Format(_T("otp_num_pages                     : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_num_pages); full_page = full_page + temp;
+	temp.Format(_T("otp_feat_addr                     : %d\r\n"), nand_onfi_vendor_micron_ptr->otp_feat_addr); full_page = full_page + temp;
+	temp.Format(_T("read_retry_options                : %d\r\n"), nand_onfi_vendor_micron_ptr->read_retry_options); full_page = full_page + temp;
+	//temp.Format(_T("reserved[72]                      : %d\r\n"), nand_onfi_vendor_micron_ptr->reserved[72]); full_page = full_page + temp;
+	temp.Format(_T("param_revision                    : %d\r\n"), nand_onfi_vendor_micron_ptr->param_revision); full_page = full_page + temp;
+
+	//memcpy(string, (char *)nand_onfi_params_ptr->vendor, 88); string[88] = 0;
+	//temp.Format(_T("vendor[88]                 : %s\r\n"), A2W(string)); full_page = full_page + temp;
+	temp.Format(_T("\r\ncrc                        : 0x%04x\r\n"), nand_onfi_params_ptr->crc); full_page = full_page + temp;
+
+
+
+	pBoxOne->SetWindowTextW(full_page);
 }
 
 
 void CUSBHOSTAPPDlg::OnBnClickedButton6()
 {
-	// TODO:  在此添加控件通知处理程序代码
-	int ret;
-	int actual_len = 0;
-	CString str;
 
-	if (handle != NULL)
+	// TODO:  在此添加控件通知处理程序代码
+	u8* bufferptr = NULL;
+	CString str = NULL;
+	if (sys_tcp == 0)
 	{
-		bulk_thread_finished = 1;
-		bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
-		//while (bulk_thread_finished == 1);
-		//TRACE("read page %dx\n", bulk_thread_finished);
+		int ret = 0;
+		int actual_len = 0;
+
+		u32 PaketNum = 1;
+
+		if (handle != NULL)
+		{
+			bulk_thread_finished = 1;
+			bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
+			//while (bulk_thread_finished == 1);
+			//TRACE("read page %dx\n", bulk_thread_finished);
+			*(u32 *)(send_buf) = 0x00007f7e | (TESTWRconsistent << 16);
+			GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+			*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+			ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			}
+
+
+			//start = clock();
+
+			//int k = 0;
+
+			while (bulk_thread_finished == 0);
+
+
+		}
+		else
+		{
+			MessageBox(_T("USB 未连接"));
+			return;
+		}
+	}
+	else
+	{
 		*(u32 *)(send_buf) = 0x00007f7e | (TESTWRconsistent << 16);
 		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
 		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
 
-		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
 
-		if (ret != 0)
+		if (SOCKET_ERROR == send(clientSocket, (const char*)send_buf, SEND_BUFF_LEN, 0))
 		{
-			//MessageBox(_T("USB 发送失败 %s"));
-			TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			TRACE("%d\n", WSAGetLastError());
+
+			MessageBox(_T("tcp 发送失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
 		}
 
-
-		//start = clock();
-
-		//int k = 0;
-
-		while (bulk_thread_finished == 0);
-
-		u8 * tmpptr = rev_buf;
-		
-		if (*(u32*)(tmpptr + 12) == 1)
+		if (SOCKET_ERROR == recv(clientSocket, (char *)rev_buf, RECV_BUFF_LEN, 0))
 		{
-			MessageBox(_T("读写一致检查成功"));
+			MessageBox(_T("tcp 接收失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
 		}
-		else
-		{
-			MessageBox(_T("读写一致检查失败"));
-		}
+		bufferptr = rev_buf + 32;
 
+
+	}
+
+	u8 * tmpptr = rev_buf;
+
+	if (*(u32*)(tmpptr + 12) == 1)
+	{
+		MessageBox(_T("读写一致检查成功"));
 	}
 	else
 	{
-		MessageBox(_T("USB 未连接"));
+		MessageBox(_T("读写一致检查失败"));
 	}
 }
 
 
 void CUSBHOSTAPPDlg::OnBnClickedButton7()
 {
+
+
 	// TODO:  在此添加控件通知处理程序代码
-	int ret;
-	int actual_len = 0;
-	CString str;
-
-	if (handle != NULL)
+	u8* bufferptr = NULL;
+	CString str = NULL;
+	if (sys_tcp == 0)
 	{
-		bulk_thread_finished = 1;
-		bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
-		//while (bulk_thread_finished == 1);
-		//TRACE("read page %dx\n", bulk_thread_finished);
-		*(u32 *)(send_buf) = 0x00007f7e | (TESTwritespeed << 16);
-		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
-		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
-		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+		int ret = 0;
+		int actual_len = 0;
 
-		if (ret != 0)
+		u32 PaketNum = 1;
+
+		if (handle != NULL)
 		{
-			//MessageBox(_T("USB 发送失败 %s"));
-			TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			bulk_thread_finished = 1;
+			bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
+
+			*(u32 *)(send_buf) = 0x00007f7e | (TESTwritespeed << 16);
+			GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+			*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+			ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			}
+
+			while (bulk_thread_finished == 0);
+
+
 		}
-
-
-		//start = clock();
-
-		//int k = 0;
-
-		while (bulk_thread_finished == 0);
-
-		u8 * tmpptr = rev_buf + 12;
-		CString tmpstring;
-		tmpstring.Format(_T("写入速度 %f MB/s\r\n"), *(float*)(tmpptr));
-
-		MessageBox(tmpstring);
+		else
+		{
+			MessageBox(_T("USB 未连接"));
+			return;
+		}
 	}
 	else
 	{
-		MessageBox(_T("USB 未连接"));
+		*(u32 *)(send_buf) = 0x00007f7e | (TESTwritespeed << 16);
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+
+		if (SOCKET_ERROR == send(clientSocket, (const char*)send_buf, SEND_BUFF_LEN, 0))
+		{
+			TRACE("%d\n", WSAGetLastError());
+
+			MessageBox(_T("tcp 发送失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
+		}
+
+		if (SOCKET_ERROR == recv(clientSocket, (char *)rev_buf, RECV_BUFF_LEN, 0))
+		{
+			MessageBox(_T("tcp 接收失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
+		}
+		bufferptr = rev_buf + 32;
+
+
 	}
+
+	u8 * tmpptr = rev_buf + 12;
+	CString tmpstring;
+	tmpstring.Format(_T("写入速度 %f MB/s\r\n"), *(float*)(tmpptr));
+	MessageBox(tmpstring);
 }
 
 
 void CUSBHOSTAPPDlg::OnBnClickedButton8()
 {
+
+
 	// TODO:  在此添加控件通知处理程序代码
-	int ret;
-	int actual_len = 0;
-	CString str;
-
-	if (handle != NULL)
+	u8* bufferptr = NULL;
+	CString str = NULL;
+	if (sys_tcp == 0)
 	{
-		bulk_thread_finished = 1;
-		bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
-		//while (bulk_thread_finished == 1);
-		//TRACE("read page %dx\n", bulk_thread_finished);
-		*(u32 *)(send_buf) = 0x00007f7e | (TESTreadspeed << 16);
-		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
-		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
-		ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+		int ret = 0;
+		int actual_len = 0;
 
-		if (ret != 0)
+		u32 PaketNum = 1;
+
+		if (handle != NULL)
 		{
-			//MessageBox(_T("USB 发送失败 %s"));
-			TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			bulk_thread_finished = 1;
+			bulk_rev_thread_ptr = AfxBeginThread(bulk_rev_thread, (LPVOID)1);
+			//while (bulk_thread_finished == 1);
+			//TRACE("read page %dx\n", bulk_thread_finished);
+			*(u32 *)(send_buf) = 0x00007f7e | (TESTreadspeed << 16);
+			GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+			*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+			ret = libusb_bulk_transfer(handle, BULK_SEND_EP, send_buf, SEND_BUFF_LEN, &actual_len, 0);
+
+			if (ret != 0)
+			{
+				//MessageBox(_T("USB 发送失败 %s"));
+				TRACE("ReadPage Usb faild, err: %s\n", libusb_error_name(ret));
+			}
+
+
+			//start = clock();
+
+			//int k = 0;
+
+			while (bulk_thread_finished == 0);
+
+
 		}
-
-		while (bulk_thread_finished == 0);
-
-
-		u8 * tmpptr = rev_buf + 12;
-		CString tmpstring;
-		tmpstring.Format(_T("读取速度 %f MB/s\r\n"), *(float*)(tmpptr));
-		MessageBox(tmpstring);
+		else
+		{
+			MessageBox(_T("USB 未连接"));
+			return;
+		}
 	}
 	else
 	{
-		MessageBox(_T("USB 未连接"));
+		*(u32 *)(send_buf) = 0x00007f7e | (TESTreadspeed << 16);
+		GetDlgItem(IDC_EDIT4)->GetWindowText(str);
+		*(u32 *)(send_buf + 12) = _tcstol(str, NULL, 10);
+
+		if (SOCKET_ERROR == send(clientSocket, (const char*)send_buf, SEND_BUFF_LEN, 0))
+		{
+			TRACE("%d\n", WSAGetLastError());
+
+			MessageBox(_T("tcp 发送失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
+		}
+
+		if (SOCKET_ERROR == recv(clientSocket, (char *)rev_buf, RECV_BUFF_LEN, 0))
+		{
+			MessageBox(_T("tcp 接收失败!"));
+			closesocket(clientSocket);    //关闭套接字
+			WSACleanup();        //释放套接字资源
+			return;
+		}
+		bufferptr = rev_buf + 32;
+
+
 	}
+
+
+	u8 * tmpptr = rev_buf + 12;
+	CString tmpstring;
+	tmpstring.Format(_T("读取速度 %f MB/s\r\n"), *(float*)(tmpptr));
+	MessageBox(tmpstring);
+}
+
+
+void CUSBHOSTAPPDlg::OnBnClickedButton9()
+{
+	// TODO:  在此添加控件通知处理程序代码
+
+	//int err;
+	//WORD versionRequired;
+	//WSADATA wsaData;
+	//versionRequired = MAKEWORD(1, 1);
+	//err = WSAStartup(versionRequired, &wsaData);//协议库的版本信息
+
+	//
+	//sockaddr_in addr;//定义套接字地址结构变量
+	//int n;
+
+
+	//addr.sin_family = AF_INET;
+	//addr.sin_port = htons(11256);
+	//inet_pton(AF_INET, "192.168.1.10", &addr.sin_addr);
+	////转换服务器IP地址
+	//
+	//clientSocket = socket(AF_INET, SOCK_STREAM, 0);   //创建套接字
+	//if (connect(clientSocket, (sockaddr *)&addr, sizeof(addr)))
+	//{
+	//	MessageBox(_T("TCP 连接成功"));
+	//	sys_tcp = 1;
+	//}
+	//else
+	//{
+	//	MessageBox(_T("TCP 连接失败"));
+	//}
+
+
+
+	WSADATA            wsad;            //WSADATA变量
+	//SOCKET             clientSocket;            //服务器套接字
+	SOCKADDR_IN        servAddr;        //服务器地址
+	int                retVal;            //返回值
+	//初始化套接字动态库
+	if (WSAStartup(MAKEWORD(2, 2), &wsad) != 0)
+	{
+		MessageBox(_T("初始化套接字失败!"));
+		return ;
+	}
+
+	//创建套接字
+	clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (INVALID_SOCKET == clientSocket)
+	{
+		MessageBox(_T("创建套接字失败!"));
+		WSACleanup();//释放套接字资源
+		return ;
+	}
+	//设置服务器地址
+	servAddr.sin_family = AF_INET;
+	servAddr.sin_addr.s_addr = inet_addr("192.168.1.10");
+	servAddr.sin_port = htons((short)11256);
+	int    nServAddlen = sizeof(servAddr);
+
+	retVal = connect(clientSocket, (LPSOCKADDR)&servAddr, sizeof(servAddr));
+	if (SOCKET_ERROR == retVal)
+	{
+		MessageBox(_T("连接服务器失败!"));
+		closesocket(clientSocket);    //关闭套接字
+		WSACleanup();        //释放套接字资源
+		return;
+	}
+	sys_tcp = 1;
+	MessageBox(_T("TCP 连接成功"));
 }

@@ -100,7 +100,7 @@ if { $::argc > 0 } {
 set orig_proj_dir "[file normalize "$origin_dir/ZynqNandFlash"]"
 
 # Create project
-create_project ${project_name} ./${project_name} -part xc7z030fbg676-2
+create_project ${project_name} ./${project_name} -part xc7z030fbg676-2 -force
 
 # Set the directory path for the new project
 set proj_dir [get_property directory [current_project]]
@@ -210,13 +210,13 @@ proc cr_bd_design_1 { parentCell } {
   ##################################################################
   # CHECK IPs
   ##################################################################
-  set bCheckIPs 1
+  set bCheckIPs 0
   if { $bCheckIPs == 1 } {
      set list_check_ips "\ 
   Opensource:user:NandFlashController:1.0\
-  xilinx.com:ip:clk_wiz:5.4\
-  xilinx.com:ip:processing_system7:5.5\
-  xilinx.com:ip:proc_sys_reset:5.0\
+  xilinx.com:ip:clk_wiz\
+  xilinx.com:ip:processing_system7\
+  xilinx.com:ip:proc_sys_reset\
   "
 
    set list_ips_missing ""
@@ -310,7 +310,7 @@ proc cr_bd_design_1 { parentCell } {
  ] $axi_mem_intercon
 
   # Create instance: clk_wiz_0, and set properties
-  set clk_wiz_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:5.4 clk_wiz_0 ]
+  set clk_wiz_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz clk_wiz_0 ]
   set_property -dict [ list \
    CONFIG.CLKIN1_JITTER_PS {50.0} \
    CONFIG.CLKOUT1_DRIVES {BUFG} \
@@ -355,7 +355,7 @@ proc cr_bd_design_1 { parentCell } {
  ] $clk_wiz_0
 
   # Create instance: processing_system7_0, and set properties
-  set processing_system7_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7:5.5 processing_system7_0 ]
+  set processing_system7_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7 processing_system7_0 ]
   set_property -dict [ list \
    CONFIG.PCW_ACT_APU_PERIPHERAL_FREQMHZ {666.666687} \
    CONFIG.PCW_ACT_CAN_PERIPHERAL_FREQMHZ {10.000000} \
@@ -610,10 +610,10 @@ proc cr_bd_design_1 { parentCell } {
  ] $ps7_0_axi_periph
 
   # Create instance: rst_ps7_0_100M, and set properties
-  set rst_ps7_0_100M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps7_0_100M ]
+  set rst_ps7_0_100M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset rst_ps7_0_100M ]
 
   # Create instance: rst_ps7_0_100M1, and set properties
-  set rst_ps7_0_100M1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps7_0_100M1 ]
+  set rst_ps7_0_100M1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset rst_ps7_0_100M1 ]
 
   # Create interface connections
   connect_bd_intf_net -intf_net NandFlashController_0_m_axi [get_bd_intf_pins NandFlashController_0/m_axi] [get_bd_intf_pins axi_mem_intercon/S00_AXI]
