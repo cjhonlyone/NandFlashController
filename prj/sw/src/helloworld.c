@@ -97,10 +97,6 @@ static int IntcInitFunction(u16 DeviceId, XUsbPs *usb);
 static int setup_interrupts(XScuGic *intc);
 static void reset_usb(void);
 
-u32 UsbCmdFlashBlock = 0;
-u32 UsbCmdFlashPage = 0;
-
-
 #define PAGE_SIZE 4096
 #define Block 128
 #define FLASH(PAGE,BLOCK) ((PAGE & 0x00000007f) | (BLOCK << 7))
@@ -110,17 +106,28 @@ u32 UsbCmdFlashPage = 0;
 //1 LUN = 2 planes = 34560 Mb 4GB
 
 
+static uint8_t rx_buffer[2048*8] __attribute__ ((__aligned__(32)));
+static uint8_t tx_buffer[2048*8] __attribute__ ((__aligned__(32)));
+static uint8_t * rx_bufferPtr = (uint8_t *)rx_buffer;
+static uint8_t * tx_bufferPtr = (uint8_t *)tx_buffer;
+
 uint64_t warray[2048] = {0};
 uint64_t rarray[2048] = {0};
 uint16_t *wptr = (uint16_t *)warray;
 uint16_t *rptr = (uint16_t *)rarray;
 
+#define TransferPacketSize 8704
+#define FLASH(PAGE,BLOCK) ((PAGE & 0x00000007f) | (BLOCK << 7))
 
-static uint8_t usb_rx_buffer[2048*8] __attribute__ ((__aligned__(32)));
-static uint8_t usb_tx_buffer[2048*8] __attribute__ ((__aligned__(32)));
-static uint8_t * usb_rx_bufferPtr = (uint8_t *)usb_rx_buffer;
-static uint8_t * usb_tx_bufferPtr = (uint8_t *)usb_tx_buffer;
-#define UsbPacketSize 8704
+#define DelayForTransferUs 500
+
+#define send_data(a,b) xusb_cdc_send_data(&usb, a, b)
+
+u32 CmdFlashBlock = 0;
+u32 CmdFlashPage = 0;
+u32 way = 1;
+
+u32 NandPageSize;
 
 u32 test_WRconsistent(u32 way, u32 page_size)
 {
@@ -274,13 +281,13 @@ int main()
 
 
     // read parameter;
-	memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
+	memset(tx_bufferPtr, 0x00, TransferPacketSize);
 	while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
-	readparameterpage(way, (u32)usb_tx_bufferPtr+32);
+	readparameterpage(way, (u32)tx_bufferPtr+32);
 	usleep(10);
-	Xil_DCacheInvalidateRange((u32)usb_tx_bufferPtr+32,256);
+	Xil_DCacheInvalidateRange((u32)tx_bufferPtr+32,256);
 
-	struct nand_onfi_params *nand_onfi_params_ptr = (struct nand_onfi_params *)(usb_tx_bufferPtr + 32);
+	struct nand_onfi_params *nand_onfi_params_ptr = (struct nand_onfi_params *)(tx_bufferPtr + 32);
 	char string[256];
 	printf("rev info and features block\r\n");
 	memcpy(string, (char *)nand_onfi_params_ptr->sig, 4); string[4] = 0;
@@ -374,7 +381,6 @@ int main()
 	//printf("vendor[88]                 : %s\r\n", string);
 	printf("\r\ncrc                        : 0x%04x\r\n", nand_onfi_params_ptr->crc);
 
-	u32 NandPageSize;
 	NandPageSize = nand_onfi_params_ptr->byte_per_page;
 
 
@@ -382,143 +388,142 @@ int main()
 	{
 
 		bytes = xusb_cdc_rx_bytes_available();
-		if (bytes == UsbPacketSize) {
-			bytes = xusb_cdc_receive_data(usb_rx_buffer, bytes);
-			if ((usb_rx_bufferPtr[0] == 0x7e) && (usb_rx_bufferPtr[1] == 0x7f))
+		if (bytes == TransferPacketSize) {
+			bytes = xusb_cdc_receive_data(rx_buffer, bytes);
+		if ((rx_bufferPtr[0] == 0x7e) && (rx_bufferPtr[1] == 0x7f))
+		{
+			if(rx_bufferPtr[2] == ReadPage)
 			{
-				if(usb_rx_bufferPtr[2] == ReadPage)
-				{
-					usleep(DelayForUsbTransferUs);
-					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);
-					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
-					way = *(u32*)(usb_rx_bufferPtr+12);
-					usleep(DelayForUsbTransferUs);
-					memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
-					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
-					readpage_00h_30h(way, 0, FLASH(UsbCmdFlashPage, UsbCmdFlashBlock), NandPageSize, (u32)usb_tx_bufferPtr+32);
-					usleep(10);
-					Xil_DCacheInvalidateRange((u32)usb_tx_bufferPtr+32,NandPageSize);
-					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (ReadPage << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
+				CmdFlashPage = *(u32*)(rx_bufferPtr+4);
+				CmdFlashBlock = *(u32*)(rx_bufferPtr+8);
+				way = *(u32*)(rx_bufferPtr+12);
+				memset(tx_bufferPtr, 0x00, TransferPacketSize);
+				while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
+				readpage_00h_30h(way, 0, FLASH(CmdFlashPage, CmdFlashBlock), NandPageSize, (u32)tx_bufferPtr+32);
+//				usleep(10);
+				Xil_DCacheInvalidateRange((u32)tx_bufferPtr+32,NandPageSize);
+				*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (ReadPage << 16);
+				*(u32*)(tx_bufferPtr+4) = CmdFlashPage;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
+//				send_data(rx_bufferPtr, n);
 
-				}
-				else if(usb_rx_bufferPtr[2] == ReadParameter)
-				{
-					usleep(DelayForUsbTransferUs);
-					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);
-					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
-					way = *(u32*)(usb_rx_bufferPtr+12);
-					usleep(DelayForUsbTransferUs);
-					memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
-					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
-					readparameterpage(way, (u32)usb_tx_bufferPtr+32);
-					usleep(10);
-					Xil_DCacheInvalidateRange((u32)usb_tx_bufferPtr+32,NandPageSize);
-					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (ReadParameter << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
-				}
-				else if(usb_rx_bufferPtr[2] == ProgramPage)
-				{
-					usleep(DelayForUsbTransferUs);
-					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);
-					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
-					way = *(u32*)(usb_rx_bufferPtr+12);
-					memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
-					Xil_DCacheFlushRange((u32)usb_rx_bufferPtr+32,NandPageSize);
-					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
-					progpage_80h_10h(way, 0, FLASH(UsbCmdFlashPage, UsbCmdFlashBlock), NandPageSize, (u32)usb_rx_bufferPtr+32);
+			}
+			else if(rx_bufferPtr[2] == ReadParameter)
+			{
+				usleep(DelayForTransferUs);
+				CmdFlashPage = *(u32*)(rx_bufferPtr+4);
+				CmdFlashBlock = *(u32*)(rx_bufferPtr+8);
+				way = *(u32*)(rx_bufferPtr+12);
+				usleep(DelayForTransferUs);
+				memset(tx_bufferPtr, 0x00, TransferPacketSize);
+				while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
+				readparameterpage(way, (u32)tx_bufferPtr+32);
+				usleep(10);
+				Xil_DCacheInvalidateRange((u32)tx_bufferPtr+32,NandPageSize);
+				*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (ReadParameter << 16);
+				*(u32*)(tx_bufferPtr+4) = CmdFlashPage;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
+			}
+			else if(rx_bufferPtr[2] == ProgramPage)
+			{
+				usleep(DelayForTransferUs);
+				CmdFlashPage = *(u32*)(rx_bufferPtr+4);
+				CmdFlashBlock = *(u32*)(rx_bufferPtr+8);
+				way = *(u32*)(rx_bufferPtr+12);
+				memset(tx_bufferPtr, 0x00, TransferPacketSize);
+				Xil_DCacheFlushRange((u32)rx_bufferPtr+32,NandPageSize);
+				while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
+				progpage_80h_10h(way, 0, FLASH(CmdFlashPage, CmdFlashBlock), NandPageSize, (u32)rx_bufferPtr+32);
 
-					*(u32*)(usb_tx_bufferPtr+0) =  0x01007e7f | (ProgramPage << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					*(u32*)(usb_tx_bufferPtr+12) = readstatus_70h(way);
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
-				}
-				else if (usb_rx_bufferPtr[2] == EraseBlcok) //
-				{
-					usleep(DelayForUsbTransferUs);
-					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
-					way = *(u32*)(usb_rx_bufferPtr+12);
-					while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
-					eraseblock_60h_d0h(way,FLASH(0, UsbCmdFlashBlock));
-					while((readstatus_70h(way) & (ARDY)) == 0x00);
+				*(u32*)(tx_bufferPtr+0) =  0x01007e7f | (ProgramPage << 16);
+				*(u32*)(tx_bufferPtr+4) = CmdFlashPage;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				*(u32*)(tx_bufferPtr+12) = readstatus_70h(way);
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
+			}
+			else if (rx_bufferPtr[2] == EraseBlcok) //
+			{
+				usleep(DelayForTransferUs);
+				CmdFlashBlock = *(u32*)(rx_bufferPtr+8);
+				way = *(u32*)(rx_bufferPtr+12);
+				while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
+				eraseblock_60h_d0h(way,FLASH(0, CmdFlashBlock));
+				while((readstatus_70h(way) & (ARDY)) == 0x00);
 
-					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (EraseBlcok << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = 0;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					*(u32*)(usb_tx_bufferPtr+12) = readstatus_70h(way);
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
-				}
-				else if (usb_rx_bufferPtr[2] == ReadBlock) //
-				{
-					UsbCmdFlashPage = *(u32*)(usb_rx_bufferPtr+4);//block num
-					UsbCmdFlashBlock = *(u32*)(usb_rx_bufferPtr+8);
-					way = *(u32*)(usb_rx_bufferPtr+12);
-						for (j = 0;j<128;j++)
-						{
-							usleep(DelayForUsbTransferUs-200);
-							memset(usb_tx_bufferPtr, 0x00, UsbPacketSize);
-							while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
-							readpage_00h_30h(way, 0, FLASH(j, (UsbCmdFlashBlock)), NandPageSize, (u32)usb_tx_bufferPtr+32);
-							usleep(200);
-							Xil_DCacheInvalidateRange((u32)usb_tx_bufferPtr+32,NandPageSize);
+				*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (EraseBlcok << 16);
+				*(u32*)(tx_bufferPtr+4) = 0;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				*(u32*)(tx_bufferPtr+12) = readstatus_70h(way);
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
+			}
+			else if (rx_bufferPtr[2] == ReadBlock) //
+			{
+				CmdFlashPage = *(u32*)(rx_bufferPtr+4);//block num
+				CmdFlashBlock = *(u32*)(rx_bufferPtr+8);
+				way = *(u32*)(rx_bufferPtr+12);
+					for (u32 j = 0;j<128;j++)
+					{
+						usleep(DelayForTransferUs-200);
+						memset(tx_bufferPtr, 0x00, TransferPacketSize);
+						while((readstatus_70h(way) & (ARDY | RDY)) == 0x00);
+						readpage_00h_30h(way, 0, FLASH(j, (CmdFlashBlock)), NandPageSize, (u32)tx_bufferPtr+32);
+						usleep(200);
+						Xil_DCacheInvalidateRange((u32)tx_bufferPtr+32,NandPageSize);
 
-							*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (ReadBlock << 16);
-							*(u32*)(usb_tx_bufferPtr+4) = j;
-							*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-							xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
+						*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (ReadBlock << 16);
+						*(u32*)(tx_bufferPtr+4) = j;
+						*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+						send_data((u8 *)tx_bufferPtr, TransferPacketSize);
 
-						}
+					}
 
-				}
-				else if (usb_rx_bufferPtr[2] == TESTWRconsistent) //
-				{
-					way = *(u32*)(usb_rx_bufferPtr+12);
+			}
+			else if (rx_bufferPtr[2] == TESTWRconsistent) //
+			{
+				way = *(u32*)(rx_bufferPtr+12);
 
-					u32 tmp;
-					tmp = test_WRconsistent(way, NandPageSize);
+				u32 tmp;
+				tmp = test_WRconsistent(way, NandPageSize);
 
-					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (TESTWRconsistent << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					*(u32*)(usb_tx_bufferPtr+12) = tmp;
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
+				*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (TESTWRconsistent << 16);
+				*(u32*)(tx_bufferPtr+4) = CmdFlashPage;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				*(u32*)(tx_bufferPtr+12) = tmp;
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
 
-				}
-				else if (usb_rx_bufferPtr[2] == TESTreadspeed) //
-				{
-					way = *(u32*)(usb_rx_bufferPtr+12);
+			}
+			else if (rx_bufferPtr[2] == TESTreadspeed) //
+			{
+				way = *(u32*)(rx_bufferPtr+12);
 
-					float tmp;
-					tmp = test_readspeed(way, NandPageSize);
+				float tmp;
+				tmp = test_readspeed(way, NandPageSize);
 
-					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (TESTreadspeed << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					*(float*)(usb_tx_bufferPtr+12) = tmp;
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
+				*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (TESTreadspeed << 16);
+				*(u32*)(tx_bufferPtr+4) = CmdFlashPage;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				*(float*)(tx_bufferPtr+12) = tmp;
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
 
-				}
-				else if (usb_rx_bufferPtr[2] == TESTwritespeed) //
-				{
-					way = *(u32*)(usb_rx_bufferPtr+12);
+			}
+			else if (rx_bufferPtr[2] == TESTwritespeed) //
+			{
+				way = *(u32*)(rx_bufferPtr+12);
 
-					float tmp;
-					tmp = test_writespeed(way, NandPageSize);
+				float tmp;
+				tmp = test_writespeed(way, NandPageSize);
 
-					*(u32*)(usb_tx_bufferPtr+0) = 0x01007e7f | (TESTwritespeed << 16);
-					*(u32*)(usb_tx_bufferPtr+4) = UsbCmdFlashPage;
-					*(u32*)(usb_tx_bufferPtr+8) = UsbCmdFlashBlock;
-					*(float*)(usb_tx_bufferPtr+12) = tmp;
-					xusb_cdc_send_data(&usb, (u8 *)usb_tx_bufferPtr, UsbPacketSize);
+				*(u32*)(tx_bufferPtr+0) = 0x01007e7f | (TESTwritespeed << 16);
+				*(u32*)(tx_bufferPtr+4) = CmdFlashPage;
+				*(u32*)(tx_bufferPtr+8) = CmdFlashBlock;
+				*(float*)(tx_bufferPtr+12) = tmp;
+				send_data((u8 *)tx_bufferPtr, TransferPacketSize);
 
-				}
 			}
 
+		}
 		}
 
 	}
