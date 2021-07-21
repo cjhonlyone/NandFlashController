@@ -4,7 +4,7 @@
 - Code idea from Cosmos-plus-OpenSSD
 - DDR mode
 - DMA Transfer
-- **BUG：The simulation is different from actual performance. The DQ data will be a beat slower during simulation, so the simulation will not pass, but the actual test on board is correct.**
+- **BUG：The simulation is different from actual performance. The DQ data will be a beat later during simulation, so the simulation will not pass, but the actual test on board is correct.**
 
 # Table of Contents
 
