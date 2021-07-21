@@ -117,7 +117,7 @@ module NandFlashController_Interface_adapter
     	if (iStatusValid) 
     		rNFCStatus <= {iStatus, 7'd0, iCMDReady};
     	else begin
-    		rNFCStatus[0] <= iCMDReady;
+    		rNFCStatus <= {rNFCStatus[31:8], 7'd0, iCMDReady};
     	end
     	rNandRBStatus <= iReadyBusy;
     end

@@ -76,7 +76,7 @@ module NandFlashController_AXIL_Reg #
     output wire [31:0]            oDMARAddress,
     output wire [31:0]            oDMAWAddress,
 
-    input  wire [23:0]            iNFCStatus  ,
+    input  wire [31:0]            iNFCStatus  ,
     input  wire [31:0]            iNandRBStatus
 );
     reg                   rAxilValid  = 0;

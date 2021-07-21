@@ -423,7 +423,7 @@ module NFC_Command_Issue_Top
     parameter NumofCMD             = 14;
 
     wire [NumofCMD - 1:0]        wCMD_Active                ;
-    assign wCMD_Active = ~{wReset_CMDReady, wSTF_CMDReady,wProg_CMDReady,wRead_CMDReady, wGTF_CMDReady,wEB_CMDReady,wRS_CMDReady,7'b111_1111};
+    assign wCMD_Active = {wReset_CMDReady, wSTF_CMDReady,wProg_CMDReady,wRead_CMDReady, wGTF_CMDReady,wEB_CMDReady,wRS_CMDReady,7'b111_1111};
 
     NFC_Command_Idle #(
             .NumberOfWays(NumberOfWays)
@@ -659,7 +659,7 @@ module NFC_Command_Issue_Top
             .NumofCMD(NumofCMD),
             .NumberOfWays(NumberOfWays)
         ) inst_NFC_Atom_Command_Issue_to_Atom_Command_Generator_Mux (
-            .iCMD_Active              (wCMD_Active),
+            .iCMD_Active              (~wCMD_Active),
 
             .iACG_Idle_Command        (wACG_Idle_Command),
             .iACG_Idle_CommandOption  (wACG_Idle_CommandOption),
@@ -836,7 +836,7 @@ module NFC_Command_Issue_Top
             .status_good_frame (status_good_frame)
         );
 
-    assign oCI_Top_CMDReady = |wCMD_Active;
+    assign oCI_Top_CMDReady = ~(&wCMD_Active);
 
 
     assign oCI_Top_ReadyBusy = iACG_CI_ReadyBusy;
