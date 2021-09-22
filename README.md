@@ -6,6 +6,11 @@
 - DMA Transfer
 - **BUG：The simulation is different from actual performance. The DQ data will be a beat later during simulation, so the simulation will not pass, but the actual test on board is correct.**
 
+# To Do
+
+- Timeout detection
+- OS support
+
 # Table of Contents
 
 - [Performance](#Performance)
