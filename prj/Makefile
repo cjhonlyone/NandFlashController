@@ -48,7 +48,7 @@ CommonPrj: $(tb_NFC_Physical_FILES) $(NFC_Physical_FILES) $(NFC_Command_FILES)
 	echo "update_compile_order -fileset sources_1" >> create_project.tcl;
 	echo "update_compile_order -fileset sim_1" >> create_project.tcl;
 
-	echo "set_Wproperty target_simulator ModelSim [current_project]" >> create_project.tcl;
+	echo "set_property target_simulator ModelSim [current_project]" >> create_project.tcl;
 	echo "set_property -name {modelsim.simulate.log_all_signals} -value {true} -objects [get_filesets sim_1]" >> create_project.tcl;
 	echo "set_property -name {modelsim.simulate.custom_wave_do} -value {../../../../../../tb/tb_NandFlashController_Top_wave.do} -objects [get_filesets sim_1]" >> create_project.tcl;
 	echo "set_property -name {modelsim.simulate.runtime} -value {3.5ms} -objects [get_filesets sim_1]" >> create_project.tcl;
