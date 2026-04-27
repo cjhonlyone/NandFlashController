@@ -4,7 +4,8 @@
 module NandFlashController_Interface_adapter
 #
 (
-    parameter NumberOfWays         = 2
+    parameter NumberOfWays         = 2,
+    parameter NumberOfBuses        = 1
 )
 (
 	iSystemClock ,
@@ -61,7 +62,7 @@ module NandFlashController_Interface_adapter
 	input   [23:0]                 iStatus      ;
 	input                          iStatusValid ;
 	
-	input   [NumberOfWays - 1:0]   iReadyBusy   ;
+	input   [NumberOfBuses*NumberOfWays - 1:0]   iReadyBusy   ;
 
 	reg                            rCommandFail ;
 	reg  [5:0]                     rOpcode      ;

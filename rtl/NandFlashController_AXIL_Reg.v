@@ -38,7 +38,9 @@ module NandFlashController_AXIL_Reg #
     // Width of wstrb (width of data bus in words)
     parameter STRB_WIDTH = (DATA_WIDTH/8),
     // Extra pipeline register on output
-    parameter PIPELINE_OUTPUT = 0
+    parameter PIPELINE_OUTPUT = 0,
+    // Number of independent NAND buses
+    parameter NumberOfBuses = 1
 )
 (
     input  wire                   clk,
@@ -77,7 +79,9 @@ module NandFlashController_AXIL_Reg #
     output wire [31:0]            oDMAWAddress,
 
     input  wire [31:0]            iNFCStatus  ,
-    input  wire [31:0]            iNandRBStatus
+    input  wire [31:0]            iNandRBStatus,
+
+    output wire [(NumberOfBuses > 1 ? $clog2(NumberOfBuses) : 1)-1:0] oBusSelect
 );
     reg                   rAxilValid  = 0;
     reg [5:0]             rDelayTapLoad =0 ;
@@ -90,6 +94,9 @@ module NandFlashController_AXIL_Reg #
     reg [31:0]            rDMAWAddress   ;
     
     reg [31:0]            rFeature       ;
+
+    localparam BUS_SEL_WIDTH = (NumberOfBuses > 1) ? $clog2(NumberOfBuses) : 1;
+    reg [BUS_SEL_WIDTH-1:0] rBusSelect = 0;
 
 parameter VALID_ADDR_WIDTH = ADDR_WIDTH - $clog2(STRB_WIDTH);
 parameter WORD_WIDTH = STRB_WIDTH;
@@ -175,6 +182,7 @@ always @(posedge clk) begin
         rDMAWAddress  <= 0;
         rFeature      <= 0;
         rAxilValid    <= 0;
+        rBusSelect    <= 0;
     end
     if (mem_wr_en) begin
         if (s_axil_awaddr_valid[7:0] == 8'd0) begin
@@ -192,6 +200,8 @@ always @(posedge clk) begin
             rFeature <= s_axil_wdata;
         end else if (s_axil_awaddr_valid[7:0] == 8'd9) begin
             rDelayTapLoad <= s_axil_wdata[5:0];
+        end else if (s_axil_awaddr_valid[7:0] == 8'd10) begin
+            rBusSelect <= s_axil_wdata[BUS_SEL_WIDTH-1:0];
         end
         rAxilValid <= 1;
     end else begin
@@ -246,6 +256,8 @@ always @(posedge clk) begin
             s_axil_rdata_reg <= iNFCStatus;
         end else if (s_axil_araddr_valid[7:0] == 8'd8) begin
             s_axil_rdata_reg <= iNandRBStatus;
+        end else if (s_axil_araddr_valid[7:0] == 8'd10) begin
+            s_axil_rdata_reg <= {{(DATA_WIDTH-BUS_SEL_WIDTH){1'b0}}, rBusSelect};
         end else begin
             s_axil_rdata_reg <= 0;
         end
@@ -265,5 +277,6 @@ end
     assign oLength       = rLength      ;
     assign oDMARAddress  = rDMARAddress ;
     assign oDMAWAddress  = rDMAWAddress ;
+    assign oBusSelect    = rBusSelect   ;
 
 endmodule

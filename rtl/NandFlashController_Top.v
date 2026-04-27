@@ -6,7 +6,8 @@ module NandFlashController_Top
     parameter IDelayValue          = 20,
     parameter InputClockBufferType = 0,
     parameter NumberOfWays         = 2,
-    parameter PageSize             = 8640
+    parameter PageSize             = 8640,
+    parameter NumberOfBuses        = 1
 )
 (
     iSystemClock                , // 1x clk
@@ -45,6 +46,8 @@ module NandFlashController_Top
 
     iDelayTapValid              ,
     iDelayTap                   ,
+
+    iBusSelect                  ,
 
     IO_NAND_DQS                 ,
     IO_NAND_DQ                  ,
@@ -90,20 +93,25 @@ module NandFlashController_Top
     input                          iReadReady              ;
     output                         oReadTransValid         ;
     
-    output  [NumberOfWays - 1:0]   oReadyBusy              ;
+    output  [NumberOfBuses*NumberOfWays - 1:0]   oReadyBusy              ;
 
     input                          iDelayTapValid          ;
     input  [4:0]                   iDelayTap               ;
 
-    inout                          IO_NAND_DQS             ;
-    inout                  [7:0]   IO_NAND_DQ              ;
-    output  [NumberOfWays - 1:0]   O_NAND_CE               ;
-    output                         O_NAND_WE               ;
-    output                         O_NAND_RE               ;
-    output                         O_NAND_ALE              ;
-    output                         O_NAND_CLE              ;
-    input   [NumberOfWays - 1:0]   I_NAND_RB               ;
-    output                         O_NAND_WP               ;
+    localparam NB            = NumberOfBuses;
+    localparam BUS_SEL_WIDTH = (NB > 1) ? $clog2(NB) : 1;
+
+    input  [BUS_SEL_WIDTH-1:0]     iBusSelect              ;
+
+    inout  [NB-1:0]                IO_NAND_DQS             ;
+    inout  [NB*8-1:0]              IO_NAND_DQ              ;
+    output [NB*NumberOfWays-1:0]   O_NAND_CE               ;
+    output [NB-1:0]                O_NAND_WE               ;
+    output [NB-1:0]                O_NAND_RE               ;
+    output [NB-1:0]                O_NAND_ALE              ;
+    output [NB-1:0]                O_NAND_CLE              ;
+    input  [NB*NumberOfWays-1:0]   I_NAND_RB               ;
+    output [NB-1:0]                O_NAND_WP               ;
 
 
 
@@ -172,6 +180,20 @@ module NandFlashController_Top
     wire  [ 1:0]                  wPHY_ACG_Buff_Keep          ;
     wire                          wPHY_ACG_Buff_Last          ;
 
+    // Per-bus output wires from all NFC_Physical_Top instances
+    wire  [NB-1:0]                wPHY_ACG_DelayReady_bus     ;
+    wire  [NB*NumberOfWays-1:0]   wPHY_ACG_ReadyBusy_bus      ;
+    wire  [NB-1:0]                wPHY_ACG_BUFF_Empty_bus     ;
+    wire  [NB-1:0]                wPHY_ACG_Buff_Valid_bus     ;
+    wire  [NB*16-1:0]             wPHY_ACG_Buff_Data_bus      ;
+    wire  [NB*2-1:0]              wPHY_ACG_Buff_Keep_bus      ;
+    wire  [NB-1:0]                wPHY_ACG_Buff_Last_bus      ;
+    wire  [NB*32-1:0]             wPI_DQ_bus                  ; // unused
+    wire  [NB-1:0]                wPI_ValidFlag_bus           ; // unused
+
+    // Dummy wire for CI ReadyBusy output (oReadyBusy now sourced from all PHY instances)
+    wire  [NumberOfWays-1:0]      wCI_Top_ReadyBusy_unused    ;
+
 
 
     NFC_Command_Issue_Top #(
@@ -204,7 +226,7 @@ module NandFlashController_Top
             
             .oCI_Top_ReadTransValid (oReadTransValid       ),
             
-            .oCI_Top_ReadyBusy      (oReadyBusy            ),
+            .oCI_Top_ReadyBusy      (wCI_Top_ReadyBusy_unused  ),
             
             .oCI_Top_Status         (oStatus               ),
             .oCI_Top_StatusValid    (oStatusValid          ),
@@ -282,54 +304,77 @@ module NandFlashController_Top
             .iPHY_ACG_Buff_Last          (wPHY_ACG_Buff_Last          )
         );
 
-    NFC_Physical_Top #(
-            .IDelayValue(IDelayValue),
-            .InputClockBufferType(InputClockBufferType),
-            .NumberOfWays(NumberOfWays)
-        ) inst_NFC_Physical_Top (
-            .iSystemClock                (iSystemClock                ),
-            .iDelayRefClock              (iDelayRefClock              ),
-            // .iOutputDrivingClock         (iOutputDrivingClock         ),
-            .iSystemClock_120             (iSystemClock_120             ),
-            // .iSystemClock_4x              (iSystemClock_4x),
-            .iACG_PHY_PinIn_Reset        (wACG_PHY_PinIn_Reset        ),
-            .iACG_PHY_PinIn_BUFF_Reset   (wACG_PHY_PinIn_BUFF_Reset   ),
-            .iACG_PHY_PinOut_Reset       (wACG_PHY_PinOut_Reset       ),
-            .iPI_BUFF_RE                 (wPI_BUFF_RE                 ),
-            .iPI_BUFF_OutSel             (wPI_BUFF_OutSel             ),
-            .oPI_DQ                      (wPI_DQ                      ),
-            .oPI_ValidFlag               (wPI_ValidFlag               ),
-            .iACG_PHY_DelayTapLoad       (iDelayTapValid              ),
-            .iACG_PHY_DelayTap           (iDelayTap                   ),
-            .oPHY_ACG_DelayReady         (wPHY_ACG_DelayReady         ),
-            .iACG_PHY_DQSOutEnable       (wACG_PHY_DQSOutEnable       ),
-            .iACG_PHY_DQOutEnable        (wACG_PHY_DQOutEnable        ),
-            .iACG_PHY_DQStrobe           (wACG_PHY_DQStrobe           ),
-            .iACG_PHY_DQ                 (wACG_PHY_DQ                 ),
-            .iACG_PHY_ChipEnable         (wACG_PHY_ChipEnable         ),
-            .iACG_PHY_ReadEnable         (wACG_PHY_ReadEnable         ),
-            .iACG_PHY_WriteEnable        (wACG_PHY_WriteEnable        ),
-            .iACG_PHY_AddressLatchEnable (wACG_PHY_AddressLatchEnable ),
-            .iACG_PHY_CommandLatchEnable (wACG_PHY_CommandLatchEnable ),
-            .oPHY_ACG_ReadyBusy          (wPHY_ACG_ReadyBusy          ),
-            .iACG_PHY_WriteProtect       (wACG_PHY_WriteProtect       ),
-            .iACG_PHY_BUFF_WE            (wACG_PHY_BUFF_WE            ),
-            .oPHY_ACG_BUFF_Empty         (wPHY_ACG_BUFF_Empty         ),
-            .iACG_PHY_Buff_Ready         (wACG_PHY_Buff_Ready         ),
-            .oPHY_ACG_Buff_Valid         (wPHY_ACG_Buff_Valid         ),
-            .oPHY_ACG_Buff_Data          (wPHY_ACG_Buff_Data          ),
-            .oPHY_ACG_Buff_Keep          (wPHY_ACG_Buff_Keep          ),
-            .oPHY_ACG_Buff_Last          (wPHY_ACG_Buff_Last          ),
-            .IO_NAND_DQS                 (IO_NAND_DQS                 ),
-            .IO_NAND_DQ                  (IO_NAND_DQ                  ),
-            .O_NAND_CE                   (O_NAND_CE                   ),
-            .O_NAND_WE                   (O_NAND_WE                   ),
-            .O_NAND_RE                   (O_NAND_RE                   ),
-            .O_NAND_ALE                  (O_NAND_ALE                  ),
-            .O_NAND_CLE                  (O_NAND_CLE                  ),
-            .I_NAND_RB                   (I_NAND_RB                   ),
-            .O_NAND_WP                   (O_NAND_WP                   )
-        );
+    // Generate NB NFC_Physical_Top instances with ACG↔PHY MUX
+    genvar gi;
+    generate
+        for (gi = 0; gi < NB; gi = gi + 1) begin : gen_phy
+            NFC_Physical_Top #(
+                    .IDelayValue(IDelayValue),
+                    .InputClockBufferType(InputClockBufferType),
+                    .NumberOfWays(NumberOfWays)
+                ) inst_NFC_Physical_Top (
+                    .iSystemClock                (iSystemClock                ),
+                    .iDelayRefClock              (iDelayRefClock              ),
+                    .iSystemClock_120             (iSystemClock_120             ),
+                    .iACG_PHY_PinIn_Reset        (wACG_PHY_PinIn_Reset        ),
+                    .iACG_PHY_PinIn_BUFF_Reset   (wACG_PHY_PinIn_BUFF_Reset   ),
+                    .iACG_PHY_PinOut_Reset       (wACG_PHY_PinOut_Reset       ),
+                    // Delay tap: applied to all buses
+                    .iACG_PHY_DelayTapLoad       (iDelayTapValid              ),
+                    .iACG_PHY_DelayTap           (iDelayTap                   ),
+                    .oPHY_ACG_DelayReady         (wPHY_ACG_DelayReady_bus[gi] ),
+                    // Unused PI signals: selected bus routes ACG signals, others get 0
+                    .iPI_BUFF_RE                 ((iBusSelect == gi) ? wPI_BUFF_RE    : 1'b0),
+                    .iPI_BUFF_OutSel             ((iBusSelect == gi) ? wPI_BUFF_OutSel : 3'b0),
+                    .oPI_DQ                      (wPI_DQ_bus[gi*32 +: 32]     ),
+                    .oPI_ValidFlag               (wPI_ValidFlag_bus[gi]       ),
+                    // ACG→PHY: selected bus drives NAND; others held idle
+                    .iACG_PHY_DQSOutEnable       ((iBusSelect == gi) ? wACG_PHY_DQSOutEnable       : 1'b0                        ),
+                    .iACG_PHY_DQOutEnable        ((iBusSelect == gi) ? wACG_PHY_DQOutEnable        : 1'b0                        ),
+                    .iACG_PHY_DQStrobe           ((iBusSelect == gi) ? wACG_PHY_DQStrobe           : 8'b0                        ),
+                    .iACG_PHY_DQ                 ((iBusSelect == gi) ? wACG_PHY_DQ                 : 32'b0                       ),
+                    .iACG_PHY_ChipEnable         ((iBusSelect == gi) ? wACG_PHY_ChipEnable         : {(2*NumberOfWays){1'b1}}     ),
+                    .iACG_PHY_ReadEnable         ((iBusSelect == gi) ? wACG_PHY_ReadEnable         : 4'hF                        ),
+                    .iACG_PHY_WriteEnable        ((iBusSelect == gi) ? wACG_PHY_WriteEnable        : 4'hF                        ),
+                    .iACG_PHY_AddressLatchEnable ((iBusSelect == gi) ? wACG_PHY_AddressLatchEnable : 4'b0                        ),
+                    .iACG_PHY_CommandLatchEnable ((iBusSelect == gi) ? wACG_PHY_CommandLatchEnable : 4'b0                        ),
+                    .iACG_PHY_WriteProtect       ((iBusSelect == gi) ? wACG_PHY_WriteProtect       : 1'b1                        ),
+                    .iACG_PHY_BUFF_WE            ((iBusSelect == gi) ? wACG_PHY_BUFF_WE            : 1'b0                        ),
+                    .iACG_PHY_Buff_Ready         ((iBusSelect == gi) ? wACG_PHY_Buff_Ready         : 1'b0                        ),
+                    // PHY→ACG: collect per-bus outputs
+                    .oPHY_ACG_ReadyBusy          (wPHY_ACG_ReadyBusy_bus[gi*NumberOfWays +: NumberOfWays]),
+                    .oPHY_ACG_BUFF_Empty         (wPHY_ACG_BUFF_Empty_bus[gi]                             ),
+                    .oPHY_ACG_Buff_Valid         (wPHY_ACG_Buff_Valid_bus[gi]                             ),
+                    .oPHY_ACG_Buff_Data          (wPHY_ACG_Buff_Data_bus[gi*16 +: 16]                     ),
+                    .oPHY_ACG_Buff_Keep          (wPHY_ACG_Buff_Keep_bus[gi*2  +:  2]                     ),
+                    .oPHY_ACG_Buff_Last          (wPHY_ACG_Buff_Last_bus[gi]                              ),
+                    // NAND pad signals: each bus connects to its own bit slice
+                    .IO_NAND_DQS                 (IO_NAND_DQS[gi]                              ),
+                    .IO_NAND_DQ                  (IO_NAND_DQ [gi*8 +: 8]                       ),
+                    .O_NAND_CE                   (O_NAND_CE  [gi*NumberOfWays +: NumberOfWays]  ),
+                    .O_NAND_WE                   (O_NAND_WE  [gi]                              ),
+                    .O_NAND_RE                   (O_NAND_RE  [gi]                              ),
+                    .O_NAND_ALE                  (O_NAND_ALE [gi]                              ),
+                    .O_NAND_CLE                  (O_NAND_CLE [gi]                              ),
+                    .I_NAND_RB                   (I_NAND_RB  [gi*NumberOfWays +: NumberOfWays]  ),
+                    .O_NAND_WP                   (O_NAND_WP  [gi]                              )
+                );
+        end
+    endgenerate
+
+    // PHY→ACG MUX: select signals from the active bus
+    assign wPHY_ACG_DelayReady = &wPHY_ACG_DelayReady_bus;  // ready only when all buses ready
+    assign wPHY_ACG_ReadyBusy  = wPHY_ACG_ReadyBusy_bus[iBusSelect*NumberOfWays +: NumberOfWays];
+    assign wPHY_ACG_BUFF_Empty = wPHY_ACG_BUFF_Empty_bus[iBusSelect];
+    assign wPHY_ACG_Buff_Valid = wPHY_ACG_Buff_Valid_bus[iBusSelect];
+    assign wPHY_ACG_Buff_Data  = wPHY_ACG_Buff_Data_bus [iBusSelect*16 +: 16];
+    assign wPHY_ACG_Buff_Keep  = wPHY_ACG_Buff_Keep_bus [iBusSelect*2  +:  2];
+    assign wPHY_ACG_Buff_Last  = wPHY_ACG_Buff_Last_bus [iBusSelect];
+    assign wPI_DQ              = wPI_DQ_bus              [iBusSelect*32 +: 32];
+    assign wPI_ValidFlag       = wPI_ValidFlag_bus       [iBusSelect];
+
+    // oReadyBusy: aggregate ReadyBusy from all buses
+    assign oReadyBusy = wPHY_ACG_ReadyBusy_bus;
 
 
 endmodule

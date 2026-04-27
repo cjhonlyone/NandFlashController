@@ -24,7 +24,8 @@ module NandFlashController_Top_AXI
     parameter IDelayValue          = 15,
     parameter InputClockBufferType = 0 ,
     parameter NumberOfWays         = 2 ,
-    parameter PageSize             = 8640
+    parameter PageSize             = 8640,
+    parameter NumberOfBuses        = 1
 )
 (
     input  wire                       s_axil_clk         ,
@@ -123,15 +124,15 @@ module NandFlashController_Top_AXI
     /*
     * Pin Pad
     */
-    inout  wire                       IO_NAND_DQS        ,
-    inout  wire                [7:0]  IO_NAND_DQ         ,
-    output wire [NumberOfWays - 1:0]  O_NAND_CE          ,
-    output wire                       O_NAND_WE          ,
-    output wire                       O_NAND_RE          ,
-    output wire                       O_NAND_ALE         ,
-    output wire                       O_NAND_CLE         ,
-    input  wire [NumberOfWays - 1:0]  I_NAND_RB          ,
-    output wire                       O_NAND_WP    
+    inout  wire [NumberOfBuses-1:0]              IO_NAND_DQS        ,
+    inout  wire [NumberOfBuses*8-1:0]            IO_NAND_DQ         ,
+    output wire [NumberOfBuses*NumberOfWays-1:0] O_NAND_CE          ,
+    output wire [NumberOfBuses-1:0]              O_NAND_WE          ,
+    output wire [NumberOfBuses-1:0]              O_NAND_RE          ,
+    output wire [NumberOfBuses-1:0]              O_NAND_ALE         ,
+    output wire [NumberOfBuses-1:0]              O_NAND_CLE         ,
+    input  wire [NumberOfBuses*NumberOfWays-1:0] I_NAND_RB          ,
+    output wire [NumberOfBuses-1:0]              O_NAND_WP    
 );
 
     wire                         waxil_AxilValid   ;
@@ -157,6 +158,12 @@ module NandFlashController_Top_AXI
     wire [31:0]                  wDMAWAddress ;
     wire [31:0]                  wTNFCStatus   ;
     wire [31:0]                  wNandRBStatus;
+
+    localparam NB            = NumberOfBuses;
+    localparam BUS_SEL_WIDTH = (NB > 1) ? $clog2(NB) : 1;
+
+    wire [BUS_SEL_WIDTH-1:0]     waxil_BusSelect   ;
+    wire [BUS_SEL_WIDTH-1:0]     wBusSelect        ;
 
     wire                         waxil_WriteTransValid;
     wire                         waxil_ReadTransValid;
@@ -186,7 +193,7 @@ module NandFlashController_Top_AXI
     wire                         wNFCReadReady              ;
     wire                         wNFCReadTransValid         ;
     
-    wire  [NumberOfWays - 1:0]   wNFCReadyBusy              ;
+    wire  [NB*NumberOfWays - 1:0]   wNFCReadyBusy              ;
     // assign dbg_RB = wNFCReadyBusy;
 
     assign m_axi_clk = s_axil_clk;
@@ -214,7 +221,8 @@ module NandFlashController_Top_AXI
     NandFlashController_AXIL_Reg #(
             .DATA_WIDTH(AXIL_DATA_WIDTH),
             .ADDR_WIDTH(AXIL_ADDR_WIDTH),
-            .PIPELINE_OUTPUT(0)
+            .PIPELINE_OUTPUT(0),
+            .NumberOfBuses(NumberOfBuses)
         ) inst_NandFlashController_AXIL_Reg (
             .clk            (s_axil_clk         ),
             .rst            (~s_axil_rst         ),
@@ -249,12 +257,13 @@ module NandFlashController_Top_AXI
             .oDMARAddress   (waxil_DMARAddress  ),
             .oDMAWAddress   (waxil_DMAWAddress  ),
             .iNFCStatus     (waxil_NFCStatus    ),
-            .iNandRBStatus  (waxil_NandRBStatus )
+            .iNandRBStatus  (waxil_NandRBStatus ),
+            .oBusSelect     (waxil_BusSelect    )
         );
 
     axis_async_fifo #(
         .DEPTH(16),
-        .DATA_WIDTH(32+32+16+1+6),
+        .DATA_WIDTH(32+32+16+1+6+BUS_SEL_WIDTH),
         .KEEP_ENABLE(0),
         .KEEP_WIDTH(1),
         .LAST_ENABLE(0),
@@ -275,24 +284,16 @@ module NandFlashController_Top_AXI
         .async_rst(~s_axil_rst),
         // AXI input
         .s_clk(s_axil_clk),
-        .s_axis_tdata({waxil_Command,waxil_Address,waxil_Length,waxil_CommandValid, waxil_DelayTapLoad}),
+        .s_axis_tdata({waxil_BusSelect, waxil_Command, waxil_Address, waxil_Length, waxil_CommandValid, waxil_DelayTapLoad}),
         .s_axis_tkeep(1),
         .s_axis_tvalid(waxil_AxilValid),
         .s_axis_tready(),
-    //    .s_axis_tlast(s_axis_tlast),
-    //    .s_axis_tid(s_axis_tid),
-    //    .s_axis_tdest(s_axis_tdest),
-    //    .s_axis_tuser(s_axis_tuser),
         // AXI output
         .m_clk(iSystemClock),
-        .m_axis_tdata({wCommand,wAddress,wLength,wCommandValid,wDelayTapLoad}),
+        .m_axis_tdata({wBusSelect, wCommand, wAddress, wLength, wCommandValid, wDelayTapLoad}),
         .m_axis_tkeep(),
         .m_axis_tvalid(wAxilValid),
         .m_axis_tready(1)
-    //    .m_axis_tlast(m_axis_tlast),
-    //    .m_axis_tid(m_axis_tid),
-    //    .m_axis_tdest(m_axis_tdest),
-    //    .m_axis_tuser(m_axis_tuser)
     );
 
     axis_async_fifo #(
@@ -340,7 +341,8 @@ module NandFlashController_Top_AXI
 
 
     NandFlashController_Interface_adapter #(
-            .NumberOfWays(NumberOfWays)
+            .NumberOfWays(NumberOfWays),
+            .NumberOfBuses(NumberOfBuses)
         ) inst_NandFlashController_Interface_adapter (
             .iSystemClock  (iSystemClock),
             .iReset        (iReset),
@@ -371,7 +373,8 @@ module NandFlashController_Top_AXI
             .IDelayValue(IDelayValue),
             .InputClockBufferType(InputClockBufferType),
             .NumberOfWays(NumberOfWays),
-            .PageSize(PageSize)
+            .PageSize(PageSize),
+            .NumberOfBuses(NumberOfBuses)
         ) inst_NandFlashController_Top (
             .iSystemClock        (iSystemClock),
             .iDelayRefClock      (iDelayRefClock),
@@ -409,6 +412,8 @@ module NandFlashController_Top_AXI
 
             .iDelayTapValid      (wDelayTapLoad[5]),
             .iDelayTap           (wDelayTapLoad[4:0]),
+
+            .iBusSelect          (wBusSelect),
 
             .IO_NAND_DQS         (IO_NAND_DQS),
             .IO_NAND_DQ          (IO_NAND_DQ),
