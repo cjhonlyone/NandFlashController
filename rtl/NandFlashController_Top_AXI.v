@@ -132,7 +132,9 @@ module NandFlashController_Top_AXI
     output wire [NumberOfBuses-1:0]              O_NAND_ALE         ,
     output wire [NumberOfBuses-1:0]              O_NAND_CLE         ,
     input  wire [NumberOfBuses*NumberOfWays-1:0] I_NAND_RB          ,
-    output wire [NumberOfBuses-1:0]              O_NAND_WP    
+    output wire [NumberOfBuses-1:0]              O_NAND_WP         ,
+
+    output wire                                  oInterrupt
 );
 
     wire                         waxil_AxilValid   ;
@@ -195,6 +197,7 @@ module NandFlashController_Top_AXI
     
     wire  [NB*NumberOfWays - 1:0]   wNFCReadyBusy              ;
     // assign dbg_RB = wNFCReadyBusy;
+    assign oInterrupt = wNFCCMDReady;
 
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
