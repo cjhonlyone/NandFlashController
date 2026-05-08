@@ -247,7 +247,9 @@ module NFC_Physical_Top
     
     // Debug assignments: fabric-side IOBUF signals
     assign oDbg_DQSFromNAND  = wDQSFromNAND;
-    assign oDbg_DQSOutEnable = wDQSOutEnableToPinpad;
+    // Use the pre-ODDR input as direction indicator (same logic, avoids REQP-1884:
+    // wDQSOutEnableToPinpad is ODDR .Q output and cannot drive fabric/test-IO directly)
+    assign oDbg_DQSOutEnable = iACG_PHY_DQSOutEnable;
     assign oDbg_DQFromNAND   = wDQFromNAND[7:0];
     
     always @ (posedge iSystemClock)
