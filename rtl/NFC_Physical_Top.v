@@ -129,9 +129,9 @@ module NFC_Physical_Top
     output                          O_NAND_WP                   ;
 
     // Debug outputs (fabric signals only)
-    // wDQSFromNAND (IOBUF.O) feeds ISERDES.CLK via dedicated path; direct OBUF tap causes RTSTAT-2.
-    // Fix: register it one iSystemClock cycle to break the dedicated-path constraint.
-    output                          oDbg_DQSFromNAND            ; // DQS received from NAND (1-clk registered, safe)
+    // DQS debug uses NFC_Physical_Input IDELAY output (not raw IOBUF.O) to avoid RTSTAT-2 and
+    // preserve read-path phase relationship for high-speed external logic analysis.
+    output                          oDbg_DQSFromNAND            ; // DQS from NAND after IDELAYE2
     output                          oDbg_DQSOutEnable           ; // DQS direction: 1=FPGA drives, 0=NAND drives
     output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] received from NAND (IOBUF.O, safe)
     
@@ -158,11 +158,7 @@ module NFC_Physical_Top
     wire    [NumberOfWays - 1:0]    wReadyBusyFromNAND  ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf0   ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf1   ;
-    
-    // Registered copy of DQS received: wDQSFromNAND (IOBUF.O) drives ISERDES.CLK via dedicated
-    // ILOGIC path; routing directly to an OBUF (test pad) causes RTSTAT-2. One register stage
-    // breaks the dedicated path while keeping the signal in the fabric domain.
-    reg                             rDbg_DQSFromNAND    ;
+    wire                            wDbg_DelayedDQS     ;
 
 
     NFC_Physical_Input
@@ -190,6 +186,7 @@ module NFC_Physical_Top
         .iPI_Buff_OutSel    (iPI_BUFF_OutSel            ),
         .oPI_DQ             (oPI_DQ                     ),
         .oPI_ValidFlag      (oPI_ValidFlag              ),
+        .oDbg_DelayedDQS    (wDbg_DelayedDQS            ),
 
         .iPI_Buff_WE        (iACG_PHY_BUFF_WE                ),
         .oPI_Buff_Empty     (oPHY_ACG_BUFF_Empty             ),
@@ -258,22 +255,20 @@ module NFC_Physical_Top
         begin
             rReadyBusyCDCBuf0 <= {(NumberOfWays){1'b0}};
             rReadyBusyCDCBuf1 <= {(NumberOfWays){1'b0}};
-            rDbg_DQSFromNAND  <= 1'b0;
         end
         else
         begin
             rReadyBusyCDCBuf0 <= rReadyBusyCDCBuf1;
             rReadyBusyCDCBuf1 <= wReadyBusyFromNAND;
-            rDbg_DQSFromNAND  <= wDQSFromNAND;
         end
     end
     assign oPHY_ACG_ReadyBusy = rReadyBusyCDCBuf0;
 
     // Debug assignments
-    // oDbg_DQSFromNAND: registered copy of wDQSFromNAND (breaks ISERDES.CLK dedicated path)
+    // oDbg_DQSFromNAND: IDELAYE2 output from NFC_Physical_Input (no extra cycle latency)
     // oDbg_DQSOutEnable: pre-ODDR fabric signal (avoids REQP-1884 from Inst_DQSTODDR .Q)
     // oDbg_DQFromNAND: IOBUF.O for DQ data path (ISERDES.D — not clock path, safe to tap)
-    assign oDbg_DQSFromNAND  = rDbg_DQSFromNAND;
+    assign oDbg_DQSFromNAND  = wDbg_DelayedDQS;
     assign oDbg_DQSOutEnable = iACG_PHY_DQSOutEnable;
     assign oDbg_DQFromNAND   = wDQFromNAND[7:0];
     

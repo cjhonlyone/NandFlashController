@@ -32,6 +32,7 @@ module NFC_Physical_Input
     
     oPI_DQ          ,
     oPI_ValidFlag   ,
+    oDbg_DelayedDQS ,
     iPI_DelayTapLoad,
     iPI_DelayTap    ,
     oPI_DelayReady  ,
@@ -54,6 +55,7 @@ module NFC_Physical_Input
     output          oPI_Buff_Empty      ;
     output  [31:0]  oPI_DQ              ; // DQ, 4 bit * 8 bit data width = 32 bit interface width
     output  [3:0]   oPI_ValidFlag       ; // { Nm1, Nm2, Nm3, Nm4 }
+    output          oDbg_DelayedDQS     ;
     input           iPI_DelayTapLoad    ;
     input   [4:0]   iPI_DelayTap        ;
     output          oPI_DelayReady      ;
@@ -134,6 +136,9 @@ module NFC_Physical_Input
         .I  (wDelayedDQS        ),
         .O  (wDelayedDQSClock   )
     );
+
+    // Debug export: DQS after IDELAYE2 (same phase reference used by capture path)
+    assign oDbg_DelayedDQS = wDelayedDQS;
 
 
     genvar c;
