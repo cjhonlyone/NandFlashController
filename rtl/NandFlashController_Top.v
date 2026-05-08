@@ -402,18 +402,18 @@ module NandFlashController_Top
     // oReadyBusy: aggregate ReadyBusy from all buses
     assign oReadyBusy = wPHY_ACG_ReadyBusy_bus;
 
-    // oDbg: bus0-oriented debug signals for logic analyzer
+    // oDbg: selected-bus debug signals for logic analyzer (bus selected by iBusSelect)
     // [15]=RB0, [14]=CE0, [13]=CLE, [12]=ALE, [11]=RE, [10]=WE, [9]=DQSOutEnable, [8]=DQSFromNAND, [7:0]=DQFromNAND
     assign oDbg = {
-        wPHY_ACG_ReadyBusy_bus[0],
+        wPHY_ACG_ReadyBusy_bus[iBusSelect*NumberOfWays + 0],
         wACG_PHY_ChipEnable[0],
         wACG_PHY_CommandLatchEnable[0],
         wACG_PHY_AddressLatchEnable[0],
         wACG_PHY_ReadEnable[0],
         wACG_PHY_WriteEnable[0],
-        wDbg_DQSOutEnable_bus[0],
-        wDbg_DQSFromNAND_bus[0],
-        wDbg_DQFromNAND_bus[7:0]
+        wDbg_DQSOutEnable_bus[iBusSelect],
+        wDbg_DQSFromNAND_bus[iBusSelect],
+        wDbg_DQFromNAND_bus[iBusSelect*8 +: 8]
     };
 
 

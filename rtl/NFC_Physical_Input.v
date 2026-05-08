@@ -33,6 +33,7 @@ module NFC_Physical_Input
     oPI_DQ          ,
     oPI_ValidFlag   ,
     oDbg_DelayedDQS ,
+    oDbg_DelayedDQ  ,
     iPI_DelayTapLoad,
     iPI_DelayTap    ,
     oPI_DelayReady  ,
@@ -56,6 +57,7 @@ module NFC_Physical_Input
     output  [31:0]  oPI_DQ              ; // DQ, 4 bit * 8 bit data width = 32 bit interface width
     output  [3:0]   oPI_ValidFlag       ; // { Nm1, Nm2, Nm3, Nm4 }
     output          oDbg_DelayedDQS     ;
+    output  [7:0]   oDbg_DelayedDQ      ;
     input           iPI_DelayTapLoad    ;
     input   [4:0]   iPI_DelayTap        ;
     output          oPI_DelayReady      ;
@@ -150,30 +152,28 @@ module NFC_Physical_Input
     generate
     for (c = 0; c < 8; c = c + 1)
     begin: DQIDDRBits    
-        // IDELAYE2
-        // #
-        // (
-        //     .IDELAY_TYPE        ("FIXED"),//"VAR_LOAD" ),
-        //     .DELAY_SRC          ("IDATAIN"  ),
-        //     .IDELAY_VALUE       (IDelayValue),
-        //     .SIGNAL_PATTERN     ("CLOCK"    ),
-        //     .REFCLK_FREQUENCY   (200        )
-        // )
-        // Inst_DQSIDELAY
-        // (
-        //     .CNTVALUEOUT    (                   ),
-        //     .DATAOUT        (wDelayedDQ[c]        ),
-        //     .C              (iDelayRefClock     ),
-        //     .CE             (0                  ),
-        //     .CINVCTRL       (0                  ),
-        //     .CNTVALUEIN     (iPI_DelayTap       ),
-        //     .DATAIN         (0                  ),
-        //     .IDATAIN        (iDQFromNAND[c]       ),
-        //     .INC            (0                  ),
-        //     .LD             (iPI_DelayTapLoad   ),
-        //     .LDPIPEEN       (0                  ),
-        //     .REGRST         (0       )
-        // );
+        IDELAYE2
+        #(
+            .IDELAY_TYPE        ("FIXED"),
+            .DELAY_SRC          ("IDATAIN"),
+            .IDELAY_VALUE       (IDelayValue),
+            .REFCLK_FREQUENCY   (200)
+        )
+        Inst_DQSIDELAY
+        (
+            .CNTVALUEOUT    (                   ),
+            .DATAOUT        (wDelayedDQ[c]      ),
+            .C              (iDelayRefClock     ),
+            .CE             (0                  ),
+            .CINVCTRL       (0                  ),
+            .CNTVALUEIN     (iPI_DelayTap       ),
+            .DATAIN         (0                  ),
+            .IDATAIN        (iDQFromNAND[c]     ),
+            .INC            (0                  ),
+            .LD             (iPI_DelayTapLoad   ),
+            .LDPIPEEN       (0                  ),
+            .REGRST         (0                  )
+        );
 
         IDDR
         #
@@ -195,6 +195,9 @@ module NFC_Physical_Input
         );
     end
     endgenerate
+
+    // Debug export: DQ after IDELAYE2 (same delay domain as oDbg_DelayedDQS)
+    assign oDbg_DelayedDQ = wDelayedDQ;
     
     wire [7:0] DQ_dly        ;
     wire [7:0] DQ_iddr_r     ;

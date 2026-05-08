@@ -133,7 +133,7 @@ module NFC_Physical_Top
     // preserve read-path phase relationship for high-speed external logic analysis.
     output                          oDbg_DQSFromNAND            ; // DQS from NAND after IDELAYE2
     output                          oDbg_DQSOutEnable           ; // DQS direction: 1=FPGA drives, 0=NAND drives
-    output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] received from NAND (IOBUF.O, safe)
+    output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] after IDELAYE2
     
     // Internal Wires/Regs
     
@@ -159,6 +159,7 @@ module NFC_Physical_Top
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf0   ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf1   ;
     wire                            wDbg_DelayedDQS     ;
+    wire    [7:0]                   wDbg_DelayedDQ      ;
 
 
     NFC_Physical_Input
@@ -187,6 +188,7 @@ module NFC_Physical_Top
         .oPI_DQ             (oPI_DQ                     ),
         .oPI_ValidFlag      (oPI_ValidFlag              ),
         .oDbg_DelayedDQS    (wDbg_DelayedDQS            ),
+        .oDbg_DelayedDQ     (wDbg_DelayedDQ             ),
 
         .iPI_Buff_WE        (iACG_PHY_BUFF_WE                ),
         .oPI_Buff_Empty     (oPHY_ACG_BUFF_Empty             ),
@@ -267,10 +269,10 @@ module NFC_Physical_Top
     // Debug assignments
     // oDbg_DQSFromNAND: IDELAYE2 output from NFC_Physical_Input (no extra cycle latency)
     // oDbg_DQSOutEnable: pre-ODDR fabric signal (avoids REQP-1884 from Inst_DQSTODDR .Q)
-    // oDbg_DQFromNAND: IOBUF.O for DQ data path (ISERDES.D — not clock path, safe to tap)
+    // oDbg_DQFromNAND: IDELAYE2 output from NFC_Physical_Input (same delay domain as DQS debug)
     assign oDbg_DQSFromNAND  = wDbg_DelayedDQS;
     assign oDbg_DQSOutEnable = iACG_PHY_DQSOutEnable;
-    assign oDbg_DQFromNAND   = wDQFromNAND[7:0];
+    assign oDbg_DQFromNAND   = wDbg_DelayedDQ;
     
     // Pinpad
     

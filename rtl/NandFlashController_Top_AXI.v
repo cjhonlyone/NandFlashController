@@ -143,15 +143,15 @@ module NandFlashController_Top_AXI
     output wire                                  oDbg_WriteTransValid , // DMA->NAND write data transfer active
     output wire                                  oDbg_ReadPageBusy    , // full ReadPage operation in progress
     output wire                                  oDbg_ProgramPageBusy , // full ProgramPage operation in progress
-    output wire                                  oDbg_RB0             , // bus0 RB[0]
-    output wire                                  oDbg_CE0             , // bus0 CE[0]
-    output wire                                  oDbg_CLE             , // bus0 CLE
-    output wire                                  oDbg_ALE             , // bus0 ALE
-    output wire                                  oDbg_RE              , // bus0 RE
-    output wire                                  oDbg_WE              , // bus0 WE
-    output wire                                  oDbg_DQSFromNAND     , // bus0 DQS from NAND (1-clk registered in PHY)
-    output wire                                  oDbg_DQSOutEnable    , // bus0 DQS direction: 1=FPGA drives, 0=NAND drives
-    output wire [7:0]                            oDbg_DQFromNAND        // bus0 DQ[7:0] from NAND
+    output wire                                  oDbg_RB0             , // selected bus RB[0]
+    output wire                                  oDbg_CE0             , // selected bus CE[0]
+    output wire                                  oDbg_CLE             , // selected bus CLE
+    output wire                                  oDbg_ALE             , // selected bus ALE
+    output wire                                  oDbg_RE              , // selected bus RE
+    output wire                                  oDbg_WE              , // selected bus WE
+    output wire                                  oDbg_DQSFromNAND     , // selected bus DQS from NAND (after IDELAYE2)
+    output wire                                  oDbg_DQSOutEnable    , // selected bus DQS direction: 1=FPGA drives, 0=NAND drives
+    output wire [7:0]                            oDbg_DQFromNAND        // selected bus DQ[7:0] (after IDELAYE2)
 );
 
     wire                         waxil_AxilValid   ;
