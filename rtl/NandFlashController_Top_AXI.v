@@ -143,9 +143,15 @@ module NandFlashController_Top_AXI
     output wire                                  oDbg_WriteTransValid , // DMA->NAND write data transfer active
     output wire                                  oDbg_ReadPageBusy    , // full ReadPage operation in progress
     output wire                                  oDbg_ProgramPageBusy , // full ProgramPage operation in progress
-    output wire                                  oDbg_RxBuffValid     , // PHY input buf valid: NAND→fabric data active (bus 0)
-    output wire                                  oDbg_DQSOutEnable    , // DQS direction: 1=FPGA drives, 0=NAND drives (bus 0)
-    output wire [7:0]                            oDbg_DQFromNAND        // DQ[7:0] from NAND, post-IOBUF (bus 0)
+    output wire                                  oDbg_RB0             , // bus0 RB[0]
+    output wire                                  oDbg_CE0             , // bus0 CE[0]
+    output wire                                  oDbg_CLE             , // bus0 CLE
+    output wire                                  oDbg_ALE             , // bus0 ALE
+    output wire                                  oDbg_RE              , // bus0 RE
+    output wire                                  oDbg_WE              , // bus0 WE
+    output wire                                  oDbg_DQSFromNAND     , // bus0 DQS from NAND (1-clk registered in PHY)
+    output wire                                  oDbg_DQSOutEnable    , // bus0 DQS direction: 1=FPGA drives, 0=NAND drives
+    output wire [7:0]                            oDbg_DQFromNAND        // bus0 DQ[7:0] from NAND
 );
 
     wire                         waxil_AxilValid   ;
@@ -207,7 +213,7 @@ module NandFlashController_Top_AXI
     wire                         wNFCReadTransValid         ;
     
     wire  [NB*NumberOfWays - 1:0]   wNFCReadyBusy              ;
-    wire  [9:0]                      wNFCDbg                    ; // [9]=DQSOutEnable, [8]=RxBuffValid, [7:0]=DQFromNAND
+    wire  [15:0]                     wNFCDbg                    ; // [15]=RB0, [14]=CE0, [13]=CLE, [12]=ALE, [11]=RE, [10]=WE, [9]=DQSOutEnable, [8]=DQSFromNAND, [7:0]=DQFromNAND
     wire                             wNFCReadPageBusy           ;
     wire                             wNFCProgramPageBusy        ;
     // assign dbg_RB = wNFCReadyBusy;
@@ -217,7 +223,13 @@ module NandFlashController_Top_AXI
     assign oDbg_WriteTransValid = wNFCWriteTransValid;
     assign oDbg_ReadPageBusy    = wNFCReadPageBusy;
     assign oDbg_ProgramPageBusy = wNFCProgramPageBusy;
-    assign oDbg_RxBuffValid     = wNFCDbg[8];
+    assign oDbg_RB0             = wNFCDbg[15];
+    assign oDbg_CE0             = wNFCDbg[14];
+    assign oDbg_CLE             = wNFCDbg[13];
+    assign oDbg_ALE             = wNFCDbg[12];
+    assign oDbg_RE              = wNFCDbg[11];
+    assign oDbg_WE              = wNFCDbg[10];
+    assign oDbg_DQSFromNAND     = wNFCDbg[8];
     assign oDbg_DQSOutEnable    = wNFCDbg[9];
     assign oDbg_DQFromNAND      = wNFCDbg[7:0];
 

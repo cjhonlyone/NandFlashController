@@ -123,8 +123,9 @@ module NandFlashController_Top
     input  [NB*NumberOfWays-1:0]   I_NAND_RB               ;
     output [NB-1:0]                O_NAND_WP               ;
 
-    // Debug: [9]=DQSOutEnable(bus0), [8]=RxBuffValid(bus0), [7:0]=DQFromNAND[7:0](bus0)
-    output [9:0]                   oDbg                    ;
+    // Debug bus [15:0] (bus 0):
+    // [15]=RB0, [14]=CE0, [13]=CLE, [12]=ALE, [11]=RE, [10]=WE, [9]=DQSOutEnable, [8]=DQSFromNAND, [7:0]=DQFromNAND
+    output [15:0]                  oDbg                    ;
 
 
 
@@ -205,7 +206,7 @@ module NandFlashController_Top
     wire  [NB-1:0]                wPI_ValidFlag_bus           ; // unused
 
     // Per-bus debug wires (bus 0 routed to oDbg)
-    wire  [NB-1:0]                wDbg_RxBuffValid_bus        ;
+    wire  [NB-1:0]                wDbg_DQSFromNAND_bus        ;
     wire  [NB-1:0]                wDbg_DQSOutEnable_bus       ;
     wire  [NB*8-1:0]              wDbg_DQFromNAND_bus         ;
 
@@ -380,7 +381,7 @@ module NandFlashController_Top
                     .I_NAND_RB                   (I_NAND_RB  [gi*NumberOfWays +: NumberOfWays]  ),
                     .O_NAND_WP                   (O_NAND_WP  [gi]                              ),
                     // Debug: collect per-bus fabric-side debug signals
-                    .oDbg_RxBuffValid            (wDbg_RxBuffValid_bus[gi]              ),
+                    .oDbg_DQSFromNAND            (wDbg_DQSFromNAND_bus[gi]              ),
                     .oDbg_DQSOutEnable           (wDbg_DQSOutEnable_bus[gi]             ),
                     .oDbg_DQFromNAND             (wDbg_DQFromNAND_bus[gi*8 +: 8]        )
                 );
@@ -401,9 +402,19 @@ module NandFlashController_Top
     // oReadyBusy: aggregate ReadyBusy from all buses
     assign oReadyBusy = wPHY_ACG_ReadyBusy_bus;
 
-    // oDbg: debug signals from bus 0 for logic analyzer
-    // [9]=DQSOutEnable, [8]=RxBuffValid, [7:0]=DQFromNAND[7:0]
-    assign oDbg = {wDbg_DQSOutEnable_bus[0], wDbg_RxBuffValid_bus[0], wDbg_DQFromNAND_bus[7:0]};
+    // oDbg: bus0-oriented debug signals for logic analyzer
+    // [15]=RB0, [14]=CE0, [13]=CLE, [12]=ALE, [11]=RE, [10]=WE, [9]=DQSOutEnable, [8]=DQSFromNAND, [7:0]=DQFromNAND
+    assign oDbg = {
+        wPHY_ACG_ReadyBusy_bus[0],
+        wACG_PHY_ChipEnable[0],
+        wACG_PHY_CommandLatchEnable[0],
+        wACG_PHY_AddressLatchEnable[0],
+        wACG_PHY_ReadEnable[0],
+        wACG_PHY_WriteEnable[0],
+        wDbg_DQSOutEnable_bus[0],
+        wDbg_DQSFromNAND_bus[0],
+        wDbg_DQFromNAND_bus[7:0]
+    };
 
 
 endmodule

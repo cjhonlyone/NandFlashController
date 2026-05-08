@@ -128,8 +128,10 @@ module NFC_Physical_Top
     input   [NumberOfWays - 1:0]    I_NAND_RB                   ;
     output                          O_NAND_WP                   ;
 
-    // Debug outputs (fabric signals only — IOBUF.O on DQS ISERDES clock path cannot be tapped)
-    output                          oDbg_RxBuffValid            ; // PHY input buffer valid (NAND→fabric data active)
+    // Debug outputs (fabric signals only)
+    // wDQSFromNAND (IOBUF.O) feeds ISERDES.CLK via dedicated path; direct OBUF tap causes RTSTAT-2.
+    // Fix: register it one iSystemClock cycle to break the dedicated-path constraint.
+    output                          oDbg_DQSFromNAND            ; // DQS received from NAND (1-clk registered, safe)
     output                          oDbg_DQSOutEnable           ; // DQS direction: 1=FPGA drives, 0=NAND drives
     output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] received from NAND (IOBUF.O, safe)
     
@@ -156,6 +158,11 @@ module NFC_Physical_Top
     wire    [NumberOfWays - 1:0]    wReadyBusyFromNAND  ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf0   ;
     reg     [NumberOfWays - 1:0]    rReadyBusyCDCBuf1   ;
+    
+    // Registered copy of DQS received: wDQSFromNAND (IOBUF.O) drives ISERDES.CLK via dedicated
+    // ILOGIC path; routing directly to an OBUF (test pad) causes RTSTAT-2. One register stage
+    // breaks the dedicated path while keeping the signal in the fabric domain.
+    reg                             rDbg_DQSFromNAND    ;
 
 
     NFC_Physical_Input
@@ -245,29 +252,30 @@ module NFC_Physical_Top
     
     assign wWPToNAND = ~iACG_PHY_WriteProtect; // convert WP to WP-
     
-    // Debug assignments: fabric-only signals (avoid IOBUF.O→ISERDES clock dedicated path)
-    // wDQSFromNAND (IOBUF.O) feeds ISERDES via dedicated ILOGIC path → cannot also drive fabric → RTSTAT-2
-    // Use oPHY_ACG_Buff_Valid instead: HIGH when NAND read data is valid in the output buffer
-    assign oDbg_RxBuffValid  = oPHY_ACG_Buff_Valid;
-    // Use the pre-ODDR input as direction indicator (same logic, avoids REQP-1884:
-    // wDQSOutEnableToPinpad is ODDR .Q output and cannot drive fabric/test-IO directly)
-    assign oDbg_DQSOutEnable = iACG_PHY_DQSOutEnable;
-    assign oDbg_DQFromNAND   = wDQFromNAND[7:0];
-    
     always @ (posedge iSystemClock)
     begin
         if (iACG_PHY_PinIn_Reset)
         begin
             rReadyBusyCDCBuf0 <= {(NumberOfWays){1'b0}};
             rReadyBusyCDCBuf1 <= {(NumberOfWays){1'b0}};
+            rDbg_DQSFromNAND  <= 1'b0;
         end
         else
         begin
             rReadyBusyCDCBuf0 <= rReadyBusyCDCBuf1;
             rReadyBusyCDCBuf1 <= wReadyBusyFromNAND;
+            rDbg_DQSFromNAND  <= wDQSFromNAND;
         end
     end
     assign oPHY_ACG_ReadyBusy = rReadyBusyCDCBuf0;
+
+    // Debug assignments
+    // oDbg_DQSFromNAND: registered copy of wDQSFromNAND (breaks ISERDES.CLK dedicated path)
+    // oDbg_DQSOutEnable: pre-ODDR fabric signal (avoids REQP-1884 from Inst_DQSTODDR .Q)
+    // oDbg_DQFromNAND: IOBUF.O for DQ data path (ISERDES.D — not clock path, safe to tap)
+    assign oDbg_DQSFromNAND  = rDbg_DQSFromNAND;
+    assign oDbg_DQSOutEnable = iACG_PHY_DQSOutEnable;
+    assign oDbg_DQFromNAND   = wDQFromNAND[7:0];
     
     // Pinpad
     
