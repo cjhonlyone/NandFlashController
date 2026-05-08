@@ -42,6 +42,9 @@ module NandFlashController_Top
     iReadReady                  ,
     oReadTransValid             ,
 
+    oReadPageBusy               ,
+    oProgramPageBusy            ,
+
     oReadyBusy                  ,
 
     iDelayTapValid              ,
@@ -95,6 +98,10 @@ module NandFlashController_Top
     output  [1:0]                  oReadKeep               ;
     input                          iReadReady              ;
     output                         oReadTransValid         ;
+
+    // Per-operation busy flags (HIGH for full operation duration)
+    output                         oReadPageBusy           ;
+    output                         oProgramPageBusy        ;
     
     output  [NumberOfBuses*NumberOfWays - 1:0]   oReadyBusy              ;
 
@@ -241,6 +248,9 @@ module NandFlashController_Top
             
             .oCI_Top_Status         (oStatus               ),
             .oCI_Top_StatusValid    (oStatusValid          ),
+
+            .oCI_Top_ReadPageBusy    (oReadPageBusy        ),
+            .oCI_Top_ProgramPageBusy (oProgramPageBusy     ),
             
             .oCI_ACG_Command        (wCI_ACG_Command       ),
             .oCI_ACG_CommandOption  (wCI_ACG_CommandOption ),

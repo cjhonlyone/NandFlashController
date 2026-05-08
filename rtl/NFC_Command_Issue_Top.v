@@ -39,6 +39,10 @@ module NFC_Command_Issue_Top
     oCI_Top_Status           ,
     oCI_Top_StatusValid      ,
 
+    // Debug: per-operation busy flags (active HIGH while operation is in progress)
+    oCI_Top_ReadPageBusy     ,
+    oCI_Top_ProgramPageBusy  ,
+
     oCI_ACG_Command          ,  
     oCI_ACG_CommandOption    ,  
 
@@ -94,6 +98,10 @@ module NFC_Command_Issue_Top
 
     output  [23:0]                  oCI_Top_Status        ;
     output                          oCI_Top_StatusValid   ;
+
+    // Debug: HIGH while the respective NAND operation is in progress
+    output                          oCI_Top_ReadPageBusy    ; // ~wRead_CMDReady
+    output                          oCI_Top_ProgramPageBusy ; // ~wProg_CMDReady
     
     output   [7:0]                  oCI_ACG_Command       ;
     output   [2:0]                  oCI_ACG_CommandOption ;
@@ -847,4 +855,7 @@ module NFC_Command_Issue_Top
 
     assign oCI_Top_ReadTransValid  = wRead_TransValid;
     assign oCI_Top_WriteTransValid = wProg_TransValid;
+
+    assign oCI_Top_ReadPageBusy    = ~wRead_CMDReady;
+    assign oCI_Top_ProgramPageBusy = ~wProg_CMDReady;
 endmodule
