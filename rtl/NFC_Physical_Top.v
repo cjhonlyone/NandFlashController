@@ -63,7 +63,12 @@ module NFC_Physical_Top
     O_NAND_ALE              ,
     O_NAND_CLE              ,
     I_NAND_RB               ,
-    O_NAND_WP
+    O_NAND_WP               ,
+
+    // Debug: fabric-side IOBUF outputs (bus 0 tap points for logic analyzer)
+    oDbg_DQSFromNAND        ,
+    oDbg_DQSOutEnable       ,
+    oDbg_DQFromNAND
 );
     // way means number of CE
     // These targets use one DQ together
@@ -122,6 +127,11 @@ module NFC_Physical_Top
     output                          O_NAND_CLE                  ;
     input   [NumberOfWays - 1:0]    I_NAND_RB                   ;
     output                          O_NAND_WP                   ;
+
+    // Debug outputs: fabric-side of IOBUF (safe to route to test pads / ILA)
+    output                          oDbg_DQSFromNAND            ; // DQS received from NAND
+    output                          oDbg_DQSOutEnable           ; // IOBUF T: 0=write, 1=read
+    output  [2:0]                   oDbg_DQFromNAND             ; // DQ[2:0] received from NAND
     
     // Internal Wires/Regs
     
@@ -234,6 +244,11 @@ module NFC_Physical_Top
     );
     
     assign wWPToNAND = ~iACG_PHY_WriteProtect; // convert WP to WP-
+    
+    // Debug assignments: fabric-side IOBUF signals
+    assign oDbg_DQSFromNAND  = wDQSFromNAND;
+    assign oDbg_DQSOutEnable = wDQSOutEnableToPinpad;
+    assign oDbg_DQFromNAND   = wDQFromNAND[2:0];
     
     always @ (posedge iSystemClock)
     begin

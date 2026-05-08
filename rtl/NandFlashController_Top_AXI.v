@@ -134,7 +134,12 @@ module NandFlashController_Top_AXI
     input  wire [NumberOfBuses*NumberOfWays-1:0] I_NAND_RB          ,
     output wire [NumberOfBuses-1:0]              O_NAND_WP         ,
 
-    output wire                                  oInterrupt
+    output wire                                  oInterrupt        ,
+
+    // Debug: 8 fabric signals for logic analyzer via test pads
+    // [7]=WriteTransValid [6]=ReadTransValid [5]=CMDReady
+    // [4]=DQSOutEnable(bus0) [3]=DQSFromNAND(bus0) [2:0]=DQFromNAND[2:0](bus0)
+    output wire [7:0]                            oDbg
 );
 
     wire                         waxil_AxilValid   ;
@@ -196,8 +201,10 @@ module NandFlashController_Top_AXI
     wire                         wNFCReadTransValid         ;
     
     wire  [NB*NumberOfWays - 1:0]   wNFCReadyBusy              ;
+    wire  [4:0]                      wNFCDbg                    ;
     // assign dbg_RB = wNFCReadyBusy;
     assign oInterrupt = wNFCCMDReady;
+    assign oDbg = {wNFCWriteTransValid, wNFCReadTransValid, wNFCCMDReady, wNFCDbg};
 
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
@@ -426,7 +433,8 @@ module NandFlashController_Top_AXI
             .O_NAND_ALE          (O_NAND_ALE),
             .O_NAND_CLE          (O_NAND_CLE),
             .I_NAND_RB           (I_NAND_RB),
-            .O_NAND_WP           (O_NAND_WP)
+            .O_NAND_WP           (O_NAND_WP),
+            .oDbg                (wNFCDbg)
         );
 
     // Parameters
