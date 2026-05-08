@@ -128,10 +128,10 @@ module NFC_Physical_Top
     input   [NumberOfWays - 1:0]    I_NAND_RB                   ;
     output                          O_NAND_WP                   ;
 
-    // Debug outputs: fabric-side of IOBUF (safe to route to test pads / ILA)
-    output                          oDbg_DQSFromNAND            ; // DQS received from NAND
-    output                          oDbg_DQSOutEnable           ; // IOBUF T: 0=write, 1=read
-    output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] received from NAND
+    // Debug outputs (fabric signals only — IOBUF.O on DQS ISERDES clock path cannot be tapped)
+    output                          oDbg_RxBuffValid            ; // PHY input buffer valid (NAND→fabric data active)
+    output                          oDbg_DQSOutEnable           ; // DQS direction: 1=FPGA drives, 0=NAND drives
+    output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] received from NAND (IOBUF.O, safe)
     
     // Internal Wires/Regs
     
@@ -245,8 +245,10 @@ module NFC_Physical_Top
     
     assign wWPToNAND = ~iACG_PHY_WriteProtect; // convert WP to WP-
     
-    // Debug assignments: fabric-side IOBUF signals
-    assign oDbg_DQSFromNAND  = wDQSFromNAND;
+    // Debug assignments: fabric-only signals (avoid IOBUF.O→ISERDES clock dedicated path)
+    // wDQSFromNAND (IOBUF.O) feeds ISERDES via dedicated ILOGIC path → cannot also drive fabric → RTSTAT-2
+    // Use oPHY_ACG_Buff_Valid instead: HIGH when NAND read data is valid in the output buffer
+    assign oDbg_RxBuffValid  = oPHY_ACG_Buff_Valid;
     // Use the pre-ODDR input as direction indicator (same logic, avoids REQP-1884:
     // wDQSOutEnableToPinpad is ODDR .Q output and cannot drive fabric/test-IO directly)
     assign oDbg_DQSOutEnable = iACG_PHY_DQSOutEnable;
