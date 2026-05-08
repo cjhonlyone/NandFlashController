@@ -197,7 +197,7 @@ module NandFlashController_Top_AXI
     
     wire  [NB*NumberOfWays - 1:0]   wNFCReadyBusy              ;
     // assign dbg_RB = wNFCReadyBusy;
-    assign oInterrupt = wNFCCMDReady;
+    assign oInterrupt = ~wNFCCMDReady;
 
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
