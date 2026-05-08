@@ -131,7 +131,7 @@ module NFC_Physical_Top
     // Debug outputs: fabric-side of IOBUF (safe to route to test pads / ILA)
     output                          oDbg_DQSFromNAND            ; // DQS received from NAND
     output                          oDbg_DQSOutEnable           ; // IOBUF T: 0=write, 1=read
-    output  [2:0]                   oDbg_DQFromNAND             ; // DQ[2:0] received from NAND
+    output  [7:0]                   oDbg_DQFromNAND             ; // DQ[7:0] received from NAND
     
     // Internal Wires/Regs
     
@@ -248,7 +248,7 @@ module NFC_Physical_Top
     // Debug assignments: fabric-side IOBUF signals
     assign oDbg_DQSFromNAND  = wDQSFromNAND;
     assign oDbg_DQSOutEnable = wDQSOutEnableToPinpad;
-    assign oDbg_DQFromNAND   = wDQFromNAND[2:0];
+    assign oDbg_DQFromNAND   = wDQFromNAND[7:0];
     
     always @ (posedge iSystemClock)
     begin

@@ -116,8 +116,8 @@ module NandFlashController_Top
     input  [NB*NumberOfWays-1:0]   I_NAND_RB               ;
     output [NB-1:0]                O_NAND_WP               ;
 
-    // Debug: [4]=DQSOutEnable(bus0), [3]=DQSFromNAND(bus0), [2:0]=DQFromNAND[2:0](bus0)
-    output [4:0]                   oDbg                    ;
+    // Debug: [9]=DQSOutEnable(bus0), [8]=DQSFromNAND(bus0), [7:0]=DQFromNAND[7:0](bus0)
+    output [9:0]                   oDbg                    ;
 
 
 
@@ -200,7 +200,7 @@ module NandFlashController_Top
     // Per-bus debug wires (bus 0 routed to oDbg)
     wire  [NB-1:0]                wDbg_DQSFromNAND_bus        ;
     wire  [NB-1:0]                wDbg_DQSOutEnable_bus       ;
-    wire  [NB*3-1:0]              wDbg_DQFromNAND_bus         ;
+    wire  [NB*8-1:0]              wDbg_DQFromNAND_bus         ;
 
     // Dummy wire for CI ReadyBusy output (oReadyBusy now sourced from all PHY instances)
     wire  [NumberOfWays-1:0]      wCI_Top_ReadyBusy_unused    ;
@@ -372,7 +372,7 @@ module NandFlashController_Top
                     // Debug: collect per-bus fabric-side IOBUF signals
                     .oDbg_DQSFromNAND            (wDbg_DQSFromNAND_bus[gi]              ),
                     .oDbg_DQSOutEnable           (wDbg_DQSOutEnable_bus[gi]             ),
-                    .oDbg_DQFromNAND             (wDbg_DQFromNAND_bus[gi*3 +: 3]        )
+                    .oDbg_DQFromNAND             (wDbg_DQFromNAND_bus[gi*8 +: 8]        )
                 );
         end
     endgenerate
@@ -392,7 +392,8 @@ module NandFlashController_Top
     assign oReadyBusy = wPHY_ACG_ReadyBusy_bus;
 
     // oDbg: debug signals from bus 0 for logic analyzer
-    assign oDbg = {wDbg_DQSOutEnable_bus[0], wDbg_DQSFromNAND_bus[0], wDbg_DQFromNAND_bus[2:0]};
+    // [9]=DQSOutEnable, [8]=DQSFromNAND, [7:0]=DQFromNAND[7:0]
+    assign oDbg = {wDbg_DQSOutEnable_bus[0], wDbg_DQSFromNAND_bus[0], wDbg_DQFromNAND_bus[7:0]};
 
 
 endmodule

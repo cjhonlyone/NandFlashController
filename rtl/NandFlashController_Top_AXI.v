@@ -136,10 +136,14 @@ module NandFlashController_Top_AXI
 
     output wire                                  oInterrupt        ,
 
-    // Debug: 8 fabric signals for logic analyzer via test pads
-    // [7]=WriteTransValid [6]=ReadTransValid [5]=CMDReady
-    // [4]=DQSOutEnable(bus0) [3]=DQSFromNAND(bus0) [2:0]=DQFromNAND[2:0](bus0)
-    output wire [7:0]                            oDbg
+    // Debug ports (oDbg_ prefix): fabric-side signals for logic analyzer via test pads.
+    // Connect any 8 of these to board test pads in XDC.
+    output wire                                  oDbg_CMDReady        , // controller idle (rising = cmd done)
+    output wire                                  oDbg_ReadTransValid  , // NAND->DMA read transfer active
+    output wire                                  oDbg_WriteTransValid , // DMA->NAND write transfer active
+    output wire                                  oDbg_DQSFromNAND     , // DQS from NAND, post-IOBUF (bus 0)
+    output wire                                  oDbg_DQSOutEnable    , // IOBUF T: 0=write, 1=read (bus 0)
+    output wire [7:0]                            oDbg_DQFromNAND        // DQ[7:0] from NAND, post-IOBUF (bus 0)
 );
 
     wire                         waxil_AxilValid   ;
@@ -201,10 +205,15 @@ module NandFlashController_Top_AXI
     wire                         wNFCReadTransValid         ;
     
     wire  [NB*NumberOfWays - 1:0]   wNFCReadyBusy              ;
-    wire  [4:0]                      wNFCDbg                    ;
+    wire  [9:0]                      wNFCDbg                    ; // [9]=DQSOutEnable, [8]=DQSFromNAND, [7:0]=DQFromNAND
     // assign dbg_RB = wNFCReadyBusy;
-    assign oInterrupt = wNFCCMDReady;
-    assign oDbg = {wNFCWriteTransValid, wNFCReadTransValid, wNFCCMDReady, wNFCDbg};
+    assign oInterrupt          = wNFCCMDReady;
+    assign oDbg_CMDReady       = wNFCCMDReady;
+    assign oDbg_ReadTransValid = wNFCReadTransValid;
+    assign oDbg_WriteTransValid= wNFCWriteTransValid;
+    assign oDbg_DQSFromNAND    = wNFCDbg[8];
+    assign oDbg_DQSOutEnable   = wNFCDbg[9];
+    assign oDbg_DQFromNAND     = wNFCDbg[7:0];
 
     assign m_axi_clk = s_axil_clk;
     assign m_axi_rst = s_axil_rst;
